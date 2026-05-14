@@ -30,6 +30,7 @@ lib/
   services/
     media/                 # PlaybackEngine and media_kit adapter.
     ffmpeg/                # ffprobe, FFmpeg commands, jobs, editor use cases.
+    storage/               # Local JSON library and playlist persistence.
 
 docs/                      # Architecture and media-learning notes.
 logs/                      # Platform progress logs.
@@ -68,8 +69,11 @@ flowchart TD
   cancellation.
 - `FfprobeMediaInspector` owns media metadata extraction.
 - `PlaybackEngine` lets the app replace `media_kit` later if needed.
-- `PlaybackQueueController` owns playlist, shuffle, repeat, folder scan settings,
-  and automatic next-track behavior.
+- `PlaybackQueueController` owns the library, user playlists, the independent
+  playback queue, playback modes, folder scan settings, and automatic
+  next-track behavior.
+- `HeniLibraryStore` persists library directories, manually added file paths,
+  playlist path references, and scan settings in a small JSON file.
 
 ## Windows Commands
 
@@ -93,14 +97,42 @@ build/windows/x64/runner/Release/heni.exe
 - Local audio/video picker.
 - Local folder scanner.
 - Local scenery image picker.
-- In-memory playlists.
-- Full-screen scenery background with fallback painting.
+- Library that merges media from multiple folders and imported files.
+- Playlists that reference library media paths without copying source files.
+- Explicit "加入歌单" action in the library view for adding library media to
+  user playlists.
+- Playlist-page "从曲库添加" flow with search and multi-select bulk add.
+- Playlist sidebar three-dot menu for add-from-library, rename, description,
+  and delete actions.
+- Local JSON config restore for library roots, file imports, playlists, and
+  basic scan settings.
+- Playlist browsing that does not interrupt the current playback queue.
+- Desktop music-player layout:
+  - Minimal top navigation with Heni, 美景/歌曲, centered palette selector, and
+    settings.
+  - Left playlist sidebar.
+  - Top "歌曲" means the playlist/song-list view; left-side "曲库" is the
+    built-in all-media collection.
+  - Main playback/content area.
+  - Bottom transport bar.
+- Scenery background with fallback painting.
 - Actual video output for video files.
-- Palette switching.
-- UI style switching: Scenery, Cinema, Library.
+- Compact top palette switching with solid color swatches, black/white choices,
+  selected glow, and expanded preset themes.
+- Active palette tinting across the top bar, sidebar, selected playlist rows,
+  bottom bar, and utility controls.
+- UI style switching: 美景, 歌曲.
+- Chinese UI copy for the main Windows player.
+- Unified typography preferring Microsoft YaHei.
 - Basic transport controls.
-- Shuffle, repeat all, and repeat one.
+- Previous/next controls backed by the current playback queue.
+- Icon-only playback mode control: 顺序播放, 列表循环, 单曲循环, 随机播放.
 - Progress slider.
+- Speaker-only volume control with a bare palette-colored vertical slider that
+  opens at the current cached volume.
+- Cleaner bottom bar layout with now-playing, centered transport/progress, and
+  right-side utility controls.
+- Optional local lyric panel for same-name `.lrc` and `.txt` files.
 - ffprobe media detail display.
 - FLAC audio extraction with FFmpeg progress state.
 
@@ -109,5 +141,5 @@ build/windows/x64/runner/Release/heni.exe
 1. Manually test real playback and extraction.
 2. Improve the player layout after seeing it in the running app.
 3. Add media detail/debug panel for codec learning.
-4. Add playlist rename/delete/reorder.
-5. Persist theme, scenery, settings, and playlists.
+4. Add playlist reorder.
+5. Persist theme and scenery pack.

@@ -2,6 +2,8 @@
 
 Heni starts as a local player, but its structure leaves room for trimming,
 transcoding, waveform extraction, and mobile/desktop platform differences.
+The Windows player currently separates the library, browsed playlists, and the
+active playback queue so browsing does not interrupt playback.
 
 ## Guiding Rules
 
@@ -21,6 +23,7 @@ flowchart TD
   State --> Scenery["Scenery state"]
   State --> Probe["MediaInspector"]
   State --> Export["AudioExportController"]
+  State --> Store["HeniLibraryStore / JSON"]
   Queue --> Scanner["LocalMediaScanner"]
   Playback --> MediaKit["media_kit"]
   Playback --> Video["media_kit_video"]
@@ -43,6 +46,8 @@ lib/
 ## Future Expansion Points
 
 - Media library persistence can be added under `data/` with Drift/SQLite.
+- The current Windows implementation starts with a small JSON store for library
+  roots, imported file paths, playlist references, and scan settings.
 - Editing can start with process-backed FFmpeg jobs before considering native
   bindings.
 - Android/iOS-specific storage permissions should stay in platform services,

@@ -6,6 +6,7 @@ abstract interface class PlaybackEngine {
   Stream<Duration> get position;
   Stream<Duration> get duration;
   Stream<double> get volume;
+  double get currentVolume;
 
   Future<void> openItem(MediaItem item, {bool play});
   Future<void> openPath(String path, {bool play});

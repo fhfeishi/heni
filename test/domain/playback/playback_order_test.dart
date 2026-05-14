@@ -40,6 +40,33 @@ void main() {
       expect(move.index, 2);
     });
 
+    test('previous moves backward in the current order', () {
+      final order = PlaybackOrder.linear(4, currentIndex: 2);
+
+      final move = order.previous(HeniRepeatMode.none);
+
+      expect(move.shouldPlay, isTrue);
+      expect(move.index, 1);
+    });
+
+    test('previous at the first item restarts the current item', () {
+      final order = PlaybackOrder.linear(4);
+
+      final move = order.previous(HeniRepeatMode.none);
+
+      expect(move.shouldPlay, isTrue);
+      expect(move.index, 0);
+    });
+
+    test('previous wraps when list loop is active', () {
+      final order = PlaybackOrder.linear(4);
+
+      final move = order.previous(HeniRepeatMode.all);
+
+      expect(move.shouldPlay, isTrue);
+      expect(move.index, 3);
+    });
+
     test('shuffle keeps the current item first', () {
       final order = PlaybackOrder.shuffled(
         5,
@@ -49,6 +76,20 @@ void main() {
 
       expect(order.currentIndex, 3);
       expect(order.indices.toSet(), {0, 1, 2, 3, 4});
+    });
+  });
+
+  group('HeniPlaybackMode', () {
+    test('cycles through player-facing modes', () {
+      expect(HeniPlaybackMode.sequence.next, HeniPlaybackMode.listLoop);
+      expect(HeniPlaybackMode.listLoop.next, HeniPlaybackMode.singleLoop);
+      expect(HeniPlaybackMode.singleLoop.next, HeniPlaybackMode.random);
+      expect(HeniPlaybackMode.random.next, HeniPlaybackMode.sequence);
+    });
+
+    test('maps random playback to shuffled list looping', () {
+      expect(HeniPlaybackMode.random.shuffle, isTrue);
+      expect(HeniPlaybackMode.random.repeatMode, HeniRepeatMode.all);
     });
   });
 }

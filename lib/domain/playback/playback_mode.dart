@@ -13,14 +13,62 @@ enum HeniRepeatMode {
 
   String get label {
     return switch (this) {
-      HeniRepeatMode.none => 'No repeat',
-      HeniRepeatMode.all => 'Repeat all',
-      HeniRepeatMode.one => 'Repeat one',
+      HeniRepeatMode.none => '不循环',
+      HeniRepeatMode.all => '列表循环',
+      HeniRepeatMode.one => '单曲循环',
     };
   }
 }
 
-enum PlaybackAdvance {
-  user,
-  automatic,
+enum HeniPlaybackMode {
+  sequence,
+  listLoop,
+  singleLoop,
+  random;
+
+  HeniPlaybackMode get next {
+    return switch (this) {
+      HeniPlaybackMode.sequence => HeniPlaybackMode.listLoop,
+      HeniPlaybackMode.listLoop => HeniPlaybackMode.singleLoop,
+      HeniPlaybackMode.singleLoop => HeniPlaybackMode.random,
+      HeniPlaybackMode.random => HeniPlaybackMode.sequence,
+    };
+  }
+
+  String get label {
+    return switch (this) {
+      HeniPlaybackMode.sequence => '顺序播放',
+      HeniPlaybackMode.listLoop => '列表循环',
+      HeniPlaybackMode.singleLoop => '单曲循环',
+      HeniPlaybackMode.random => '随机播放',
+    };
+  }
+
+  HeniRepeatMode get repeatMode {
+    return switch (this) {
+      HeniPlaybackMode.sequence => HeniRepeatMode.none,
+      HeniPlaybackMode.listLoop => HeniRepeatMode.all,
+      HeniPlaybackMode.singleLoop => HeniRepeatMode.one,
+      HeniPlaybackMode.random => HeniRepeatMode.all,
+    };
+  }
+
+  bool get shuffle => this == HeniPlaybackMode.random;
+
+  static HeniPlaybackMode fromState({
+    required HeniRepeatMode repeatMode,
+    required bool shuffle,
+  }) {
+    if (shuffle) {
+      return HeniPlaybackMode.random;
+    }
+
+    return switch (repeatMode) {
+      HeniRepeatMode.none => HeniPlaybackMode.sequence,
+      HeniRepeatMode.all => HeniPlaybackMode.listLoop,
+      HeniRepeatMode.one => HeniPlaybackMode.singleLoop,
+    };
+  }
 }
+
+enum PlaybackAdvance { user, automatic }

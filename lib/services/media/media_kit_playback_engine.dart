@@ -1,12 +1,21 @@
+import 'dart:async';
+
 import 'package:media_kit/media_kit.dart';
 
 import '../../domain/media/media_item.dart';
 import 'playback_engine.dart';
 
 class MediaKitPlaybackEngine implements PlaybackEngine {
-  MediaKitPlaybackEngine({Player? player}) : _player = player ?? Player();
+  MediaKitPlaybackEngine({Player? player}) : _player = player ?? Player() {
+    _currentVolume = _player.state.volume.clamp(0, 100).toDouble();
+    _volumeSubscription = _player.stream.volume.listen((volume) {
+      _currentVolume = volume.clamp(0, 100).toDouble();
+    });
+  }
 
   final Player _player;
+  late double _currentVolume;
+  StreamSubscription<double>? _volumeSubscription;
 
   Player get player => _player;
 
@@ -24,6 +33,9 @@ class MediaKitPlaybackEngine implements PlaybackEngine {
 
   @override
   Stream<double> get volume => _player.stream.volume;
+
+  @override
+  double get currentVolume => _currentVolume;
 
   @override
   Future<void> openPath(String path, {bool play = false}) {
@@ -45,11 +57,18 @@ class MediaKitPlaybackEngine implements PlaybackEngine {
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
-  Future<void> setVolume(double volume) => _player.setVolume(volume);
+  Future<void> setVolume(double volume) {
+    final nextVolume = volume.clamp(0, 100).toDouble();
+    _currentVolume = nextVolume;
+    return _player.setVolume(nextVolume);
+  }
 
   @override
   Future<void> stop() => _player.stop();
 
   @override
-  Future<void> dispose() => _player.dispose();
+  Future<void> dispose() async {
+    await _volumeSubscription?.cancel();
+    await _player.dispose();
+  }
 }
