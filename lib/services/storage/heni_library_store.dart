@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../domain/playback/playback_mode.dart';
+
 final heniLibraryStoreProvider = Provider<HeniLibraryStore>((ref) {
   return FileHeniLibraryStore();
 });
@@ -19,6 +21,11 @@ class HeniLibraryConfig {
     this.libraryFiles = const [],
     this.playlists = const [],
     this.activePlaylistId,
+    this.sceneryImagePaths = const [],
+    this.activePaletteName,
+    this.activeUiStyle,
+    this.playbackModeName,
+    this.volumeLevel,
     this.recursiveScan = true,
     this.includeVideo = true,
     this.autoplayOnLoad = true,
@@ -32,6 +39,11 @@ class HeniLibraryConfig {
         json['playlists'],
       ).map(HeniPlaylistConfig.fromJson).toList(growable: false),
       activePlaylistId: _string(json['activePlaylistId']),
+      sceneryImagePaths: _stringList(json['sceneryImagePaths']),
+      activePaletteName: _string(json['activePaletteName']),
+      activeUiStyle: _string(json['activeUiStyle']),
+      playbackModeName: _string(json['playbackModeName']),
+      volumeLevel: _double(json['volumeLevel']),
       recursiveScan: _bool(json['recursiveScan']) ?? true,
       includeVideo: _bool(json['includeVideo']) ?? true,
       autoplayOnLoad: _bool(json['autoplayOnLoad']) ?? true,
@@ -42,15 +54,36 @@ class HeniLibraryConfig {
   final List<String> libraryFiles;
   final List<HeniPlaylistConfig> playlists;
   final String? activePlaylistId;
+  final List<String> sceneryImagePaths;
+  final String? activePaletteName;
+  final String? activeUiStyle;
+  final String? playbackModeName;
+  final double? volumeLevel;
   final bool recursiveScan;
   final bool includeVideo;
   final bool autoplayOnLoad;
+
+  HeniPlaybackMode? get playbackMode {
+    final modeName = playbackModeName;
+    if (modeName == null) {
+      return null;
+    }
+    return HeniPlaybackMode.values.firstWhere(
+      (mode) => mode.name == modeName,
+      orElse: () => HeniPlaybackMode.sequence,
+    );
+  }
 
   bool get isEmpty {
     return libraryDirectories.isEmpty &&
         libraryFiles.isEmpty &&
         playlists.isEmpty &&
-        activePlaylistId == null;
+        activePlaylistId == null &&
+        sceneryImagePaths.isEmpty &&
+        activePaletteName == null &&
+        activeUiStyle == null &&
+        playbackModeName == null &&
+        volumeLevel == null;
   }
 
   Map<String, Object?> toJson() {
@@ -60,6 +93,11 @@ class HeniLibraryConfig {
       'libraryFiles': libraryFiles,
       'playlists': playlists.map((playlist) => playlist.toJson()).toList(),
       'activePlaylistId': activePlaylistId,
+      'sceneryImagePaths': sceneryImagePaths,
+      'activePaletteName': activePaletteName,
+      'activeUiStyle': activeUiStyle,
+      'playbackModeName': playbackModeName,
+      'volumeLevel': volumeLevel,
       'recursiveScan': recursiveScan,
       'includeVideo': includeVideo,
       'autoplayOnLoad': autoplayOnLoad,
@@ -184,4 +222,12 @@ String? _string(Object? value) {
 
 bool? _bool(Object? value) {
   return value is bool ? value : null;
+}
+
+double? _double(Object? value) {
+  return switch (value) {
+    final int number => number.toDouble(),
+    final double number => number,
+    _ => null,
+  };
 }

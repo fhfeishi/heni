@@ -1,5 +1,42 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+Color heniReadableForegroundOn(Color color) {
+  final blackContrast = _contrastRatio(Colors.black, color);
+  final whiteContrast = _contrastRatio(Colors.white, color);
+  return whiteContrast >= blackContrast ? Colors.white : Colors.black;
+}
+
+Color heniAccentOnGlass(Color color, {double alpha = 1}) {
+  final luminance = color.computeLuminance();
+  final lift =
+      luminance < 0.58
+          ? ((0.58 - luminance) / 0.58).clamp(0.0, 1.0) * 0.78
+          : 0.0;
+  return Color.lerp(color, Colors.white, lift)!.withValues(alpha: alpha);
+}
+
+double _contrastRatio(Color foreground, Color background) {
+  final lighter = _relativeLuminance(foreground) + 0.05;
+  final darker = _relativeLuminance(background) + 0.05;
+  return lighter > darker ? lighter / darker : darker / lighter;
+}
+
+double _relativeLuminance(Color color) {
+  double channel(double value) {
+    final normalized = value / 255.0;
+    if (normalized <= 0.03928) {
+      return normalized / 12.92;
+    }
+    return pow((normalized + 0.055) / 1.055, 2.4).toDouble();
+  }
+
+  return 0.2126 * channel((color.r * 255.0).roundToDouble()) +
+      0.7152 * channel((color.g * 255.0).roundToDouble()) +
+      0.0722 * channel((color.b * 255.0).roundToDouble());
+}
 
 final activePaletteProvider = NotifierProvider<ActivePalette, HeniPalette>(
   ActivePalette.new,
@@ -16,6 +53,13 @@ class ActivePalette extends Notifier<HeniPalette> {
   void select(HeniPalette palette) {
     state = palette;
   }
+
+  void restoreByName(String name) {
+    state = HeniPalette.all.firstWhere(
+      (palette) => palette.name == name,
+      orElse: () => HeniPalette.nocturne,
+    );
+  }
 }
 
 class ActiveUiStyle extends Notifier<HeniUiStyle> {
@@ -25,10 +69,17 @@ class ActiveUiStyle extends Notifier<HeniUiStyle> {
   void select(HeniUiStyle style) {
     state = style;
   }
+
+  void restoreByName(String name) {
+    state = HeniUiStyle.values.firstWhere(
+      (style) => style.name == name,
+      orElse: () => HeniUiStyle.scenery,
+    );
+  }
 }
 
 enum HeniUiStyle {
-  scenery('美景'),
+  scenery('播放中'),
   library('歌曲');
 
   const HeniUiStyle(this.label);
@@ -204,7 +255,11 @@ class HeniTheme {
     final scheme = ColorScheme.fromSeed(
       seedColor: palette.seed,
       brightness: Brightness.dark,
-    ).copyWith(surface: palette.surface);
+    ).copyWith(
+      surface: palette.surface,
+      primary: palette.accent,
+      onPrimary: heniReadableForegroundOn(palette.accent),
+    );
 
     return _base(scheme, palette);
   }
@@ -213,18 +268,79 @@ class HeniTheme {
     final scheme = ColorScheme.fromSeed(
       seedColor: palette.seed,
       brightness: Brightness.light,
+    ).copyWith(
+      primary: palette.accent,
+      onPrimary: heniReadableForegroundOn(palette.accent),
     );
 
     return _base(scheme, palette);
   }
 
   static ThemeData _base(ColorScheme scheme, HeniPalette palette) {
+    final textTheme = Typography.whiteMountainView.apply(
+      bodyColor: scheme.onSurface,
+      displayColor: scheme.onSurface,
+      fontFamily: 'Microsoft YaHei',
+    );
+
     return ThemeData(
       colorScheme: scheme,
       useMaterial3: true,
       fontFamily: 'Microsoft YaHei',
       fontFamilyFallback: const ['Segoe UI', 'Arial', 'sans-serif'],
       scaffoldBackgroundColor: palette.surface,
+      textTheme: textTheme.copyWith(
+        headlineMedium: textTheme.headlineMedium?.copyWith(
+          fontSize: 31,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0,
+          height: 1.08,
+        ),
+        headlineSmall: textTheme.headlineSmall?.copyWith(
+          fontSize: 24,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0,
+          height: 1.12,
+        ),
+        titleLarge: textTheme.titleLarge?.copyWith(
+          fontSize: 21,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0,
+        ),
+        titleMedium: textTheme.titleMedium?.copyWith(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+        ),
+        titleSmall: textTheme.titleSmall?.copyWith(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+        ),
+        bodyMedium: textTheme.bodyMedium?.copyWith(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0,
+          height: 1.35,
+        ),
+        bodySmall: textTheme.bodySmall?.copyWith(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0,
+          height: 1.3,
+        ),
+        labelLarge: textTheme.labelLarge?.copyWith(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+        ),
+        labelMedium: textTheme.labelMedium?.copyWith(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+        ),
+      ),
+      dividerColor: Colors.white.withValues(alpha: 0.08),
       sliderTheme: SliderThemeData(
         activeTrackColor: palette.accent,
         thumbColor: palette.accent,
@@ -233,16 +349,106 @@ class HeniTheme {
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           foregroundColor: scheme.onSurface,
-          fixedSize: const Size.square(46),
+          fixedSize: const Size.square(42),
+          padding: EdgeInsets.zero,
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: palette.accent,
-          foregroundColor: Colors.black,
-          minimumSize: const Size(44, 44),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          foregroundColor: scheme.onPrimary,
+          minimumSize: const Size(46, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
         ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: scheme.onSurface,
+          minimumSize: const Size(46, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.05),
+        hintStyle: textTheme.bodySmall?.copyWith(
+          color: Colors.white.withValues(alpha: 0.42),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(color: palette.seed.withValues(alpha: 0.42)),
+        ),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          ),
+          side: WidgetStatePropertyAll(
+            BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+          ),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return palette.seed.withValues(alpha: 0.18);
+            }
+            return Colors.white.withValues(alpha: 0.03);
+          }),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        backgroundColor: Color.alphaBlend(
+          palette.surfaceAlt.withValues(alpha: 0.92),
+          palette.surface,
+        ),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        titleTextStyle: textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w900,
+        ),
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: Colors.white.withValues(alpha: 0.76),
+          height: 1.45,
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: Color.alphaBlend(
+          palette.surfaceAlt.withValues(alpha: 0.94),
+          palette.surface,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        menuPadding: const EdgeInsets.symmetric(vertical: 8),
+        textStyle: textTheme.bodyMedium,
       ),
     );
   }

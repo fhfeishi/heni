@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../design/app_theme.dart';
 import '../../../domain/media/media_item.dart';
 import '../../../domain/media/media_path.dart';
 import '../../../domain/playback/heni_playlist.dart';
@@ -31,7 +32,12 @@ final playbackQueueControllerProvider =
 
 class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   StreamSubscription<bool>? _completedSubscription;
+  Timer? _volumePersistTimer;
   final _random = Random();
+  String? _persistedPaletteName;
+  String? _persistedUiStyleName;
+  List<String> _persistedSceneryImagePaths = const [];
+  double? _persistedVolumeLevel;
 
   @override
   PlaybackQueueState build() {
@@ -44,6 +50,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     });
     ref.onDispose(() {
       _completedSubscription?.cancel();
+      _volumePersistTimer?.cancel();
     });
     unawaited(_restorePersistedState());
 
@@ -217,6 +224,73 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     }
   }
 
+  Future<void> refreshLibrary() async {
+    if (state.libraryDirectories.isEmpty && state.libraryFilePaths.isEmpty) {
+      state = state.copyWith(statusMessage: '还没有可刷新的曲库来源', lastError: null);
+      return;
+    }
+
+    state = state.copyWith(
+      isScanning: true,
+      statusMessage: '正在刷新曲库...',
+      lastError: null,
+    );
+
+    try {
+      final config = HeniLibraryConfig(
+        libraryDirectories: state.libraryDirectories,
+        libraryFiles: state.libraryFilePaths,
+        playlists: [
+          for (final playlist in state.playlists)
+            HeniPlaylistConfig(
+              id: playlist.id,
+              name: playlist.name,
+              description: playlist.description,
+              itemPaths: playlist.items.map((item) => item.path).toList(),
+            ),
+        ],
+        activePlaylistId: state.activePlaylistId,
+        playbackModeName: state.playbackMode.name,
+        recursiveScan: state.recursiveScan,
+        includeVideo: state.includeVideo,
+        autoplayOnLoad: state.autoplayOnLoad,
+      );
+      final libraryItems = await _scanConfiguredLibrary(config);
+      final itemByPath = {
+        for (final item in libraryItems) _pathKey(item.path): item,
+      };
+      final playlists = [
+        for (final playlist in state.playlists)
+          playlist.copyWith(
+            items: [
+              for (final item in playlist.items)
+                if (itemByPath[_pathKey(item.path)]
+                    case final MediaItem refreshed)
+                  refreshed,
+            ],
+          ),
+      ];
+
+      state = state.copyWith(
+        library: state.library.copyWith(items: libraryItems),
+        playlists: playlists,
+        isScanning: false,
+        statusMessage:
+            libraryItems.isEmpty
+                ? '曲库已刷新，暂未找到媒体文件'
+                : '曲库已刷新 ${libraryItems.length} 首',
+        lastError: null,
+      );
+      unawaited(_persistState());
+    } catch (error) {
+      state = state.copyWith(
+        isScanning: false,
+        statusMessage: '曲库刷新失败',
+        lastError: error.toString(),
+      );
+    }
+  }
+
   Future<void> playIndex(int index) async {
     final source = state.activePlaylist;
     if (index < 0 || index >= source.items.length) {
@@ -312,6 +386,102 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     unawaited(_persistState());
   }
 
+  void removeItemsFromPlaylist(String playlistId, Iterable<MediaItem> items) {
+    if (playlistId == heniLibraryPlaylistId) {
+      return;
+    }
+
+    final removals = {for (final item in items) _pathKey(item.path)};
+    if (removals.isEmpty) {
+      return;
+    }
+
+    final index = state.playlists.indexWhere(
+      (playlist) => playlist.id == playlistId,
+    );
+    if (index < 0) {
+      return;
+    }
+
+    final playlist = state.playlists[index];
+    final nextItems = [
+      for (final item in playlist.items)
+        if (!removals.contains(_pathKey(item.path))) item,
+    ];
+    final removedCount = playlist.items.length - nextItems.length;
+    if (removedCount <= 0) {
+      return;
+    }
+
+    final nextPlaylist = playlist.copyWith(items: nextItems);
+    state = state.copyWith(
+      playlists: [
+        for (final existing in state.playlists)
+          if (existing.id == nextPlaylist.id) nextPlaylist else existing,
+      ],
+      statusMessage:
+          removedCount == 1
+              ? '已从“${playlist.name}”移除 1 首'
+              : '已从“${playlist.name}”移除 $removedCount 首',
+      lastError: null,
+    );
+    unawaited(_persistState());
+  }
+
+  Future<void> playQueueIndex(int index) async {
+    await _playQueueIndex(index);
+  }
+
+  Future<void> removePlaybackQueueItemAt(int index) async {
+    final items = List<MediaItem>.of(state.playbackQueue.items);
+    if (index < 0 || index >= items.length) {
+      return;
+    }
+
+    final removed = items.removeAt(index);
+    final nextQueue = state.playbackQueue.copyWith(items: items);
+    final message = '已从当前播放列表移除“${removed.title}”';
+
+    if (items.isEmpty) {
+      state = state.copyWith(
+        playbackQueue: nextQueue,
+        currentIndex: -1,
+        order: const PlaybackOrder(indices: [], position: -1),
+        statusMessage: message,
+        lastError: null,
+      );
+      ref.read(currentMediaProvider.notifier).set(null);
+      ref.read(currentMediaProbeProvider.notifier).clear();
+      ref.read(currentLyricsProvider.notifier).clear();
+      await ref.read(playbackEngineProvider).stop();
+      return;
+    }
+
+    if (index == state.currentIndex) {
+      final nextIndex = index >= items.length ? items.length - 1 : index;
+      await _playQueueIndex(
+        nextIndex,
+        playbackQueue: nextQueue,
+        playbackSourceId: state.playbackSourceId,
+        order: _buildOrder(items.length, nextIndex),
+      );
+      state = state.copyWith(statusMessage: message, lastError: null);
+      return;
+    }
+
+    final adjustedIndex =
+        index < state.currentIndex
+            ? state.currentIndex - 1
+            : state.currentIndex;
+    state = state.copyWith(
+      playbackQueue: nextQueue,
+      currentIndex: adjustedIndex,
+      order: _buildOrder(items.length, adjustedIndex),
+      statusMessage: message,
+      lastError: null,
+    );
+  }
+
   void toggleShuffle() {
     setPlaybackMode(
       state.shuffle ? HeniPlaybackMode.sequence : HeniPlaybackMode.random,
@@ -344,6 +514,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
       statusMessage: '播放模式：${mode.label}',
       lastError: null,
     );
+    unawaited(_persistState());
   }
 
   void setRecursiveScan(bool enabled) {
@@ -361,15 +532,50 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     unawaited(_persistState());
   }
 
+  Future<void> persistVolume(double volume) async {
+    final normalized = volume.clamp(0, 100).toDouble();
+    _persistedVolumeLevel = normalized;
+    _volumePersistTimer?.cancel();
+    _volumePersistTimer = Timer(const Duration(milliseconds: 220), () {
+      unawaited(_persistState(volumeLevel: normalized));
+    });
+  }
+
+  Future<void> persistShellPreferences({
+    HeniPalette? palette,
+    HeniUiStyle? uiStyle,
+    List<String>? sceneryImagePaths,
+  }) async {
+    if (palette != null) {
+      _persistedPaletteName = palette.name;
+    }
+    if (uiStyle != null) {
+      _persistedUiStyleName = uiStyle.name;
+    }
+    if (sceneryImagePaths != null) {
+      _persistedSceneryImagePaths = List.unmodifiable(sceneryImagePaths);
+    }
+    await _persistState(
+      paletteName: _persistedPaletteName,
+      uiStyleName: _persistedUiStyleName,
+      sceneryImagePaths: _persistedSceneryImagePaths,
+    );
+  }
+
   Future<void> _restorePersistedState() async {
     try {
       final config = await ref.read(heniLibraryStoreProvider).read();
+      if (!ref.mounted) {
+        return;
+      }
       if (config == null || config.isEmpty) {
         return;
       }
 
       state = state.copyWith(
         isScanning: config.libraryDirectories.isNotEmpty,
+        repeatMode: config.playbackMode?.repeatMode ?? state.repeatMode,
+        shuffle: config.playbackMode?.shuffle ?? state.shuffle,
         recursiveScan: config.recursiveScan,
         includeVideo: config.includeVideo,
         autoplayOnLoad: config.autoplayOnLoad,
@@ -377,8 +583,36 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
             config.libraryDirectories.isEmpty ? '正在恢复曲库...' : '正在恢复曲库目录...',
         lastError: null,
       );
+      if (config.activePaletteName case final String paletteName) {
+        _persistedPaletteName = paletteName;
+        ref.read(activePaletteProvider.notifier).restoreByName(paletteName);
+      }
+      if (config.activeUiStyle case final String uiStyleName) {
+        _persistedUiStyleName = uiStyleName;
+        ref.read(activeUiStyleProvider.notifier).restoreByName(uiStyleName);
+      }
+      _persistedVolumeLevel = config.volumeLevel?.clamp(0, 100).toDouble();
+      _persistedSceneryImagePaths = List.unmodifiable(config.sceneryImagePaths);
+      if (config.sceneryImagePaths.isNotEmpty) {
+        ref
+            .read(sceneryImagePathsProvider.notifier)
+            .replaceAll(
+              config.sceneryImagePaths
+                  .where((path) => File(path).existsSync())
+                  .toList(),
+            );
+      }
+      if (_persistedVolumeLevel case final double volumeLevel) {
+        await ref.read(playbackEngineProvider).setVolume(volumeLevel);
+        if (!ref.mounted) {
+          return;
+        }
+      }
 
       final libraryItems = await _scanConfiguredLibrary(config);
+      if (!ref.mounted) {
+        return;
+      }
       final library = state.library.copyWith(items: libraryItems);
       final itemByPath = {
         for (final item in libraryItems) _pathKey(item.path): item,
@@ -416,6 +650,9 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
         lastError: null,
       );
     } catch (error) {
+      if (!ref.mounted) {
+        return;
+      }
       state = state.copyWith(
         isScanning: false,
         statusMessage: '曲库恢复失败',
@@ -546,15 +783,21 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   }
 
   String _validPlaylistId(String? playlistId, List<HeniPlaylist> playlists) {
-    if (playlistId == heniLibraryPlaylistId) {
-      return heniLibraryPlaylistId;
+    if (playlistId == heniLibraryPlaylistId ||
+        playlistId == heniPlaybackQueueId) {
+      return playlistId!;
     }
     return playlists.any((playlist) => playlist.id == playlistId)
         ? playlistId!
         : heniLibraryPlaylistId;
   }
 
-  Future<void> _persistState() async {
+  Future<void> _persistState({
+    String? paletteName,
+    String? uiStyleName,
+    List<String>? sceneryImagePaths,
+    double? volumeLevel,
+  }) async {
     final config = HeniLibraryConfig(
       libraryDirectories: state.libraryDirectories,
       libraryFiles: state.libraryFilePaths,
@@ -568,9 +811,14 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
           ),
       ],
       activePlaylistId: state.activePlaylistId,
+      playbackModeName: state.playbackMode.name,
       recursiveScan: state.recursiveScan,
       includeVideo: state.includeVideo,
       autoplayOnLoad: state.autoplayOnLoad,
+      activePaletteName: paletteName ?? _persistedPaletteName,
+      activeUiStyle: uiStyleName ?? _persistedUiStyleName,
+      sceneryImagePaths: sceneryImagePaths ?? _persistedSceneryImagePaths,
+      volumeLevel: volumeLevel ?? _persistedVolumeLevel,
     );
 
     try {
@@ -661,6 +909,9 @@ class PlaybackQueueState {
   HeniPlaylist playlistById(String playlistId) {
     if (playlistId == library.id) {
       return library;
+    }
+    if (playlistId == playbackQueue.id) {
+      return playbackQueue;
     }
 
     return playlists.firstWhere(

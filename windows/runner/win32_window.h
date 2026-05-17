@@ -13,15 +13,15 @@
 class Win32Window {
  public:
   struct Point {
-    unsigned int x;
-    unsigned int y;
-    Point(unsigned int x, unsigned int y) : x(x), y(y) {}
+    int x;
+    int y;
+    Point(int x, int y) : x(x), y(y) {}
   };
 
   struct Size {
-    unsigned int width;
-    unsigned int height;
-    Size(unsigned int width, unsigned int height)
+    int width;
+    int height;
+    Size(int width, int height)
         : width(width), height(height) {}
   };
 
@@ -97,6 +97,9 @@ class Win32Window {
 
   // window handle for hosted content.
   HWND child_content_ = nullptr;
+
+  // preferred show command for the first Show call.
+  int initial_show_command_ = SW_SHOWNORMAL;
 };
 
 #endif  // RUNNER_WIN32_WINDOW_H_

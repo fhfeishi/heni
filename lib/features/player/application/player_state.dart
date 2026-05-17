@@ -20,7 +20,7 @@ final currentMediaProbeProvider =
     );
 
 final currentLyricsProvider =
-    NotifierProvider<CurrentLyrics, AsyncValue<List<LyricLine>>>(
+    NotifierProvider<CurrentLyrics, AsyncValue<LyricsDocument>>(
       CurrentLyrics.new,
     );
 
@@ -29,6 +29,22 @@ class LyricLine {
 
   final Duration? time;
   final String text;
+}
+
+class LyricHeader {
+  const LyricHeader({this.title, this.artist, this.album, this.offset});
+
+  final String? title;
+  final String? artist;
+  final String? album;
+  final Duration? offset;
+}
+
+class LyricsDocument {
+  const LyricsDocument({required this.header, required this.lines});
+
+  final LyricHeader header;
+  final List<LyricLine> lines;
 }
 
 class CurrentMedia extends Notifier<MediaItem?> {
@@ -65,26 +81,26 @@ class CurrentMediaProbe extends Notifier<AsyncValue<MediaProbe?>> {
   }
 }
 
-class CurrentLyrics extends Notifier<AsyncValue<List<LyricLine>>> {
+class CurrentLyrics extends Notifier<AsyncValue<LyricsDocument>> {
   @override
-  AsyncValue<List<LyricLine>> build() => const AsyncData([]);
+  AsyncValue<LyricsDocument> build() =>
+      const AsyncData(LyricsDocument(header: LyricHeader(), lines: []));
 
   Future<void> loadFor(String mediaPath) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final file = _findLyricsFile(mediaPath);
       if (file == null) {
-        return const <LyricLine>[];
+        return const LyricsDocument(header: LyricHeader(), lines: []);
       }
 
       final text = await file.readAsString();
-      final lines = _parseLyrics(text);
-      return lines;
+      return _parseLyrics(text);
     });
   }
 
   void clear() {
-    state = const AsyncData([]);
+    state = const AsyncData(LyricsDocument(header: LyricHeader(), lines: []));
   }
 
   File? _findLyricsFile(String mediaPath) {
@@ -99,14 +115,42 @@ class CurrentLyrics extends Notifier<AsyncValue<List<LyricLine>>> {
     return null;
   }
 
-  List<LyricLine> _parseLyrics(String text) {
+  LyricsDocument _parseLyrics(String text) {
     final timestampPattern = RegExp(r'\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]');
+    final metadataPattern = RegExp(
+      r'^\[(ti|ar|al|offset):(.*)\]$',
+      caseSensitive: false,
+    );
     final lines = <LyricLine>[];
     final plainLines = <String>[];
+    String? title;
+    String? artist;
+    String? album;
+    Duration? offset;
 
     for (final rawLine in text.split(RegExp(r'\r?\n'))) {
       final line = rawLine.trim();
       if (line.isEmpty) {
+        continue;
+      }
+
+      final metadataMatch = metadataPattern.firstMatch(line);
+      if (metadataMatch != null && !line.contains(RegExp(r'\[\d'))) {
+        final key = (metadataMatch.group(1) ?? '').toLowerCase();
+        final value = (metadataMatch.group(2) ?? '').trim();
+        switch (key) {
+          case 'ti':
+            title = value.isEmpty ? title : value;
+          case 'ar':
+            artist = value.isEmpty ? artist : value;
+          case 'al':
+            album = value.isEmpty ? album : value;
+          case 'offset':
+            final milliseconds = int.tryParse(value);
+            if (milliseconds != null) {
+              offset = Duration(milliseconds: milliseconds);
+            }
+        }
         continue;
       }
 
@@ -128,13 +172,16 @@ class CurrentLyrics extends Notifier<AsyncValue<List<LyricLine>>> {
           2 => int.parse(fraction) * 10,
           _ => int.parse(fraction.padRight(3, '0').substring(0, 3)),
         };
-        lines.add(
-          LyricLine(
-            time: Duration(
+        final shifted =
+            Duration(
               minutes: minutes,
               seconds: seconds,
               milliseconds: milliseconds,
-            ),
+            ) +
+            (offset ?? Duration.zero);
+        lines.add(
+          LyricLine(
+            time: shifted.isNegative ? Duration.zero : shifted,
             text: content.isEmpty ? '♪' : content,
           ),
         );
@@ -145,11 +192,27 @@ class CurrentLyrics extends Notifier<AsyncValue<List<LyricLine>>> {
       lines.sort(
         (a, b) => (a.time ?? Duration.zero).compareTo(b.time ?? Duration.zero),
       );
-      return List.unmodifiable(lines);
+      return LyricsDocument(
+        header: LyricHeader(
+          title: title,
+          artist: artist,
+          album: album,
+          offset: offset,
+        ),
+        lines: List.unmodifiable(lines),
+      );
     }
 
-    return List.unmodifiable([
-      for (final line in plainLines) LyricLine(time: null, text: line),
-    ]);
+    return LyricsDocument(
+      header: LyricHeader(
+        title: title,
+        artist: artist,
+        album: album,
+        offset: offset,
+      ),
+      lines: List.unmodifiable([
+        for (final line in plainLines) LyricLine(time: null, text: line),
+      ]),
+    );
   }
 }

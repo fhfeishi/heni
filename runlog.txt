@@ -1,0 +1,58 @@
+Launching lib\main.dart on Windows in debug mode...
+Building Windows application...                                    12.8s
+鈭?Built build\windows\x64\runner\Debug\heni.exe
+package:media_kit_libs_windows_video registered.
+Syncing files to device Windows...                              
+
+鈺愨晲鈺?EXCEPTION CAUGHT BY RENDERING LIBRARY 鈺炩晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
+The following assertion was thrown during layout:
+A RenderFlex overflowed by 22 pixels on the bottom.
+
+The relevant error-causing widget was:
+  Column
+  Column:file:///D:/codespace/fhfeishi/heni/lib/features/player/presentation/player_screen.dart:954:19
+
+The overflowing RenderFlex has an orientation of Axis.vertical.
+The edge of the RenderFlex that is overflowing has been marked in the rendering with a yellow and
+black striped pattern. This is usually caused by the contents being too big for the RenderFlex.
+Consider applying a flex factor (e.g. using an Expanded widget) to force the children of the
+RenderFlex to fit within the available space instead of being sized to their natural size.
+This is considered an error condition because it indicates that there is content that cannot be
+seen. If the content is legitimately bigger than the available space, consider clipping it with a
+ClipRect widget before putting it in the flex, or using a scrollable container rather than a Flex,
+like a ListView.
+The specific RenderFlex in question is: RenderFlex#25e50 relayoutBoundary=up22 OVERFLOWING:
+  creator: Column 鈫?Row 鈫?Padding 鈫?DecoratedBox 鈫?Container 鈫?AnimatedContainer 鈫?Row-[<'娣卞'>] 鈫?    FractionalTranslation 鈫?SlideTransition 鈫?FadeTransition 鈫?KeyedSubtree-[<0>] 鈫?Stack 鈫?鈰?  parentData: offset=Offset(36.0, 0.0); flex=null; fit=null (can use size)
+  constraints: BoxConstraints(0.0<=w<=Infinity, 0.0<=h<=14.0)
+  size: Size(26.0, 14.0)
+  direction: vertical
+  mainAxisAlignment: start
+  mainAxisSize: min
+  crossAxisAlignment: start
+  textDirection: ltr
+  verticalDirection: down
+  spacing: 0.0
+鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼⑩棨鈼?鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼も棦鈼?鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
+
+Another exception was thrown: A RenderFlex overflowed by 4.0 pixels on the bottom.
+Syncing files to device Windows...                                 131ms
+
+Flutter run key commands.
+r Hot reload. 
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+A Dart VM Service on Windows is available at: http://127.0.0.1:12242/zOICgGVjU1Q=/
+The Flutter DevTools debugger and profiler on Windows is available at: http://127.0.0.1:12242/zOICgGVjU1Q=/devtools/?uri=ws://127.0.0.1:12242/zOICgGVjU1Q=/ws
+media_kit: NativeReferenceHolder: Allocated 2969870319616
+media_kit: ANGLESurfaceManager: Direct3D Feature Level: 11_0
+1 1
+media_kit: VideoOutput: Create Texture: 2967971418704
+Another exception was thrown: A RenderFlex overflowed by 22 pixels on the bottom.
+media_kit: VideoOutput: Using H/W rendering.
+VideoOutput.Resize
+{handle: 2969679787872, id: 2967971418704, rect: {height: 0, left: 0, top: 0, width: 0}}
+NativeVideoController: Texture ID: 2967971418704

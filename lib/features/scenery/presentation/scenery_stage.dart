@@ -10,11 +10,13 @@ class SceneryStage extends StatefulWidget {
   const SceneryStage({
     required this.imagePaths,
     required this.palette,
+    this.isPlaying = false,
     super.key,
   });
 
   final List<String> imagePaths;
   final HeniPalette palette;
+  final bool isPlaying;
 
   @override
   State<SceneryStage> createState() => _SceneryStageState();
@@ -71,14 +73,37 @@ class _SceneryStageState extends State<SceneryStage> {
           ),
         ),
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 1200),
+          duration: const Duration(milliseconds: 1600),
           switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
+          switchOutCurve: Curves.easeInOutCubic,
+          transitionBuilder: (child, animation) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInOutCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 1.02, end: 1.0).animate(curved),
+                child: child,
+              ),
+            );
+          },
+          layoutBuilder: (currentChild, previousChildren) {
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                ...previousChildren,
+                if (currentChild != null) currentChild,
+              ],
+            );
+          },
           child: TweenAnimationBuilder<double>(
             key: ValueKey(path),
-            duration: const Duration(seconds: 9),
-            tween: Tween(begin: 1.015, end: 1.055),
-            curve: Curves.easeInOut,
+            duration: const Duration(seconds: 11),
+            tween: Tween(begin: 1.02, end: 1.075),
+            curve: Curves.easeInOutCubic,
             builder: (context, scale, child) {
               return Transform.scale(scale: scale, child: child);
             },
@@ -91,10 +116,29 @@ class _SceneryStageState extends State<SceneryStage> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withValues(alpha: 0.28),
+                Colors.black.withValues(alpha: 0.24),
                 Colors.transparent,
-                Colors.black.withValues(alpha: 0.58),
+                Colors.black.withValues(alpha: 0.52),
               ],
+              stops: const [0.0, 0.46, 1.0],
+            ),
+          ),
+        ),
+        AnimatedOpacity(
+          duration: const Duration(milliseconds: 600),
+          opacity: widget.isPlaying ? 1 : 0.55,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(0, 0.72),
+                radius: 0.92,
+                colors: [
+                  widget.palette.seed.withValues(alpha: 0.12),
+                  widget.palette.seed.withValues(alpha: 0.04),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.38, 1.0],
+              ),
             ),
           ),
         ),
@@ -108,7 +152,7 @@ class _SceneryStageState extends State<SceneryStage> {
       return;
     }
 
-    _timer = Timer.periodic(const Duration(seconds: 9), (_) {
+    _timer = Timer.periodic(const Duration(seconds: 11), (_) {
       if (!mounted) {
         return;
       }
@@ -154,23 +198,25 @@ class _FallbackSceneryPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..color = palette.accent.withValues(alpha: 0.2);
+    final paint =
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..color = palette.accent.withValues(alpha: 0.2);
 
     for (var index = 0; index < 9; index += 1) {
       final top = size.height * (0.16 + index * 0.075);
-      final path = Path()
-        ..moveTo(0, top)
-        ..cubicTo(
-          size.width * 0.28,
-          top - 34,
-          size.width * 0.62,
-          top + 40,
-          size.width,
-          top - 8,
-        );
+      final path =
+          Path()
+            ..moveTo(0, top)
+            ..cubicTo(
+              size.width * 0.28,
+              top - 34,
+              size.width * 0.62,
+              top + 40,
+              size.width,
+              top - 8,
+            );
       canvas.drawPath(path, paint);
     }
   }

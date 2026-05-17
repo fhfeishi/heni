@@ -1,7 +1,11 @@
 #include "win32_window.h"
 
+#include <cstdlib>
 #include <dwmapi.h>
 #include <flutter_windows.h>
+#include <filesystem>
+#include <fstream>
+#include <optional>
 
 #include "resource.h"
 
@@ -31,6 +35,14 @@ static int g_active_window_count = 0;
 
 using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
 
+struct PersistedWindowState {
+  int left = 10;
+  int top = 10;
+  int width = 1280;
+  int height = 720;
+  bool maximized = false;
+};
+
 // Scale helper to convert logical scaler values to physical using passed in
 // scale factor
 int Scale(int source, double scale_factor) {
@@ -51,6 +63,97 @@ void EnableFullDpiSupportIfAvailable(HWND hwnd) {
     enable_non_client_dpi_scaling(hwnd);
   }
   FreeLibrary(user32_module);
+}
+
+std::filesystem::path GetWindowStatePath() {
+  wchar_t* appdata = nullptr;
+  size_t length = 0;
+  if (_wdupenv_s(&appdata, &length, L"APPDATA") == 0 && appdata != nullptr) {
+    const auto path =
+        std::filesystem::path(appdata) / L"Heni" / L"window-state.ini";
+    free(appdata);
+    return path;
+  }
+  return std::filesystem::temp_directory_path() / L"Heni-window-state.ini";
+}
+
+std::optional<PersistedWindowState> LoadWindowState() {
+  const auto path = GetWindowStatePath();
+  std::ifstream stream(path);
+  if (!stream.is_open()) {
+    return std::nullopt;
+  }
+
+  PersistedWindowState state;
+  std::string line;
+  try {
+    while (std::getline(stream, line)) {
+      const auto separator = line.find('=');
+      if (separator == std::string::npos) {
+        continue;
+      }
+      const auto key = line.substr(0, separator);
+      const auto value = line.substr(separator + 1);
+      if (key == "left") {
+        state.left = std::stoi(value);
+      } else if (key == "top") {
+        state.top = std::stoi(value);
+      } else if (key == "width") {
+        state.width = std::stoi(value);
+      } else if (key == "height") {
+        state.height = std::stoi(value);
+      } else if (key == "maximized") {
+        state.maximized = value == "1";
+      }
+    }
+  } catch (...) {
+    return std::nullopt;
+  }
+
+  if (state.width < 720 || state.height < 480) {
+    return std::nullopt;
+  }
+
+  RECT rect = {state.left, state.top, state.left + state.width,
+               state.top + state.height};
+  if (MonitorFromRect(&rect, MONITOR_DEFAULTTONULL) == nullptr) {
+    return std::nullopt;
+  }
+
+  return state;
+}
+
+void SaveWindowState(HWND hwnd) {
+  if (hwnd == nullptr || IsIconic(hwnd)) {
+    return;
+  }
+
+  WINDOWPLACEMENT placement;
+  placement.length = sizeof(WINDOWPLACEMENT);
+  if (!GetWindowPlacement(hwnd, &placement)) {
+    return;
+  }
+
+  RECT rect = placement.rcNormalPosition;
+  if (rect.right <= rect.left || rect.bottom <= rect.top) {
+    return;
+  }
+
+  const auto path = GetWindowStatePath();
+  std::error_code error;
+  std::filesystem::create_directories(path.parent_path(), error);
+
+  std::ofstream stream(path, std::ios::trunc);
+  if (!stream.is_open()) {
+    return;
+  }
+
+  stream << "left=" << rect.left << '\n';
+  stream << "top=" << rect.top << '\n';
+  stream << "width=" << (rect.right - rect.left) << '\n';
+  stream << "height=" << (rect.bottom - rect.top) << '\n';
+  stream << "maximized="
+         << (placement.showCmd == SW_SHOWMAXIMIZED ? 1 : 0) << '\n';
 }
 
 }  // namespace
@@ -128,16 +231,35 @@ bool Win32Window::Create(const std::wstring& title,
   const wchar_t* window_class =
       WindowClassRegistrar::GetInstance()->GetWindowClass();
 
-  const POINT target_point = {static_cast<LONG>(origin.x),
-                              static_cast<LONG>(origin.y)};
-  HMONITOR monitor = MonitorFromPoint(target_point, MONITOR_DEFAULTTONEAREST);
-  UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
-  double scale_factor = dpi / 96.0;
+  auto restored_state = LoadWindowState();
+  int left = origin.x;
+  int top = origin.y;
+  int width = size.width;
+  int height = size.height;
+
+  if (restored_state.has_value()) {
+    left = restored_state->left;
+    top = restored_state->top;
+    width = restored_state->width;
+    height = restored_state->height;
+    initial_show_command_ =
+        restored_state->maximized ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL;
+  } else {
+    const POINT target_point = {static_cast<LONG>(origin.x),
+                                static_cast<LONG>(origin.y)};
+    HMONITOR monitor = MonitorFromPoint(target_point, MONITOR_DEFAULTTONEAREST);
+    UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
+    double scale_factor = dpi / 96.0;
+    left = Scale(origin.x, scale_factor);
+    top = Scale(origin.y, scale_factor);
+    width = Scale(size.width, scale_factor);
+    height = Scale(size.height, scale_factor);
+    initial_show_command_ = SW_SHOWNORMAL;
+  }
 
   HWND window = CreateWindow(
       window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
-      Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
-      Scale(size.width, scale_factor), Scale(size.height, scale_factor),
+      left, top, width, height,
       nullptr, nullptr, GetModuleHandle(nullptr), this);
 
   if (!window) {
@@ -150,7 +272,7 @@ bool Win32Window::Create(const std::wstring& title,
 }
 
 bool Win32Window::Show() {
-  return ShowWindow(window_handle_, SW_SHOWNORMAL);
+  return ShowWindow(window_handle_, initial_show_command_);
 }
 
 // static
@@ -180,6 +302,7 @@ Win32Window::MessageHandler(HWND hwnd,
                             LPARAM const lparam) noexcept {
   switch (message) {
     case WM_DESTROY:
+      SaveWindowState(hwnd);
       window_handle_ = nullptr;
       Destroy();
       if (quit_on_close_) {
@@ -198,6 +321,7 @@ Win32Window::MessageHandler(HWND hwnd,
       return 0;
     }
     case WM_SIZE: {
+      SaveWindowState(hwnd);
       RECT rect = GetClientArea();
       if (child_content_ != nullptr) {
         // Size and position the child window.
@@ -206,6 +330,11 @@ Win32Window::MessageHandler(HWND hwnd,
       }
       return 0;
     }
+
+    case WM_MOVE:
+    case WM_EXITSIZEMOVE:
+      SaveWindowState(hwnd);
+      return 0;
 
     case WM_ACTIVATE:
       if (child_content_ != nullptr) {

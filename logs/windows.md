@@ -1,6 +1,6 @@
 # Windows Development Log
 
-Last updated: 2026-05-14
+Last updated: 2026-05-16
 
 ## Status
 
@@ -19,6 +19,7 @@ Windows is the active development target.
 ## Implemented
 
 - Flutter project scaffold generated for Windows and other future platforms.
+- Windows app icon unified to the provided custom `d.ico` asset.
 - Windows plugin symlink issue resolved by enabling Developer Mode.
 - Windows CMake install prefix fixed to bundle files beside `heni.exe`.
 - Debug build succeeds:
@@ -29,10 +30,104 @@ Windows is the active development target.
 - UI shell implemented:
   - Product-style desktop layout with top navigation, left playlist sidebar,
     main playback content area, and bottom transport bar.
+  - Top and bottom shell bands now share a more unified breathing rhythm
+    through matched framing, glow, and subtle entrance motion.
+  - The shared shell-band system now also mirrors highlight placement between
+    the top navigation and bottom playback areas for stronger frame continuity.
   - Simplified top navigation: Heni logo, 美景/歌曲 switch, centered palette
     selector, and settings only.
   - Top "歌曲" tab opens the playlist/song-list view; the built-in all-media
     collection remains named "曲库" in the left sidebar.
+  - Refreshed shell styling toward a lighter product UI with rounded frosted
+    panels across the top bar, sidebar, content header, library view, lyric
+    panel, and bottom player bar.
+  - Added palette-tinted ambient backdrop lighting behind the shell so theme
+    changes read more clearly across the full window.
+  - Refined the top bar with a compact logo tile, calmer spacing, and a more
+    polished palette selector.
+  - Sidebar now shows compact library metrics and a more deliberate empty state
+    for playlists.
+  - Song list presentation refined with summary pills, a softer table header,
+    numbered rows, and more structured type/source metadata.
+  - Bottom player bar refined with a clearer now-playing summary, stronger
+    transport hierarchy, pill-style progress area, and calmer utility grouping.
+  - The bottom-right utility group now includes a dedicated current playback
+    list control ahead of playback mode, volume, and FLAC export.
+  - The current playback queue dialog now has stronger hierarchy with source
+    and count pills, current-track emphasis, and queue search.
+  - Current playback queue rows now use calmer inline action buttons and more
+    deliberate hover/current-item emphasis.
+  - Main player dialogs now share a more consistent frame with unified inset,
+    inner spacing, and action-area rhythm.
+  - Theme-level dialog and popup styling now reinforces that same consistency
+    through shared radius, tint, text, and menu spacing.
+  - The sidebar now transitions into the main content through a softer bridge
+    and right-edge glow instead of a harder split.
+  - The top palette selector now has a richer active-theme preview and more
+    refined swatch sizing/treatment.
+  - Information hierarchy is now more deliberate across the songs header,
+    sidebar status area, and bottom now-playing summary.
+  - Hover timing and content transitions now share a calmer motion language
+    across playlist tiles, song rows, queue rows, theme changes, and now-
+    playing updates.
+  - Icon density is now more consistent across bottom controls and row actions,
+    table spacing is tighter, and the scenery page's lower info block sits more
+    lightly against the background.
+  - High-frequency action labels have been tightened for a more even product
+    density, and a final Windows release/launch smoke pass completed cleanly.
+  - Add-from-library dialog rows now use rounded card styling and clearer media
+    type chips so playlist curation feels more integrated with the main UI.
+  - Top navigation theme control now shows the active palette name and reads as
+    a more complete product control instead of a bare swatch strip.
+  - Song rows now respond to hover and selection with animated leading
+    indicators, deeper surfaces, and calmer action emphasis.
+  - Sidebar playlist items now respond to hover with light lift, softer motion,
+    and clearer option-menu emphasis.
+  - The 美景/歌曲 switcher now sits inside a clearer rounded shell and includes
+    lightweight icons for stronger mode identity.
+  - The scenery playback page now uses a lighter floating hero and no longer
+    keeps an empty lyric placeholder panel over the background when lyrics are
+    missing.
+  - The main play button now has subtle motion and glow changes between play
+    and pause states.
+  - Scenery image transitions now use slower layered fade/scale motion with a
+    calmer drift for a more cinematic background change.
+  - Lower-left media information in scenery mode now has clearer hierarchy and
+    lighter containment.
+  - Centered video playback now sits inside a softer framed surface with
+    rounded outer spacing and shadow.
+  - Scenery ambience now subtly responds to active playback so the page feels
+    more connected to the transport state.
+  - Bottom now-playing summary now reflects play state with small glow and
+    emphasis changes.
+  - Video mode now reuses the lower-left scenery info block and compacts it
+    automatically when lyrics are present.
+  - Right-side songs-view header now distinguishes correctly between the full
+    library and custom playlists when displaying counts and supporting metrics.
+  - Settings now open as a dedicated dialog with grouped toggle cards and a
+    compact library summary.
+  - Songs-view empty states now use a more polished card instead of raw text.
+  - Scenery audio mode now composes the ambient orb with the lower info block
+    rather than leaving it static in the center of the stage.
+  - Lyric presentation now includes a clearer heading and a gentler focus style
+    for the active line.
+  - Top navigation now has a gentler entrance feel and a more alive
+    palette-responsive brand treatment.
+  - Bottom now-playing information now transitions more smoothly when the
+    current media changes.
+  - Lyric loading now supports richer `.lrc` metadata such as title, artist,
+    album, and offset.
+  - Theme choice, UI mode, and scenery image selections are now restored as
+    part of the app's persisted shell experience.
+  - Library refresh is now a first-class action that rescans configured sources
+    with current scan settings and keeps playlist path references aligned with
+    refreshed library items.
+  - Lyric display now exposes richer metadata and a more follow-friendly active
+    line treatment when timed lyrics exist.
+  - Songs-view header now shows gentler refresh progress/result pills, and the
+    settings dialog includes an immediate refresh action.
+  - Songs-view refresh feedback now uses calmer animated badges for active
+    refresh and refresh/restore results.
   - Simplified UI mode selector: 美景 and 歌曲. 影院模式先暂停，等有明确的
     视频沉浸播放设计后再做。
   - Full-screen scenery stage inside the playback content area.
@@ -44,9 +139,18 @@ Windows is the active development target.
   - Library rows expose an explicit "加入歌单" action for adding songs to user
     playlists.
   - Playlist pages expose "从曲库添加" with search and multi-select bulk add.
+  - Custom playlists now support row-level removal and a dedicated
+    multi-select "管理歌曲" flow for removing songs without touching local
+    files.
+  - Custom playlist song tables now also support in-place multi-select mode
+    with checkbox rows, select-all, batch removal, and selected-count feedback.
+  - Songs-table row styling now more clearly distinguishes hover, now-playing,
+    and checked-for-batch-edit states.
   - User playlists expose a three-dot sidebar menu for adding songs from the
     library, renaming, editing descriptions, and deleting.
   - Playlist browsing no longer interrupts the independent playback queue.
+  - The current playback queue now has a dedicated dialog that can jump
+    playback to any queued item and remove queued songs directly.
   - Playlist/library UI style.
   - Playback controls.
   - Previous/next item controls backed by the current playback queue.
@@ -93,7 +197,7 @@ flutter build windows --debug
 flutter build windows --release
 ```
 
-Current test count: 27 passing tests.
+Current test count: 29 passing tests.
 
 ## Issues Seen And Resolved
 
@@ -110,8 +214,8 @@ Current test count: 27 passing tests.
   verification from the running app.
 - Playlist persistence now stores path references, not copied media files.
 - Playlist editing is basic: create/delete playlist, add library items, rename,
-  edit descriptions, load folders, select and play items. Reorder is not
-  implemented yet.
+  edit descriptions, remove items, load folders, select and play items.
+  Reorder is not implemented yet.
 - FFmpeg/ffprobe paths currently rely on PATH; a settings override should be
   added later.
 
@@ -126,3 +230,128 @@ Current test count: 27 passing tests.
 7. Improve empty states, loading states, and export error display.
 8. Add a small debug media-details panel for codec learning.
 9. Add persistent settings for theme, scenery pack, playlists, and FFmpeg path.
+
+## 2026-05-16 - Launch Crash Fix
+
+- Symptom:
+  app launched to a black screen and logged
+  `Cannot hit test a render box that has never been laid out.`
+- Root cause:
+  the top navigation used `_ShellBand` with an unbounded `Stack`; after that
+  was fixed, `_TopPaletteDeck` still had a height-collapse overflow caused by
+  an `AnimatedSwitcher` around the active theme label.
+- Fix:
+  gave the top shell band a fixed height and simplified the theme label
+  animation to a stable text-style transition.
+- Validation:
+  `flutter analyze`, `flutter test`,
+  `flutter build windows --release`,
+  Windows release launch smoke passed.
+
+## 2026-05-17 - Responsive UI Polish
+
+- Added a shell layout model with compact and quiet modes for the Windows UI.
+- Top and bottom shell bands now tighten their height based on window size.
+- Sidebar width, padding, and the optional status block now respond to window
+  size.
+- The scenery page hides the decorative orb in quieter layouts to protect the
+  main media stage.
+- The bottom player hides lower-priority now-playing details in quieter layouts
+  so transport and utility controls stay readable.
+- The songs table header and rows now share the same column widths, which fixes
+  the previous visual misalignment in playlist detail pages.
+- The top theme picker now shows palette names on hover instead of keeping the
+  text always visible.
+
+## 2026-05-17 - Theme Atmosphere And Table Finish
+
+- The main Windows backdrop now animates when the palette changes instead of
+  switching abruptly.
+- Added an extra palette-linked glow wash so the active theme feels more global.
+- The top border accent now blends between seed and accent colors for a richer
+  palette signature.
+- The songs table header now has clearer hierarchy and a slightly more premium
+  surface treatment.
+- The songs rows now use subtle alternating rhythm plus a refined active rail
+  and highlight line for better scanability.
+
+## 2026-05-17 - Palette Strip Cleanup And Glass Pass
+
+- The top palette chooser on Windows is now a pure swatch strip with no reserved
+  label space on the left.
+- Removed hover-driven palette strip reflow to stop the earlier flicker.
+- Shared glass panels now use stronger blur and layered highlights/shadows for
+  a more dimensional translucent look.
+
+## 2026-05-17 - Shell Glass Unification
+
+- Added shared shell-glass fill and border helpers for the Windows UI shell.
+- Top band, left sidebar, and content header now use the same material recipe
+  with only small emphasis differences.
+- The songs panel was adjusted toward the same family so the whole app shell
+  reads as one coherent glass system.
+
+## 2026-05-17 - Glass Content Hierarchy
+
+- Added shared contrast helpers for text placed on glass surfaces.
+- Top bar, sidebar, pills, badges, empty states, and playlist text were updated
+  to use a more consistent primary/secondary/tertiary hierarchy.
+- Shared button sizing and label weight were tightened so controls feel more
+  consistent across the Windows glass shell.
+
+## 2026-05-17 - Accent Contrast Fixes
+
+- Windows theme primary now follows `palette.accent` with a luminance-aware
+  `onPrimary` color.
+- High-visibility controls and labels no longer rely on dark palette hues as
+  direct foreground text colors.
+- This improves readability for difficult themes such as black and other very
+  dark palette variants.
+
+## 2026-05-17 - Multi-Theme Contrast Sweep
+
+- Added shared contrast helpers for solid accent surfaces and for accent text
+  shown on dark glass, so the Windows UI stops mixing those two cases.
+- Updated scenery status labels, bottom now-playing status text, playlist add
+  chips, selected-state pills, and active row icons to use palette-aware glass
+  foreground colors.
+- Added automated palette contrast coverage to catch unreadable accent text and
+  `onPrimary` regressions before release.
+
+## 2026-05-17 - Playback Mode Persistence
+
+- The Windows player now stores the last selected playback mode in the local
+  Heni config file.
+- Restoring the app rehydrates `repeatMode` and `shuffle` from that saved mode,
+  so sequence, list loop, single loop, and random all come back automatically.
+- Added a controller-level regression test for playback-mode restore.
+
+## 2026-05-17 - Volume And Window Restore
+
+- The Windows player now stores the last volume in the local Heni config and
+  reapplies it during startup.
+- Volume persistence is debounced so the config file is not rewritten on every
+  tiny drag update.
+- The Windows runner now remembers the last window position, size, and
+  maximized state and restores them on the next launch.
+
+## 2026-05-17 - Structure Refactor Round 1
+
+- The Windows top bar now behaves as a global work bar with search, palette
+  controls, scope counts, and settings instead of housing the main mode switch.
+- The left sidebar now treats `曲库` and `当前播放列表` as first-level browsing
+  destinations, with user playlists grouped underneath.
+- The `歌曲 / 播放中` switch moved into the content header, so playback stage vs.
+  songs view is now framed as a content-mode decision rather than a global shell
+  tab.
+- The active songs view now understands the playback queue as its own context,
+  with dedicated copy and empty-state behavior.
+
+## 2026-05-17 - Content Workspace Round 2
+
+- The Windows songs workspace now exposes list-level search feedback and a sort
+  selector for queue order, title, type, and source.
+- Added a duration column to the songs table with tabular time formatting so
+  the list reads more like a real media workspace.
+- The current playback queue now behaves more like a dedicated queue page,
+  including queue-specific copy and a direct return path to the playback stage.

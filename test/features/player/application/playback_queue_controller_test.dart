@@ -4,6 +4,7 @@ import 'package:heni/design/app_theme.dart';
 import 'package:heni/domain/media/media_item.dart';
 import 'package:heni/domain/media/media_kind.dart';
 import 'package:heni/domain/media/media_probe.dart';
+import 'package:heni/domain/playback/playback_mode.dart';
 import 'package:heni/features/player/application/playback_queue_controller.dart';
 import 'package:heni/services/ffmpeg/media_inspector.dart';
 import 'package:heni/services/ffmpeg/media_inspector_provider.dart';
@@ -116,6 +117,103 @@ void main() {
       expect(store.latest?.playlists.single.name, '夜跑');
       expect(store.latest?.playlists.single.description, '晚上散步和跑步听');
     });
+
+    test('persists playback mode across restore', () async {
+      final engine = _FakePlaybackEngine();
+      final store = _MemoryLibraryStore();
+      final firstContainer = _container(engine, store: store);
+      addTearDown(firstContainer.dispose);
+
+      final firstController = firstContainer.read(
+        playbackQueueControllerProvider.notifier,
+      );
+      firstController.setPlaybackMode(HeniPlaybackMode.random);
+
+      expect(store.latest?.playbackModeName, HeniPlaybackMode.random.name);
+
+      final restoredContainer = _container(_FakePlaybackEngine(), store: store);
+      addTearDown(restoredContainer.dispose);
+      restoredContainer.read(playbackQueueControllerProvider.notifier);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      final restoredState = restoredContainer.read(
+        playbackQueueControllerProvider,
+      );
+      expect(restoredState.playbackMode, HeniPlaybackMode.random);
+      expect(restoredState.shuffle, isTrue);
+      expect(restoredState.repeatMode, HeniRepeatMode.all);
+    });
+
+    test('persists volume level across restore', () async {
+      final engine = _FakePlaybackEngine();
+      final store = _MemoryLibraryStore();
+      final firstContainer = _container(engine, store: store);
+      addTearDown(firstContainer.dispose);
+
+      final firstController = firstContainer.read(
+        playbackQueueControllerProvider.notifier,
+      );
+      await firstController.persistVolume(37);
+      await Future<void>.delayed(const Duration(milliseconds: 260));
+
+      expect(store.latest?.volumeLevel, 37);
+
+      final restoredEngine = _FakePlaybackEngine();
+      final restoredContainer = _container(restoredEngine, store: store);
+      addTearDown(restoredContainer.dispose);
+      restoredContainer.read(playbackQueueControllerProvider.notifier);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(restoredEngine.currentVolume, 37);
+    });
+
+    test(
+      'removes songs from a user playlist without touching the library',
+      () async {
+        final engine = _FakePlaybackEngine();
+        final store = _MemoryLibraryStore();
+        final container = _container(engine, store: store);
+        addTearDown(container.dispose);
+
+        final controller = container.read(
+          playbackQueueControllerProvider.notifier,
+        );
+        await controller.addItems(_items);
+        await controller.createPlaylist('精选');
+        final playlistId =
+            container.read(playbackQueueControllerProvider).playlists.single.id;
+
+        controller.addItemsToPlaylist(playlistId, [_items[0], _items[1]]);
+        controller.removeItemsFromPlaylist(playlistId, [_items[0]]);
+
+        final state = container.read(playbackQueueControllerProvider);
+        expect(state.library.items, hasLength(3));
+        expect(state.playlists.single.items.map((item) => item.title), ['B']);
+        expect(store.latest?.playlists.single.itemPaths, [_items[1].path]);
+      },
+    );
+
+    test(
+      'removing the current playback item advances to the nearest remaining item',
+      () async {
+        final engine = _FakePlaybackEngine();
+        final container = _container(engine);
+        addTearDown(container.dispose);
+
+        final controller = container.read(
+          playbackQueueControllerProvider.notifier,
+        );
+        await controller.addItems(_items, playFirst: true);
+        await controller.playNext();
+
+        await controller.removePlaybackQueueItemAt(1);
+
+        final state = container.read(playbackQueueControllerProvider);
+        expect(state.playbackQueue.items.map((item) => item.title), ['A', 'C']);
+        expect(state.currentItem?.title, 'C');
+        expect(engine.opened.map((item) => item.title), ['A', 'B', 'C']);
+      },
+    );
 
     test(
       'deleting the active playlist returns browsing to the library',
