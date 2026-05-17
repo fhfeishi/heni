@@ -1663,3 +1663,218 @@ request that changes Heni.
   labels, empty states, and a direct `回到播放中` action from the queue view.
 - Refined the songs summary pills so search, sort, library, playlist, and queue
   contexts are easier to parse at a glance.
+
+## 2026-05-17 - Adaptive Header And Resize Stability
+
+### User Request
+
+- Do not add extra browsing dimensions such as album, artist, or folder.
+- Continue optimizing the UI from a professional designer angle so the visuals
+  feel more harmonious and beautiful.
+- Inspect and fix the yellow-black overflow warnings and range issues that
+  appear while resizing the window.
+
+### Understanding
+
+- The next value is not more information architecture but better visual rhythm
+  and stronger resize resilience.
+- The biggest practical issue is that some high-density header and toolbar rows
+  still assume wide desktop space and overflow when the window narrows.
+- A good fix should also make the UI calmer: less forced one-line packing, more
+  graceful stacking, and steadier theme controls.
+
+### Should Do
+
+- Convert resize-sensitive header/tool rows to adaptive multi-line layouts
+  instead of leaving them as rigid single rows.
+- Make the bottom player bar switch into a compact variant earlier on narrower
+  Windows widths.
+- Remove small visual jitter from the theme swatch picker so palette controls
+  look more deliberate.
+- Keep the Windows release build healthy and record the change in the logs.
+
+### Done
+
+- Rebuilt the right content header to use width-aware stacked layouts for both
+  songs mode and playback-stage mode, which prevents action clusters from
+  forcing overflow on narrow windows.
+- Converted the songs workspace toolbar from a rigid row into an adaptive
+  wrap/stack layout so search feedback, selection state, and actions stay
+  readable during resize.
+- Made the bottom player bar enter compact mode automatically on narrower
+  window widths instead of waiting only for explicit focus mode.
+- Changed the empty-state card to use a max-width constraint rather than a
+  fixed width, which avoids one more narrow-window overflow case.
+- Simplified theme swatch selection so the palette dots no longer change size
+  when selected, making the color picker calmer and more refined.
+
+## 2026-05-17 - Visual Hierarchy And Glass Quieting
+
+### User Request
+
+- Keep focusing on UI instead of adding more browsing dimensions.
+- Specifically reduce the visual weight of the top bar, improve the hierarchy
+  of the right content area, and refine contrast and spacing inside the glass
+  material so the interface feels more harmonious and beautiful.
+
+### Understanding
+
+- The product already has enough structure for now; the next gain comes from
+  taste and restraint.
+- The top shell was still a little too assertive, and the right content area
+  had too many mid-priority elements speaking at once.
+- This round should not make the app flatter or duller; it should make the
+  emphasis more selective so important content stands out better.
+
+### Should Do
+
+- Quiet the top shell by trimming its height, padding, glow, and brand weight.
+- Soften the songs workspace materials so the list content carries more of the
+  visual focus than the surrounding chrome.
+- Make hero, chips, and small metadata badges feel lighter and more cohesive.
+- Preserve readability and Windows stability across the existing palette system.
+
+### Done
+
+- Reduced the top bar’s visual presence by trimming shell spacing, lowering its
+  emphasis, calming the search field focus glow, and tightening the brand mark.
+- Unified the songs workspace glass fill with the shared shell material recipe
+  instead of using a heavier custom dark panel.
+- Softened the library hero banner by reducing gradient intensity, icon weight,
+  shadow strength, and headline size so the banner supports the content instead
+  of competing with it.
+- Tuned heading chips and info pills to use lighter fills, quieter borders, and
+  more restrained text contrast for a cleaner hierarchy inside the glass UI.
+
+## 2026-05-17 - Sidebar/Table Balance And Bottom Density
+
+### User Request
+
+- Keep refining two high-value details: the quiet-vs-busy balance between the
+  left playlist sidebar and the right songs table, and the information density
+  of the bottom player.
+
+### Understanding
+
+- The app already feels coherent, but some areas still speak a little too
+  loudly at the same time: the sidebar competes with the songs workspace, and
+  the bottom player still carries a bit more visual mass than necessary.
+- The goal is not to flatten the UI, but to let the browsing content own more
+  of the attention while navigation and playback chrome become calmer.
+
+### Should Do
+
+- Reduce the visual weight of sidebar gradients, section headers, playlist tile
+- hover/selected states, and count badges.
+- Give the songs table header slightly clearer reading rhythm so the main
+  content side feels more deliberate.
+- Tighten the bottom player summary and utility cluster so it stays expressive
+  but lighter.
+
+### Done
+
+- Softened the sidebar edge glow, status card, section headers, playlist tile
+  hover/selected treatment, and badge styling so the left rail reads quieter.
+- Slightly clarified the songs table header contrast and spacing so the right
+  content area feels more anchored and readable.
+- Reduced the visual mass of the bottom player by tightening now-playing width,
+  lowering secondary text contrast, shrinking transport emphasis, and trimming
+  spacing between utility controls.
+
+## 2026-05-17 - Final Spacing Calibration
+
+### User Request
+
+- Do one last pure visual calibration pass focused on the songs-table row
+  treatment, the bottom progress area, and the spacing relationship between the
+  left sidebar sections.
+
+### Understanding
+
+- The product is already coherent; the remaining gains come from rhythm rather
+  than structure.
+- These three areas need to breathe on the same cadence so the whole app feels
+  intentionally composed instead of merely well-styled.
+
+### Should Do
+
+- Rebalance sidebar section gaps and local spacing so the left rail feels
+  quieter and more deliberate.
+- Smooth the songs-table row rhythm through margin, radius, icon spacing, and
+  typography micro-adjustments.
+- Refine the progress strip with calmer timing labels and a slightly slimmer,
+  steadier track/thumb treatment.
+
+### Done
+
+- Recalibrated left-sidebar section spacing so `浏览`, `我的歌单`, and the status
+  area now breathe with a more even desktop rhythm.
+- Smoothed the table row treatment through slightly softer shadows, cleaner row
+  spacing, and tighter-but-airier content alignment inside each song row.
+- Refined the bottom progress area with subtler time labels, a slimmer progress
+  track, and a lighter hover thumb so the player footer feels more polished and
+  less busy.
+
+## 2026-05-17 - Windows Visual QA Sweep
+
+### User Request
+
+- Stop making structural changes and do a Windows real-machine-style visual QA
+  sweep, checking consistency across different window sizes.
+
+### Understanding
+
+- At this stage the most useful work is not another redesign, but a careful
+  review of how the existing UI behaves in wide, medium, compact, and narrow
+  desktop sizes.
+- The goal is to catch small inconsistencies in density, legibility, and visual
+  balance before they become “that one annoying corner” in daily use.
+
+### Should Do
+
+- Launch the Windows build and inspect the UI across several window sizes.
+- Look specifically at shell balance, list readability, and compact-state
+- behavior under real resize conditions.
+- Fix any small issues that show up during the sweep and record the result.
+
+### Done
+
+- Ran a Windows visual QA pass by launching the app and capturing screenshots in
+  wide, medium, compact, and narrow window sizes.
+- Verified that the current shell, sidebar, content header, and compact-state
+  transitions now stay visually stable without new overflow regressions.
+- Found one remaining polish issue during the narrow-width pass: the top search
+  placeholder was too verbose, making the shell feel denser than necessary.
+- Shortened the quiet-layout search hint to `搜索歌曲或路径`, improving narrow
+  window balance without changing behavior.
+
+## 2026-05-17 - Sidebar Centering And Row Breathing
+
+### User Request
+
+- Fine-tune two small UI details:
+  the text/icon inside each left-sidebar playlist tile feels a little too high,
+  and the song icon in the right songs table sits too close to the title.
+
+### Understanding
+
+- These are small alignment issues, but they directly affect polish because the
+  eye catches them constantly during browsing.
+- The fix should stay minimal: re-center the playlist tile content and give the
+  songs table title a touch more breathing room without changing the overall
+  density of the interface.
+
+### Should Do
+
+- Re-center sidebar playlist tile contents vertically.
+- Add a subtle horizontal gap between the songs-table media icon cluster and the
+  track title area.
+- Re-run formatting and analysis to make sure the touch-up stays clean.
+
+### Done
+
+- Wrapped the sidebar playlist tile content in a centered layout and added a
+  steadier text line-height so the icon and title sit more naturally on the
+  vertical centerline.
+- Added a small spacer between the songs-table lead cluster and the title block,
+  which makes the icon/title relationship feel less cramped.

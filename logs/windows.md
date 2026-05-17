@@ -355,3 +355,62 @@ Current test count: 29 passing tests.
   the list reads more like a real media workspace.
 - The current playback queue now behaves more like a dedicated queue page,
   including queue-specific copy and a direct return path to the playback stage.
+
+## 2026-05-17 - Adaptive Header And Resize Stability
+
+- The Windows content header now switches to stacked layouts before narrow
+  widths become unsafe, so playlist/library headers no longer try to force all
+  pills, actions, and mode controls into one row.
+- The songs workspace toolbar now wraps and stacks intelligently during resize,
+  which removes common overflow pressure from search, selection, and sort
+  controls.
+- The bottom player bar now auto-enters its compact variant on narrower window
+  widths, improving resize stability without requiring manual focus mode.
+- Theme swatch selection was simplified to a steadier dot treatment, so the
+  palette picker feels calmer and avoids small selection-size jitter.
+
+## 2026-05-17 - Visual Hierarchy And Glass Quieting
+
+- The Windows top shell was quieted by slightly reducing its height, padding,
+  and emphasis, with a calmer focus treatment in the global search field.
+- The songs workspace panel now uses the shared shell-glass recipe, which makes
+  the right content area feel more like part of the same material system.
+- The library hero banner was softened through lighter gradients, gentler
+  shadows, and a less dominant title/icon treatment.
+- Chips and metadata pills now use lighter fills and borders, improving content
+  hierarchy inside the glass UI without hurting readability across themes.
+
+## 2026-05-17 - Sidebar/Table Balance And Bottom Density
+
+- The Windows sidebar was quieted further through softer edge glow, lighter
+  section headers, calmer playlist-tile hover/selected states, and subtler
+  count badges.
+- The songs table header gained slightly clearer spacing and contrast so the
+  main content side reads with more confidence against the quieter sidebar.
+- The bottom player now uses a tighter now-playing summary, more restrained
+  secondary text, smaller transport emphasis, and denser utility spacing.
+
+## 2026-05-17 - Final Spacing Calibration
+
+- The Windows sidebar now uses more even section spacing between browse,
+  playlists, and status areas, which improves overall shell rhythm.
+- Songs-table rows were tuned with slightly calmer spacing, softer highlight
+  treatment, and cleaner internal alignment.
+- The bottom progress area now uses subtler time labels, a slimmer track, and
+  a lighter hover thumb for a more refined footer presentation.
+
+## 2026-05-17 - Windows Visual QA Sweep
+
+- Performed a Windows screenshot-based visual QA pass across wide, medium,
+  compact, and narrow window sizes.
+- The current adaptive shell remained stable during the sweep with no new
+  overflow issues observed in the inspected desktop sizes.
+- Narrow-width review exposed one last density issue in the top shell, so the
+  quiet-layout search placeholder was shortened to `搜索歌曲或路径`.
+
+## 2026-05-17 - Sidebar Centering And Row Breathing
+
+- Re-centered the left-sidebar playlist tile content so the icon/title group
+  sits more comfortably on the tile’s vertical middle.
+- Added a little more horizontal breathing room between the songs-table media
+  icon cluster and the track title block.

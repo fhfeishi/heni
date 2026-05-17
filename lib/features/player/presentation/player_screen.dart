@@ -35,13 +35,13 @@ const _libraryActionColumnWidth = 92.0;
 
 Color _shellGlassFill(HeniPalette palette, {double emphasis = 1}) {
   return Color.alphaBlend(
-    palette.surfaceAlt.withValues(alpha: 0.58 + 0.05 * emphasis),
+    palette.surfaceAlt.withValues(alpha: 0.52 + 0.04 * emphasis),
     palette.surface,
   );
 }
 
 Color _shellGlassBorder(HeniPalette palette, {double emphasis = 1}) {
-  return palette.seed.withValues(alpha: 0.13 + 0.02 * emphasis);
+  return palette.seed.withValues(alpha: 0.10 + 0.018 * emphasis);
 }
 
 Color _primaryGlassText({double emphasis = 1}) {
@@ -149,7 +149,7 @@ IconData _playbackModeIcon(HeniPlaybackMode mode) {
   };
 }
 
-class _GlassPanel extends StatelessWidget {
+class _GlassPanel extends StatefulWidget {
   const _GlassPanel({
     required this.child,
     this.padding,
@@ -157,6 +157,7 @@ class _GlassPanel extends StatelessWidget {
     this.fillColor,
     this.borderColor,
     this.auroraPalette,
+    this.hoverAccentPalette,
   });
 
   final Widget child;
@@ -166,48 +167,87 @@ class _GlassPanel extends StatelessWidget {
   final Color? borderColor;
   final HeniPalette? auroraPalette;
 
+  /// 桌面端指针悬停时略微提亮描边与光晕，避免玻璃块「死板」。
+  final HeniPalette? hoverAccentPalette;
+
+  @override
+  State<_GlassPanel> createState() => _GlassPanelState();
+}
+
+class _GlassPanelState extends State<_GlassPanel> {
+  bool _hover = false;
+
   @override
   Widget build(BuildContext context) {
     final resolvedFill =
-        fillColor ??
+        widget.fillColor ??
         Color.alphaBlend(Colors.white.withValues(alpha: 0.06), Colors.black);
-    final resolvedBorder =
-        borderColor ?? Colors.white.withValues(alpha: 0.07);
+    final baseBorder =
+        widget.borderColor ?? Colors.white.withValues(alpha: 0.07);
+    final accent = widget.hoverAccentPalette;
+    final borderCol =
+        _hover && accent != null
+            ? Color.alphaBlend(accent.seed.withValues(alpha: 0.34), baseBorder)
+            : baseBorder;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
+    final shadows = <BoxShadow>[
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.22),
+        blurRadius: 30,
+        offset: const Offset(0, 14),
+      ),
+      if (_hover && accent != null)
+        BoxShadow(
+          color: accent.seed.withValues(alpha: 0.15),
+          blurRadius: 28,
+          spreadRadius: -8,
+          offset: const Offset(0, 12),
+        ),
+    ];
+
+    Widget core = ClipRRect(
+      borderRadius: BorderRadius.circular(widget.radius),
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 26, sigmaY: 26),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
           decoration: BoxDecoration(
             color: resolvedFill,
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: resolvedBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.22),
-                blurRadius: 30,
-                offset: const Offset(0, 14),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(widget.radius),
+            border: Border.all(color: borderCol),
+            boxShadow: shadows,
           ),
           child: Stack(
             children: [
-              if (auroraPalette != null)
+              if (widget.auroraPalette != null)
                 Positioned(
                   left: 14,
                   right: 14,
                   top: 0,
                   height: 1,
                   child: IgnorePointer(
-                    child: _AuroraBar(palette: auroraPalette!),
+                    child: _AuroraBar(palette: widget.auroraPalette!),
                   ),
                 ),
-              Padding(padding: padding ?? EdgeInsets.zero, child: child),
+              Padding(
+                padding: widget.padding ?? EdgeInsets.zero,
+                child: widget.child,
+              ),
             ],
           ),
         ),
       ),
+    );
+
+    if (accent == null) {
+      return core;
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: core,
     );
   }
 }
@@ -342,6 +382,7 @@ class _ShellBand extends StatelessWidget {
                 fillColor: _shellGlassFill(palette, emphasis: emphasis),
                 borderColor: _shellGlassBorder(palette, emphasis: emphasis),
                 auroraPalette: palette,
+                hoverAccentPalette: palette,
                 padding: padding,
                 child: child,
               ),
@@ -602,9 +643,7 @@ class _AmbientBackdropState extends ConsumerState<_AmbientBackdrop>
                     scale: scale1,
                     child: _GlowOrb(
                       size: 420,
-                      color: palette.seed.withValues(
-                        alpha: 0.18 * intensity,
-                      ),
+                      color: palette.seed.withValues(alpha: 0.18 * intensity),
                     ),
                   ),
                 ),
@@ -615,9 +654,7 @@ class _AmbientBackdropState extends ConsumerState<_AmbientBackdrop>
                     scale: scale2,
                     child: _GlowOrb(
                       size: 460,
-                      color: palette.accent.withValues(
-                        alpha: 0.10 * intensity,
-                      ),
+                      color: palette.accent.withValues(alpha: 0.10 * intensity),
                     ),
                   ),
                 ),
@@ -732,12 +769,11 @@ class _CornerGlowState extends ConsumerState<_CornerGlow>
                 scale: 1.0 + 0.045 * breathe * amp,
                 child: _CornerOrb(
                   size: 300,
-                  color:
-                      Color.lerp(
-                        palette.seed,
-                        palette.accent,
-                        0.6,
-                      )!.withValues(alpha: 0.12 + alphaBoost * 0.08),
+                  color: Color.lerp(
+                    palette.seed,
+                    palette.accent,
+                    0.6,
+                  )!.withValues(alpha: 0.12 + alphaBoost * 0.08),
                 ),
               ),
             ),
@@ -898,35 +934,48 @@ class PlayerScreen extends ConsumerWidget {
                                                     .toggle(),
                                       )
                                       : _Sidebar(
-                              palette: palette,
-                              queue: queue,
-                              layout: layout,
-                              onCreatePlaylist:
-                                  () => _createPlaylist(context, ref),
-                              onSelectPlaylist: (playlistId) {
-                                ref
-                                    .read(
-                                      playbackQueueControllerProvider.notifier,
-                                    )
-                                    .selectPlaylist(playlistId);
-                              },
-                              onAddFromLibrary: (playlistId) {
-                                _addFromLibrary(context, ref, playlistId);
-                              },
-                              onRenamePlaylist: (playlist) {
-                                _renamePlaylist(context, ref, playlist);
-                              },
-                              onEditDescription: (playlist) {
-                                _editPlaylistDescription(
-                                  context,
-                                  ref,
-                                  playlist,
-                                );
-                              },
-                              onDeletePlaylist: (playlist) {
-                                _confirmDeletePlaylist(context, ref, playlist);
-                              },
-                            ),
+                                        palette: palette,
+                                        queue: queue,
+                                        layout: layout,
+                                        onCreatePlaylist:
+                                            () => _createPlaylist(context, ref),
+                                        onSelectPlaylist: (playlistId) {
+                                          ref
+                                              .read(
+                                                playbackQueueControllerProvider
+                                                    .notifier,
+                                              )
+                                              .selectPlaylist(playlistId);
+                                        },
+                                        onAddFromLibrary: (playlistId) {
+                                          _addFromLibrary(
+                                            context,
+                                            ref,
+                                            playlistId,
+                                          );
+                                        },
+                                        onRenamePlaylist: (playlist) {
+                                          _renamePlaylist(
+                                            context,
+                                            ref,
+                                            playlist,
+                                          );
+                                        },
+                                        onEditDescription: (playlist) {
+                                          _editPlaylistDescription(
+                                            context,
+                                            ref,
+                                            playlist,
+                                          );
+                                        },
+                                        onDeletePlaylist: (playlist) {
+                                          _confirmDeletePlaylist(
+                                            context,
+                                            ref,
+                                            playlist,
+                                          );
+                                        },
+                                      ),
                             ),
                             Expanded(
                               child: _ContentArea(
@@ -1317,16 +1366,16 @@ class _TopNavigation extends ConsumerWidget {
       palette: palette,
       margin: EdgeInsets.fromLTRB(
         layout.topHorizontalMargin,
-        12,
+        10,
         layout.topHorizontalMargin,
-        6,
+        4,
       ),
       padding: EdgeInsets.symmetric(
-        horizontal: layout.quiet ? 12 : 16,
-        vertical: layout.quiet ? 8 : 10,
+        horizontal: layout.quiet ? 11 : 14,
+        vertical: layout.quiet ? 7 : 9,
       ),
-      height: layout.topHeight,
-      emphasis: 1.05,
+      height: layout.topHeight - 4,
+      emphasis: 0.94,
       child: Row(
         children: [
           _TopBrand(palette: palette, layout: layout),
@@ -1365,12 +1414,12 @@ class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
     _controller = TextEditingController(
       text: ref.read(librarySearchQueryProvider),
     );
-    _focusNode = FocusNode()
-      ..addListener(() {
-        if (_focused != _focusNode.hasFocus) {
-          setState(() => _focused = _focusNode.hasFocus);
-        }
-      });
+    _focusNode =
+        FocusNode()..addListener(() {
+          if (_focused != _focusNode.hasFocus) {
+            setState(() => _focused = _focusNode.hasFocus);
+          }
+        });
   }
 
   @override
@@ -1392,32 +1441,33 @@ class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
     });
 
     final palette = ref.watch(activePaletteProvider);
+    final hintText = widget.layout.quiet ? '搜索歌曲或路径' : '搜索当前列表里的歌曲、路径';
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOutCubic,
       height: widget.layout.quiet ? 34 : 38,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: _focused ? 0.07 : 0.04),
+        color: Colors.white.withValues(alpha: _focused ? 0.055 : 0.032),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color:
               _focused
-                  ? palette.seed.withValues(alpha: 0.55)
-                  : Colors.white.withValues(alpha: 0.08),
-          width: _focused ? 1.4 : 1,
+                  ? palette.seed.withValues(alpha: 0.34)
+                  : Colors.white.withValues(alpha: 0.06),
+          width: _focused ? 1.2 : 1,
         ),
         boxShadow:
             _focused
                 ? [
                   BoxShadow(
-                    color: palette.seed.withValues(alpha: 0.32),
-                    blurRadius: 16,
+                    color: palette.seed.withValues(alpha: 0.18),
+                    blurRadius: 14,
                     spreadRadius: 0,
                   ),
                   BoxShadow(
-                    color: palette.accent.withValues(alpha: 0.18),
-                    blurRadius: 22,
+                    color: palette.accent.withValues(alpha: 0.08),
+                    blurRadius: 18,
                   ),
                 ]
                 : const [],
@@ -1434,7 +1484,7 @@ class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
         ),
         decoration: InputDecoration(
           border: InputBorder.none,
-          hintText: '搜索当前列表里的歌曲、路径',
+          hintText: hintText,
           hintStyle: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: _tertiaryGlassText()),
@@ -1443,8 +1493,8 @@ class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
             size: 20,
             color:
                 _focused
-                    ? palette.seed
-                    : _secondaryGlassText(emphasis: 0.96),
+                    ? palette.seed.withValues(alpha: 0.92)
+                    : _secondaryGlassText(emphasis: 0.92),
           ),
           suffixIcon:
               _controller.text.isEmpty
@@ -1479,7 +1529,7 @@ class _TopBrand extends StatelessWidget {
     final theme = Theme.of(context);
 
     return SizedBox(
-      width: layout.quiet ? 116 : 134,
+      width: layout.quiet ? 104 : 120,
       child: Row(
         children: [
           TweenAnimationBuilder<double>(
@@ -1491,8 +1541,8 @@ class _TopBrand extends StatelessWidget {
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
-              width: 30,
-              height: 30,
+              width: 28,
+              height: 28,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -1508,8 +1558,8 @@ class _TopBrand extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: palette.seed.withValues(alpha: 0.32),
-                    blurRadius: 12,
+                    color: palette.seed.withValues(alpha: 0.22),
+                    blurRadius: 10,
                     spreadRadius: 0,
                   ),
                 ],
@@ -1530,9 +1580,9 @@ class _TopBrand extends StatelessWidget {
               'Heni',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w900,
-                fontSize: 17,
-                letterSpacing: 0.4,
-                color: _primaryGlassText(emphasis: 1.04),
+                fontSize: 16,
+                letterSpacing: 0.25,
+                color: _primaryGlassText(emphasis: 0.98),
               ),
             ),
           ),
@@ -1599,8 +1649,8 @@ class _Sidebar extends StatelessWidget {
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   colors: [
-                    palette.seed.withValues(alpha: 0.12),
-                    palette.seed.withValues(alpha: 0.04),
+                    palette.seed.withValues(alpha: 0.08),
+                    palette.seed.withValues(alpha: 0.025),
                     Colors.transparent,
                   ],
                 ),
@@ -1612,6 +1662,7 @@ class _Sidebar extends StatelessWidget {
             fillColor: _shellGlassFill(palette, emphasis: 0.96),
             borderColor: _shellGlassBorder(palette, emphasis: 0.96),
             auroraPalette: palette,
+            hoverAccentPalette: palette,
             padding: EdgeInsets.fromLTRB(
               layout.quiet ? 10 : 12,
               layout.quiet ? 10 : 12,
@@ -1626,7 +1677,7 @@ class _Sidebar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _SidebarSectionHeader(title: '浏览'),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   _PlaylistTile(
                     palette: palette,
                     playlist: queue.library,
@@ -1634,7 +1685,7 @@ class _Sidebar extends StatelessWidget {
                     isPlayingHere: queue.currentItem != null,
                     onTap: () => onSelectPlaylist(queue.library.id),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   _PlaylistTile(
                     palette: palette,
                     playlist: playbackQueuePlaylist,
@@ -1642,7 +1693,7 @@ class _Sidebar extends StatelessWidget {
                     isPlayingHere: queue.currentItem != null,
                     onTap: () => onSelectPlaylist(heniPlaybackQueueId),
                   ),
-                  SizedBox(height: layout.quiet ? 14 : 18),
+                  SizedBox(height: layout.quiet ? 16 : 22),
                   _SidebarSectionHeader(
                     title: '我的歌单',
                     action: IconButton(
@@ -1657,7 +1708,7 @@ class _Sidebar extends StatelessWidget {
                       visualDensity: VisualDensity.compact,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Expanded(
                     flex: 2,
                     child:
@@ -1692,16 +1743,17 @@ class _Sidebar extends StatelessWidget {
                               ],
                             ),
                   ),
+                  SizedBox(height: layout.quiet ? 12 : 16),
                   const Spacer(),
                   if (layout.showSidebarStatus &&
                       (queue.statusMessage != null || queue.lastError != null))
                     Container(
                       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.03),
+                        color: Colors.white.withValues(alpha: 0.024),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.05),
+                          color: Colors.white.withValues(alpha: 0.04),
                         ),
                       ),
                       child: Column(
@@ -1771,9 +1823,9 @@ class _SidebarSectionHeader extends StatelessWidget {
               title,
               style: theme.textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w800,
-                fontSize: 12.5,
-                letterSpacing: 0.3,
-                color: _secondaryGlassText(emphasis: 0.95),
+                fontSize: 11.8,
+                letterSpacing: 0.2,
+                color: _secondaryGlassText(emphasis: 0.82),
               ),
             ),
           ),
@@ -1826,175 +1878,179 @@ class _PlaylistTileState extends ConsumerState<_PlaylistTile> {
       child: AnimatedScale(
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOutCubic,
-        scale:
-            widget.selected
-                ? 1.0
-                : _hovered
-                ? 1.012
-                : 1.0,
+        scale: widget.selected ? 1.0 : (_hovered ? 1.006 : 1.0),
         child: Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          height: 40,
-          decoration: BoxDecoration(
-            color: tint.withValues(
-              alpha:
-                  widget.selected
-                      ? 0.18
-                      : _hovered
-                      ? 0.08
-                      : 0.0,
+          padding: const EdgeInsets.only(bottom: 3),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            height: 38,
+            decoration: BoxDecoration(
+              color: tint.withValues(
+                alpha:
+                    widget.selected
+                        ? 0.14
+                        : _hovered
+                        ? 0.05
+                        : 0.0,
+              ),
+              borderRadius: BorderRadius.circular(11),
             ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: widget.onTap,
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: 0,
-                    top: 8,
-                    bottom: 8,
-                    child: AnimatedContainer(
-                      duration: _hoverDuration,
-                      curve: _hoverCurve,
-                      width: widget.selected ? 3 : (_hovered ? 1.5 : 0),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(999),
-                        color:
-                            widget.selected
-                                ? tint
-                                : Colors.white.withValues(alpha: 0.28),
-                        boxShadow: [
-                          if (widget.selected)
-                            BoxShadow(
-                              color: tint.withValues(alpha: 0.5),
-                              blurRadius: 6,
-                            ),
-                        ],
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(11),
+                onTap: widget.onTap,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      left: 0,
+                      top: 8,
+                      bottom: 8,
+                      child: AnimatedContainer(
+                        duration: _hoverDuration,
+                        curve: _hoverCurve,
+                        width: widget.selected ? 3 : (_hovered ? 1.5 : 0),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(999),
+                          color:
+                              widget.selected
+                                  ? tint
+                                  : Colors.white.withValues(alpha: 0.18),
+                          boxShadow: [
+                            if (widget.selected)
+                              BoxShadow(
+                                color: tint.withValues(alpha: 0.34),
+                                blurRadius: 5,
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 0, 6, 0),
-                    child: Row(
-                      children: [
-                        AnimatedContainer(
-                          duration: _hoverDuration,
-                          width: 26,
-                          height: 26,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: tint.withValues(
-                              alpha: active ? 0.24 : 0.10,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            widget.onDelete == null
-                                ? Icons.library_music_outlined
-                                : Icons.queue_music_rounded,
-                            size: 14,
-                            color: _primaryGlassText(
-                              emphasis: active ? 1.06 : 0.92,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            widget.playlist.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight:
-                                  widget.selected
-                                      ? FontWeight.w800
-                                      : FontWeight.w600,
-                              color: _primaryGlassText(
-                                emphasis: widget.selected ? 1.04 : 0.94,
-                              ),
-                              letterSpacing: 0.1,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        if (widget.isPlayingHere)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: StreamBuilder<bool>(
-                              stream: ref.read(playbackEngineProvider).playing,
-                              initialData: false,
-                              builder: (context, snap) {
-                                return _NowPlayingWave(
-                                  color: widget.palette.seed,
-                                  active: snap.data ?? false,
-                                );
-                              },
-                            ),
-                          ),
-                        _CountBadge(count: widget.playlist.items.length),
-                        if (widget.onDelete != null)
-                          AnimatedOpacity(
-                            duration: _hoverDuration,
-                            opacity: _hovered ? 1 : 0,
-                            child: SizedBox(
-                              width: _hovered ? 24 : 0,
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 0, 4, 0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            AnimatedContainer(
+                              duration: _hoverDuration,
+                              width: 24,
                               height: 24,
-                              child: PopupMenuButton<_PlaylistAction>(
-                                tooltip: '歌单选项',
-                                padding: EdgeInsets.zero,
-                                icon: const Icon(Icons.more_horiz, size: 16),
-                                iconSize: 16,
-                                onSelected: (action) {
-                                  switch (action) {
-                                    case _PlaylistAction.addFromLibrary:
-                                      widget.onAddFromLibrary?.call();
-                                    case _PlaylistAction.rename:
-                                      widget.onRename?.call();
-                                    case _PlaylistAction.description:
-                                      widget.onEditDescription?.call();
-                                    case _PlaylistAction.delete:
-                                      widget.onDelete?.call();
-                                  }
-                                },
-                                itemBuilder:
-                                    (context) => const [
-                                      PopupMenuItem<_PlaylistAction>(
-                                        value: _PlaylistAction.addFromLibrary,
-                                        child: Text('添加歌曲'),
-                                      ),
-                                      PopupMenuItem<_PlaylistAction>(
-                                        value: _PlaylistAction.rename,
-                                        child: Text('重命名'),
-                                      ),
-                                      PopupMenuItem<_PlaylistAction>(
-                                        value: _PlaylistAction.description,
-                                        child: Text('编辑说明'),
-                                      ),
-                                      PopupMenuDivider(),
-                                      PopupMenuItem<_PlaylistAction>(
-                                        value: _PlaylistAction.delete,
-                                        child: Text('删除'),
-                                      ),
-                                    ],
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: tint.withValues(
+                                  alpha: active ? 0.18 : 0.07,
+                                ),
+                                borderRadius: BorderRadius.circular(7),
+                              ),
+                              child: Icon(
+                                widget.onDelete == null
+                                    ? Icons.library_music_outlined
+                                    : Icons.queue_music_rounded,
+                                size: 13,
+                                color: _primaryGlassText(
+                                  emphasis: active ? 1.0 : 0.9,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
+                            const SizedBox(width: 9),
+                            Expanded(
+                              child: Text(
+                                widget.playlist.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12.6,
+                                  height: 1.15,
+                                  fontWeight:
+                                      widget.selected
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
+                                  color: _primaryGlassText(
+                                    emphasis: widget.selected ? 1.0 : 0.9,
+                                  ),
+                                  letterSpacing: 0.05,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            if (widget.isPlayingHere)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: StreamBuilder<bool>(
+                                  stream:
+                                      ref.read(playbackEngineProvider).playing,
+                                  initialData: false,
+                                  builder: (context, snap) {
+                                    return _NowPlayingWave(
+                                      color: widget.palette.seed,
+                                      active: snap.data ?? false,
+                                    );
+                                  },
+                                ),
+                              ),
+                            _CountBadge(count: widget.playlist.items.length),
+                            if (widget.onDelete != null)
+                              AnimatedOpacity(
+                                duration: _hoverDuration,
+                                opacity: _hovered ? 1 : 0,
+                                child: SizedBox(
+                                  width: _hovered ? 24 : 0,
+                                  height: 24,
+                                  child: PopupMenuButton<_PlaylistAction>(
+                                    tooltip: '歌单选项',
+                                    padding: EdgeInsets.zero,
+                                    icon: const Icon(
+                                      Icons.more_horiz,
+                                      size: 16,
+                                    ),
+                                    iconSize: 16,
+                                    onSelected: (action) {
+                                      switch (action) {
+                                        case _PlaylistAction.addFromLibrary:
+                                          widget.onAddFromLibrary?.call();
+                                        case _PlaylistAction.rename:
+                                          widget.onRename?.call();
+                                        case _PlaylistAction.description:
+                                          widget.onEditDescription?.call();
+                                        case _PlaylistAction.delete:
+                                          widget.onDelete?.call();
+                                      }
+                                    },
+                                    itemBuilder:
+                                        (context) => const [
+                                          PopupMenuItem<_PlaylistAction>(
+                                            value:
+                                                _PlaylistAction.addFromLibrary,
+                                            child: Text('添加歌曲'),
+                                          ),
+                                          PopupMenuItem<_PlaylistAction>(
+                                            value: _PlaylistAction.rename,
+                                            child: Text('重命名'),
+                                          ),
+                                          PopupMenuItem<_PlaylistAction>(
+                                            value: _PlaylistAction.description,
+                                            child: Text('编辑说明'),
+                                          ),
+                                          PopupMenuDivider(),
+                                          PopupMenuItem<_PlaylistAction>(
+                                            value: _PlaylistAction.delete,
+                                            child: Text('删除'),
+                                          ),
+                                        ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
         ),
       ),
     );
@@ -2012,11 +2068,11 @@ class _InfoPill extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: Colors.white.withValues(alpha: 0.032),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.065)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2026,7 +2082,7 @@ class _InfoPill extends StatelessWidget {
           Text(
             label,
             style: theme.textTheme.labelMedium?.copyWith(
-              color: _secondaryGlassText(),
+              color: _secondaryGlassText(emphasis: 0.92),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -2110,17 +2166,17 @@ class _CountBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       constraints: const BoxConstraints(minWidth: 22),
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.07),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         '$count',
         textAlign: TextAlign.center,
         style: TextStyle(
-          fontSize: 10.5,
-          color: _secondaryGlassText(),
+          fontSize: 10,
+          color: _secondaryGlassText(emphasis: 0.88),
           fontWeight: FontWeight.w800,
           letterSpacing: 0.2,
           fontFeatures: const [ui.FontFeature.tabularFigures()],
@@ -2184,46 +2240,48 @@ class _SongsEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      width: 360,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.035),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(18),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 360),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.035),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(Icons.library_music_outlined),
             ),
-            child: const Icon(Icons.library_music_outlined),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: _primaryGlassText(),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: _primaryGlassText(),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: _secondaryGlassText(emphasis: 0.82),
-              height: 1.45,
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: _secondaryGlassText(emphasis: 0.82),
+                height: 1.45,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -2302,6 +2360,7 @@ class _ContentArea extends ConsumerWidget {
               fillColor: _shellGlassFill(palette, emphasis: 0.9),
               borderColor: _shellGlassBorder(palette, emphasis: 0.9),
               auroraPalette: palette,
+              hoverAccentPalette: palette,
               padding: EdgeInsets.fromLTRB(
                 layout.quiet ? 12 : 16,
                 layout.quiet ? 8 : 10,
@@ -2446,100 +2505,195 @@ class _ContentHeader extends StatelessWidget {
               ),
             ];
 
-    if (uiStyle == HeniUiStyle.scenery) {
-      return Row(
-        children: [
-          _HeadingChip(label: headingLabel, palette: palette),
-          const SizedBox(width: 10),
-          if (refreshStatus != null) refreshStatus,
-          const Spacer(),
-          ...actionButtons,
-          const SizedBox(width: 12),
-          _UiStyleSwitch(
-            palette: palette,
-            active: uiStyle,
-            onSelect: onSelectUiStyle,
-          ),
-        ],
-      );
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final stackedHeader = width < 940;
+        final compactHeader = width < 760;
 
-    final infoPills =
-        browsingLibrary
-            ? [
-              _InfoPill(
-                icon: Icons.music_note_outlined,
-                label: '${queue.library.items.length} 首内容',
-              ),
-              _InfoPill(
-                icon: Icons.folder_outlined,
-                label: '${queue.libraryDirectories.length} 个目录',
-              ),
-              if (refreshStatus != null) refreshStatus,
-            ]
-            : [
-              _InfoPill(
-                icon: Icons.queue_music,
-                label: '${playlist.items.length} 首内容',
-              ),
-              if (browsingPlaybackQueue)
-                _InfoPill(
-                  icon: Icons.swap_horiz_rounded,
-                  label: queue.playbackMode.label,
+        if (uiStyle == HeniUiStyle.scenery) {
+          if (compactHeader) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    _HeadingChip(label: headingLabel, palette: palette),
+                    const Spacer(),
+                    _UiStyleSwitch(
+                      palette: palette,
+                      active: uiStyle,
+                      onSelect: onSelectUiStyle,
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (refreshStatus != null) refreshStatus,
+                    ...actionButtons,
+                  ],
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              _HeadingChip(label: headingLabel, palette: palette),
+              const SizedBox(width: 10),
               if (refreshStatus != null) refreshStatus,
-            ];
+              const Spacer(),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: actionButtons,
+              ),
+              const SizedBox(width: 12),
+              _UiStyleSwitch(
+                palette: palette,
+                active: uiStyle,
+                onSelect: onSelectUiStyle,
+              ),
+            ],
+          );
+        }
 
-    final headerRow = Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        _HeadingChip(label: headingLabel, palette: palette),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            playlist.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w900,
-              fontSize: 20,
-              letterSpacing: -0.2,
+        final infoPills =
+            browsingLibrary
+                ? [
+                  _InfoPill(
+                    icon: Icons.music_note_outlined,
+                    label: '${queue.library.items.length} 首内容',
+                  ),
+                  _InfoPill(
+                    icon: Icons.folder_outlined,
+                    label: '${queue.libraryDirectories.length} 个目录',
+                  ),
+                  if (refreshStatus != null) refreshStatus,
+                ]
+                : [
+                  _InfoPill(
+                    icon: Icons.queue_music,
+                    label: '${playlist.items.length} 首内容',
+                  ),
+                  if (browsingPlaybackQueue)
+                    _InfoPill(
+                      icon: Icons.swap_horiz_rounded,
+                      label: queue.playbackMode.label,
+                    ),
+                  if (refreshStatus != null) refreshStatus,
+                ];
+
+        final titleText = Text(
+          playlist.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w900,
+            fontSize: compactHeader ? 18 : 20,
+            letterSpacing: -0.2,
+          ),
+        );
+
+        final infoWrap = Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: infoPills,
+        );
+
+        final actionWrap = Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.end,
+          children: actionButtons,
+        );
+
+        if (compactHeader) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  _HeadingChip(label: headingLabel, palette: palette),
+                  const Spacer(),
+                  _UiStyleSwitch(
+                    palette: palette,
+                    active: uiStyle,
+                    onSelect: onSelectUiStyle,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              titleText,
+              const SizedBox(height: 10),
+              infoWrap,
+              if (actionButtons.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Align(alignment: Alignment.centerRight, child: actionWrap),
+              ],
+            ],
+          );
+        }
+
+        final headerRow = Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _HeadingChip(label: headingLabel, palette: palette),
+            const SizedBox(width: 10),
+            Expanded(child: titleText),
+            const SizedBox(width: 12),
+            _UiStyleSwitch(
+              palette: palette,
+              active: uiStyle,
+              onSelect: onSelectUiStyle,
             ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        _UiStyleSwitch(
-          palette: palette,
-          active: uiStyle,
-          onSelect: onSelectUiStyle,
-        ),
-      ],
-    );
+          ],
+        );
 
-    final actionsAndPills = Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: infoPills,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Wrap(spacing: 8, runSpacing: 8, children: actionButtons),
-      ],
-    );
+        if (stackedHeader) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              headerRow,
+              const SizedBox(height: 10),
+              infoWrap,
+              if (actionButtons.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Align(alignment: Alignment.centerRight, child: actionWrap),
+              ],
+            ],
+          );
+        }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        headerRow,
-        const SizedBox(height: 10),
-        actionsAndPills,
-      ],
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            headerRow,
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: infoWrap),
+                if (actionButtons.isNotEmpty) ...[
+                  const SizedBox(width: 10),
+                  actionWrap,
+                ],
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -2585,6 +2739,7 @@ class _LibraryHeroBanner extends StatelessWidget {
     required this.onSelectUiStyle,
     required this.libraryDirCount,
     required this.isScanning,
+    this.playbackSourceName,
   });
 
   final HeniPalette palette;
@@ -2598,6 +2753,9 @@ class _LibraryHeroBanner extends StatelessWidget {
   final ValueChanged<HeniUiStyle> onSelectUiStyle;
   final int libraryDirCount;
   final bool isScanning;
+
+  /// 浏览「当前播放列表」时用于 Tooltip 展示队列来源歌单名。
+  final String? playbackSourceName;
 
   @override
   Widget build(BuildContext context) {
@@ -2614,6 +2772,35 @@ class _LibraryHeroBanner extends StatelessWidget {
             ? Icons.library_music_outlined
             : Icons.album_rounded;
 
+    final subtitleParts = <String>['$itemCount 首'];
+    if (browsingLibrary) {
+      subtitleParts.add('$libraryDirCount 个目录');
+    } else if (!browsingPlaybackQueue && totalDurationLabel != '--') {
+      subtitleParts.add(totalDurationLabel);
+    }
+
+    final subtitleLine = subtitleParts.join(' · ');
+
+    final tooltipLines = <String>[
+      if (browsingLibrary && totalDurationLabel != '--')
+        '合计时长约 $totalDurationLabel',
+      if (browsingPlaybackQueue && totalDurationLabel != '--')
+        '队列合计约 $totalDurationLabel',
+      if (browsingPlaybackQueue &&
+          playbackSourceName != null &&
+          playbackSourceName!.isNotEmpty)
+        '播放来源：$playbackSourceName',
+    ];
+    final subtitleTooltip =
+        tooltipLines.isEmpty ? null : tooltipLines.join('\n');
+
+    final scopeStyle = theme.textTheme.labelSmall?.copyWith(
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.9,
+      color: Colors.white.withValues(alpha: 0.48),
+    );
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
       child: BackdropFilter(
@@ -2625,23 +2812,23 @@ class _LibraryHeroBanner extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                palette.seed.withValues(alpha: 0.32),
+                palette.seed.withValues(alpha: 0.20),
                 Color.alphaBlend(
-                  palette.accent.withValues(alpha: 0.18),
-                  Colors.black.withValues(alpha: 0.42),
+                  palette.accent.withValues(alpha: 0.10),
+                  Colors.black.withValues(alpha: 0.38),
                 ),
-                Colors.black.withValues(alpha: 0.5),
+                Colors.black.withValues(alpha: 0.46),
               ],
               stops: const [0.0, 0.55, 1.0],
             ),
             border: Border.all(
-              color: palette.seed.withValues(alpha: 0.28),
+              color: palette.seed.withValues(alpha: 0.18),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: palette.seed.withValues(alpha: 0.18),
-                blurRadius: 24,
+                color: palette.seed.withValues(alpha: 0.10),
+                blurRadius: 18,
               ),
             ],
           ),
@@ -2654,26 +2841,14 @@ class _LibraryHeroBanner extends StatelessWidget {
                 height: 1,
                 child: IgnorePointer(child: _AuroraBar(palette: palette)),
               ),
-              Positioned(
-                right: -40,
-                top: -30,
-                child: Transform.rotate(
-                  angle: 0.18,
-                  child: Icon(
-                    heroIcon,
-                    size: 220,
-                    color: palette.accent.withValues(alpha: 0.07),
-                  ),
-                ),
-              ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+                padding: const EdgeInsets.fromLTRB(18, 15, 12, 15),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      width: 56,
-                      height: 56,
+                      width: 44,
+                      height: 44,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -2681,25 +2856,25 @@ class _LibraryHeroBanner extends StatelessWidget {
                           end: Alignment.bottomRight,
                           colors: [
                             palette.seed,
-                            Color.lerp(palette.seed, palette.accent, 0.6)!,
+                            Color.lerp(palette.seed, palette.accent, 0.55)!,
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: palette.seed.withValues(alpha: 0.45),
-                            blurRadius: 16,
-                            spreadRadius: 1,
+                            color: palette.seed.withValues(alpha: 0.24),
+                            blurRadius: 10,
+                            spreadRadius: 0,
                           ),
                         ],
                       ),
                       child: Icon(
                         heroIcon,
-                        size: 26,
+                        size: 20,
                         color: heniReadableForegroundOn(palette.seed),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2707,96 +2882,89 @@ class _LibraryHeroBanner extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(999),
-                                  color: Colors.white.withValues(alpha: 0.10),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.12),
-                                  ),
-                                ),
-                                child: Text(
-                                  headingLabel,
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.6,
-                                    color: Colors.white.withValues(alpha: 0.86),
-                                  ),
-                                ),
+                              Text(
+                                headingLabel.toUpperCase(),
+                                style: scopeStyle,
                               ),
                               if (isScanning) ...[
                                 const SizedBox(width: 8),
-                                _RefreshStatusBadge(
-                                  icon: Icons.sync_rounded,
-                                  label: '整理中',
-                                  accent: true,
-                                  spinning: true,
+                                Icon(
+                                  Icons.sync_rounded,
+                                  size: 13,
+                                  color: Colors.white.withValues(alpha: 0.55),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '整理中',
+                                  style: scopeStyle?.copyWith(
+                                    letterSpacing: 0.4,
+                                    color: Colors.white.withValues(alpha: 0.62),
+                                  ),
                                 ),
                               ],
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 5),
                           Text(
                             activePlaylist.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.headlineSmall?.copyWith(
-                              fontSize: 24,
+                              fontSize: 19.5,
                               fontWeight: FontWeight.w900,
-                              letterSpacing: -0.4,
-                              height: 1.05,
+                              letterSpacing: -0.2,
+                              height: 1.08,
                               shadows: [
                                 Shadow(
-                                  color: Colors.black.withValues(alpha: 0.5),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 3),
+                                  color: Colors.black.withValues(alpha: 0.32),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              _heroMetric(
-                                icon: Icons.music_note_rounded,
-                                label: '$itemCount 首',
-                              ),
-                              if (totalDurationLabel != '--') ...[
-                                const SizedBox(width: 12),
-                                _heroDot(),
-                                const SizedBox(width: 12),
-                                _heroMetric(
-                                  icon: Icons.schedule_rounded,
-                                  label: totalDurationLabel,
+                          const SizedBox(height: 4),
+                          Builder(
+                            builder: (context) {
+                              final subtitleStyle = theme.textTheme.bodySmall
+                                  ?.copyWith(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.2,
+                                    color: Colors.white.withValues(alpha: 0.50),
+                                    letterSpacing: 0.15,
+                                  );
+                              final text = Text(
+                                subtitleLine,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: subtitleStyle,
+                              );
+                              final tip = subtitleTooltip;
+                              if (tip == null || tip.isEmpty) {
+                                return text;
+                              }
+                              return Tooltip(
+                                message: tip,
+                                waitDuration: const Duration(milliseconds: 320),
+                                child: MouseRegion(
+                                  cursor: SystemMouseCursors.help,
+                                  child: text,
                                 ),
-                              ],
-                              if (browsingLibrary) ...[
-                                const SizedBox(width: 12),
-                                _heroDot(),
-                                const SizedBox(width: 12),
-                                _heroMetric(
-                                  icon: Icons.folder_outlined,
-                                  label: '$libraryDirCount 个目录',
-                                ),
-                              ],
-                            ],
+                              );
+                            },
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
+                      spacing: 8,
+                      runSpacing: 8,
                       crossAxisAlignment: WrapCrossAlignment.center,
+                      alignment: WrapAlignment.end,
                       children: [
                         ...actions,
-                        const SizedBox(width: 4),
                         _UiStyleSwitch(
                           palette: palette,
                           active: uiStyle,
@@ -2810,35 +2978,6 @@ class _LibraryHeroBanner extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _heroMetric({required IconData icon, required String label}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: Colors.white.withValues(alpha: 0.66)),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
-            color: Colors.white.withValues(alpha: 0.74),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _heroDot() {
-    return Container(
-      width: 3,
-      height: 3,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: 0.32),
       ),
     );
   }
@@ -2924,29 +3063,31 @@ class _HeadingChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            palette.seed.withValues(alpha: 0.32),
-            Color.lerp(palette.seed, palette.accent, 0.55)!.withValues(
-              alpha: 0.22,
-            ),
+            palette.seed.withValues(alpha: 0.22),
+            Color.lerp(
+              palette.seed,
+              palette.accent,
+              0.55,
+            )!.withValues(alpha: 0.16),
           ],
         ),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: palette.seed.withValues(alpha: 0.36),
+          color: palette.seed.withValues(alpha: 0.24),
           width: 1,
         ),
       ),
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 11.5,
+          fontSize: 11,
           fontWeight: FontWeight.w800,
-          letterSpacing: 0.3,
-          color: Colors.white.withValues(alpha: 0.92),
+          letterSpacing: 0.25,
+          color: Colors.white.withValues(alpha: 0.88),
         ),
       ),
     );
@@ -3635,7 +3776,6 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final activePlaylist = widget.queue.activePlaylist;
     final items = activePlaylist.items;
     final query = ref.watch(librarySearchQueryProvider);
@@ -3663,48 +3803,73 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
     final actionButtons =
         browsingLibrary
             ? <Widget>[
-              OutlinedButton.icon(
-                onPressed: widget.queue.isScanning ? null : widget.onRefreshLibrary,
+              IconButton(
+                tooltip: '刷新曲库',
+                onPressed:
+                    widget.queue.isScanning ? null : widget.onRefreshLibrary,
                 icon: Icon(
                   widget.queue.isScanning
                       ? Icons.sync_rounded
                       : Icons.refresh_rounded,
-                  size: 16,
+                  size: 20,
                 ),
-                label: Text(widget.queue.isScanning ? '刷新中' : '刷新'),
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
               ),
-              OutlinedButton.icon(
+              IconButton(
+                tooltip: '导入文件夹',
                 onPressed: widget.onPickFolder,
-                icon: const Icon(Icons.folder_open_rounded, size: 16),
-                label: const Text('导入目录'),
+                icon: const Icon(Icons.folder_open_rounded, size: 20),
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
               ),
-              FilledButton.icon(
+              IconButton.filled(
+                tooltip: '添加文件',
                 onPressed: widget.onPickMedia,
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('添加文件'),
+                icon: const Icon(Icons.add_rounded, size: 20),
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(36, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero,
+                ),
               ),
             ]
             : browsingPlaybackQueue
             ? <Widget>[
-              FilledButton.tonalIcon(
+              IconButton.filledTonal(
+                tooltip: '回到播放界面',
                 onPressed:
                     widget.queue.currentItem == null
                         ? null
                         : () => widget.onSelectUiStyle(HeniUiStyle.scenery),
-                icon: const Icon(Icons.play_circle_outline, size: 16),
-                label: const Text('回到播放中'),
+                icon: const Icon(Icons.play_circle_outline, size: 22),
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(38, 38),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero,
+                ),
               ),
             ]
             : <Widget>[
-              OutlinedButton.icon(
+              IconButton(
+                tooltip: '管理歌单',
                 onPressed: () => widget.onManagePlaylist(activePlaylist),
-                icon: const Icon(Icons.tune_rounded, size: 16),
-                label: const Text('管理'),
+                icon: const Icon(Icons.tune_rounded, size: 20),
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
               ),
-              FilledButton.icon(
+              IconButton.filled(
+                tooltip: '从曲库添加',
                 onPressed: () => widget.onAddFromLibrary(activePlaylist.id),
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('添加歌曲'),
+                icon: const Icon(Icons.add_rounded, size: 20),
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(36, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero,
+                ),
               ),
             ];
 
@@ -3729,236 +3894,263 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
           onSelectUiStyle: widget.onSelectUiStyle,
           libraryDirCount: widget.queue.libraryDirectories.length,
           isScanning: widget.queue.isScanning,
+          playbackSourceName:
+              browsingPlaybackQueue
+                  ? widget.queue
+                      .playlistById(widget.queue.playbackSourceId)
+                      .name
+                  : null,
         ),
         SizedBox(height: widget.layout.contentGap),
         Expanded(
-    child: _GlassPanel(
-      radius: 22,
-      fillColor: Color.alphaBlend(
-        Colors.white.withValues(alpha: 0.06),
-        Colors.black.withValues(alpha: 0.26),
-      ),
-      borderColor: Colors.white.withValues(alpha: 0.09),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 14, 10),
-            child: Row(
+          child: _GlassPanel(
+            radius: 22,
+            fillColor: _shellGlassFill(widget.palette, emphasis: 0.82),
+            borderColor: _shellGlassBorder(widget.palette, emphasis: 0.82),
+            auroraPalette: widget.palette,
+            hoverAccentPalette: widget.palette,
+            child: Column(
               children: [
-                if (query.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: _InfoPill(
-                      icon: Icons.search_rounded,
-                      label: '筛出 ${filteredEntries.length} 首',
-                    ),
-                  ),
-                if (_selectionMode)
-                  _RefreshStatusBadge(
-                    icon: Icons.done_all_rounded,
-                    label: '已选 $selectedCount 首',
-                    accent: true,
-                  ),
-                const Spacer(),
-                if (_selectionMode) ...[
-                  TextButton(
-                    onPressed: items.isEmpty ? null : _selectAll,
-                    child: const Text('全选'),
-                  ),
-                  const SizedBox(width: 4),
-                  FilledButton.tonal(
-                    onPressed: selectedCount == 0 ? null : _removeSelected,
-                    child: Text('移除 $selectedCount 首'),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: _exitSelectionMode,
-                    child: const Text('取消'),
-                  ),
-                ] else ...[
-                  PopupMenuButton<_SongsSortMode>(
-                    tooltip: '排序方式',
-                    onSelected: (mode) {
-                      setState(() {
-                        _sortMode = mode;
-                      });
-                    },
-                    itemBuilder:
-                        (context) => [
-                          for (final mode in _SongsSortMode.values)
-                            PopupMenuItem<_SongsSortMode>(
-                              value: mode,
-                              child: Text(mode.label),
-                            ),
-                        ],
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.035),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.06),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final narrowToolbar = constraints.maxWidth < 720;
+                      final statusWidgets = <Widget>[
+                        if (query.isNotEmpty)
+                          _InfoPill(
+                            icon: Icons.search_rounded,
+                            label: '筛出 ${filteredEntries.length} 首',
+                          ),
+                        if (_selectionMode)
+                          _RefreshStatusBadge(
+                            icon: Icons.done_all_rounded,
+                            label: '已选 $selectedCount 首',
+                            accent: true,
+                          ),
+                      ];
+                      final actionWidgets =
+                          _selectionMode
+                              ? <Widget>[
+                                TextButton(
+                                  onPressed: items.isEmpty ? null : _selectAll,
+                                  child: const Text('全选'),
+                                ),
+                                FilledButton.tonal(
+                                  onPressed:
+                                      selectedCount == 0
+                                          ? null
+                                          : _removeSelected,
+                                  child: Text('移除 $selectedCount 首'),
+                                ),
+                                OutlinedButton(
+                                  onPressed: _exitSelectionMode,
+                                  child: const Text('取消'),
+                                ),
+                              ]
+                              : <Widget>[
+                                PopupMenuButton<_SongsSortMode>(
+                                  tooltip: '排序 · ${_sortMode.label}',
+                                  icon: Icon(
+                                    Icons.sort_rounded,
+                                    size: 20,
+                                    color: _secondaryGlassText(emphasis: 0.96),
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 34,
+                                    minHeight: 34,
+                                  ),
+                                  onSelected: (mode) {
+                                    setState(() {
+                                      _sortMode = mode;
+                                    });
+                                  },
+                                  itemBuilder:
+                                      (context) => [
+                                        for (final mode
+                                            in _SongsSortMode.values)
+                                          PopupMenuItem<_SongsSortMode>(
+                                            value: mode,
+                                            child: Text(mode.label),
+                                          ),
+                                      ],
+                                ),
+                                if (canMultiSelect)
+                                  IconButton(
+                                    tooltip: '多选',
+                                    onPressed: _enterSelectionMode,
+                                    icon: Icon(
+                                      Icons.checklist_rounded,
+                                      size: 20,
+                                      color: _secondaryGlassText(
+                                        emphasis: 0.96,
+                                      ),
+                                    ),
+                                    visualDensity: VisualDensity.compact,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 34,
+                                      minHeight: 34,
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                              ];
+
+                      if (narrowToolbar) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (statusWidgets.isNotEmpty)
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: statusWidgets,
+                              ),
+                            if (statusWidgets.isNotEmpty &&
+                                actionWidgets.isNotEmpty)
+                              const SizedBox(height: 8),
+                            if (actionWidgets.isNotEmpty)
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  alignment: WrapAlignment.end,
+                                  children: actionWidgets,
+                                ),
+                              ),
+                          ],
+                        );
+                      }
+
+                      return Row(
                         children: [
-                          Icon(
-                            Icons.sort_rounded,
-                            size: 13,
-                            color: _secondaryGlassText(emphasis: 0.96),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            _sortMode.label,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              fontSize: 11.5,
-                              color: _secondaryGlassText(emphasis: 0.96),
-                              fontWeight: FontWeight.w700,
+                          if (statusWidgets.isNotEmpty)
+                            Expanded(
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: statusWidgets,
+                              ),
+                            )
+                          else
+                            const Spacer(),
+                          if (actionWidgets.isNotEmpty)
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: actionWidgets,
                             ),
-                          ),
                         ],
-                      ),
-                    ),
+                      );
+                    },
                   ),
-                  if (canMultiSelect) ...[
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        minimumSize: const Size(0, 30),
-                        textStyle: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                ),
+                Container(
+                  height: 30,
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      SizedBox(width: _libraryLeadColumnWidth),
+                      Expanded(
+                        child: Text(
+                          '曲目',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                            color: Colors.white.withValues(alpha: 0.40),
+                          ),
                         ),
                       ),
-                      onPressed: _enterSelectionMode,
-                      child: const Text('多选'),
-                    ),
-                  ],
-                ],
-              ],
-            ),
-          ),
-          Container(
-            height: 32,
-            margin: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: _libraryLeadColumnWidth,
-                  child: Text(
-                    '#',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.2,
-                      color: Colors.white.withValues(alpha: 0.34),
-                    ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: _libraryDurationColumnWidth,
+                        child: Text(
+                          '时长',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                            color: Colors.white.withValues(alpha: 0.34),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const SizedBox(width: _libraryActionColumnWidth),
+                    ],
                   ),
                 ),
                 Expanded(
-                  child: Text(
-                    '曲目',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.2,
-                      color: Colors.white.withValues(alpha: 0.46),
-                    ),
-                  ),
+                  child:
+                      filteredEntries.isEmpty
+                          ? Center(
+                            child: _SongsEmptyState(
+                              title:
+                                  items.isEmpty
+                                      ? (browsingLibrary
+                                          ? '曲库还是空的'
+                                          : browsingPlaybackQueue
+                                          ? '当前还没有播放队列'
+                                          : '这个歌单还没有歌曲')
+                                      : '没有找到匹配的歌曲',
+                              message:
+                                  items.isEmpty
+                                      ? (browsingLibrary
+                                          ? '添加文件或导入文件夹，把本地音频视频整理进来。'
+                                          : browsingPlaybackQueue
+                                          ? '开始播放后，这里会显示当前这轮待播内容。'
+                                          : '回到曲库挑几首喜欢的内容，慢慢把它养成自己的歌单。')
+                                      : '换个关键词试试，或者清空搜索继续浏览。',
+                            ),
+                          )
+                          : ListView.builder(
+                            itemCount: filteredEntries.length,
+                            itemBuilder: (context, index) {
+                              final entry = filteredEntries[index];
+                              final itemIndex = entry.key;
+                              final item = entry.value;
+                              final selected = widget.queue.isCurrentItem(item);
+                              return _LibraryRow(
+                                item: item,
+                                index: itemIndex,
+                                selected: selected,
+                                browsingLibrary: browsingLibrary,
+                                browsingPlaybackQueue: browsingPlaybackQueue,
+                                playlists: widget.queue.playlists,
+                                selectionMode: _selectionMode,
+                                checked: _selectedPaths.contains(item.path),
+                                onPlay:
+                                    () =>
+                                        _selectionMode
+                                            ? _toggleItem(item)
+                                            : widget.onPlayIndex(itemIndex),
+                                onAddToPlaylist:
+                                    (playlistId) => widget.onAddToPlaylist(
+                                      playlistId,
+                                      item,
+                                    ),
+                                onRemoveFromPlaylist:
+                                    () =>
+                                        browsingPlaybackQueue
+                                            ? widget.onRemoveFromPlaybackQueue(
+                                              itemIndex,
+                                            )
+                                            : widget.onRemoveFromPlaylist(
+                                              activePlaylist.id,
+                                              item,
+                                            ),
+                                onToggleSelect: () => _toggleItem(item),
+                              );
+                            },
+                          ),
                 ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: _libraryDurationColumnWidth,
-                  child: Text(
-                    '时长',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.2,
-                      color: Colors.white.withValues(alpha: 0.34),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const SizedBox(width: _libraryActionColumnWidth),
               ],
             ),
           ),
-          Expanded(
-            child:
-                filteredEntries.isEmpty
-                    ? Center(
-                      child: _SongsEmptyState(
-                        title:
-                            items.isEmpty
-                                ? (browsingLibrary
-                                    ? '曲库还是空的'
-                                    : browsingPlaybackQueue
-                                    ? '当前还没有播放队列'
-                                    : '这个歌单还没有歌曲')
-                                : '没有找到匹配的歌曲',
-                        message:
-                            items.isEmpty
-                                ? (browsingLibrary
-                                    ? '添加文件或导入文件夹，把本地音频视频整理进来。'
-                                    : browsingPlaybackQueue
-                                    ? '开始播放后，这里会显示当前这轮待播内容。'
-                                    : '回到曲库挑几首喜欢的内容，慢慢把它养成自己的歌单。')
-                                : '换个关键词试试，或者清空搜索继续浏览。',
-                      ),
-                    )
-                    : ListView.builder(
-                      itemCount: filteredEntries.length,
-                      itemBuilder: (context, index) {
-                        final entry = filteredEntries[index];
-                        final itemIndex = entry.key;
-                        final item = entry.value;
-                        final selected = widget.queue.isCurrentItem(item);
-                        return _LibraryRow(
-                          item: item,
-                          index: itemIndex,
-                          selected: selected,
-                          browsingLibrary: browsingLibrary,
-                          browsingPlaybackQueue: browsingPlaybackQueue,
-                          playlists: widget.queue.playlists,
-                          selectionMode: _selectionMode,
-                          checked: _selectedPaths.contains(item.path),
-                          onPlay:
-                              () =>
-                                  _selectionMode
-                                      ? _toggleItem(item)
-                                      : widget.onPlayIndex(itemIndex),
-                          onAddToPlaylist:
-                              (playlistId) =>
-                                  widget.onAddToPlaylist(playlistId, item),
-                          onRemoveFromPlaylist:
-                              () =>
-                                  browsingPlaybackQueue
-                                      ? widget.onRemoveFromPlaybackQueue(
-                                        itemIndex,
-                                      )
-                                      : widget.onRemoveFromPlaylist(
-                                        activePlaylist.id,
-                                        item,
-                                      ),
-                          onToggleSelect: () => _toggleItem(item),
-                        );
-                      },
-                    ),
-          ),
-        ],
-      ),
-    ),
         ),
       ],
     );
@@ -4114,341 +4306,357 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
         curve: Curves.easeOutCubic,
         scale: playing ? 1.0 : (_hovered ? 1.006 : 1.0),
         child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        margin: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [
-              if (playing || checked)
-                Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: playing ? 0.1 : 0.06)
-              else
-                Colors.white.withValues(alpha: evenRow ? 0.012 : 0.0),
-              rowColor,
-              rowColor,
-            ],
-            stops: const [0.0, 0.08, 1.0],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor),
-          boxShadow: [
-            if (hoverOrSelected)
-              BoxShadow(
-                color: Colors.black.withValues(
-                  alpha:
-                      playing
-                          ? 0.14
-                          : checked
-                          ? 0.10
-                          : 0.07,
-                ),
-                blurRadius: playing ? 14 : 10,
-                offset: const Offset(0, 5),
-              ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              left: 0,
-              top: playing ? 6 : 10,
-              bottom: playing ? 6 : 10,
-              child: AnimatedContainer(
-                duration: _hoverDuration,
-                width:
-                    playing
-                        ? 4
-                        : checked
-                            ? 3
-                            : _hovered
-                                ? 2
-                                : 0,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  color:
-                      playing || checked
-                          ? Theme.of(context).colorScheme.primary
-                          : Colors.white.withValues(alpha: 0.22),
-                  boxShadow: [
-                    if (playing)
-                      BoxShadow(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.5),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                  ],
-                ),
-              ),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                if (playing || checked)
+                  Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: playing ? 0.09 : 0.05)
+                else
+                  Colors.white.withValues(alpha: evenRow ? 0.014 : 0.004),
+                rowColor,
+                rowColor,
+              ],
+              stops: const [0.0, 0.08, 1.0],
             ),
-            Positioned(
-              left: 18,
-              right: 18,
-              top: 0,
-              child: AnimatedOpacity(
-                duration: _hoverDuration,
-                opacity: hoverOrSelected ? 0.14 : 0.08,
-                child: Container(
-                  height: 1,
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: borderColor),
+            boxShadow: [
+              if (hoverOrSelected)
+                BoxShadow(
+                  color: Colors.black.withValues(
+                    alpha:
+                        playing
+                            ? 0.14
+                            : checked
+                            ? 0.10
+                            : 0.07,
+                  ),
+                  blurRadius: playing ? 12 : 8,
+                  offset: const Offset(0, 4),
+                ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                left: 0,
+                top: playing ? 6 : 10,
+                bottom: playing ? 6 : 10,
+                child: AnimatedContainer(
+                  duration: _hoverDuration,
+                  width:
+                      playing
+                          ? 4
+                          : checked
+                          ? 3
+                          : _hovered
+                          ? 2
+                          : 0,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
-                    color: Colors.white,
+                    color:
+                        playing || checked
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.white.withValues(alpha: 0.22),
+                    boxShadow: [
+                      if (playing)
+                        BoxShadow(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.5),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                    ],
                   ),
                 ),
               ),
-            ),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: widget.onPlay,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: _libraryLeadColumnWidth,
-                        child: Row(
-                          children: [
-                            AnimatedSwitcher(
-                              duration: _hoverDuration,
-                              child:
-                                  widget.selectionMode
-                                      ? Checkbox(
-                                        key: ValueKey(
-                                          'check-${widget.index}-${widget.checked}',
-                                        ),
-                                        value: widget.checked,
-                                        onChanged:
-                                            (_) => widget.onToggleSelect(),
-                                      )
-                                      : hoverOrSelected
-                                      ? widget.selected
-                                          ? SizedBox(
-                                            key: ValueKey(
-                                              'wave-${widget.index}',
-                                            ),
-                                            width: 18,
-                                            height: 18,
-                                            child: Center(
-                                              child: StreamBuilder<bool>(
-                                                stream:
-                                                    ref
-                                                        .read(
-                                                          playbackEngineProvider,
-                                                        )
-                                                        .playing,
-                                                initialData: false,
-                                                builder: (context, snap) {
-                                                  return _NowPlayingWave(
-                                                    color: leadingColor,
-                                                    active: snap.data ?? false,
-                                                  );
-                                                },
+              Positioned(
+                left: 18,
+                right: 18,
+                top: 0,
+                child: AnimatedOpacity(
+                  duration: _hoverDuration,
+                  opacity: hoverOrSelected ? 0.11 : 0.06,
+                  child: Container(
+                    height: 1,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(17),
+                  onTap: widget.onPlay,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 9, 4, 9),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: _libraryLeadColumnWidth,
+                          child: Row(
+                            children: [
+                              AnimatedSwitcher(
+                                duration: _hoverDuration,
+                                child:
+                                    widget.selectionMode
+                                        ? Checkbox(
+                                          key: ValueKey(
+                                            'check-${widget.index}-${widget.checked}',
+                                          ),
+                                          value: widget.checked,
+                                          onChanged:
+                                              (_) => widget.onToggleSelect(),
+                                        )
+                                        : hoverOrSelected
+                                        ? widget.selected
+                                            ? SizedBox(
+                                              key: ValueKey(
+                                                'wave-${widget.index}',
                                               ),
-                                            ),
-                                          )
-                                          : Icon(
-                                            Icons.play_arrow_rounded,
-                                            key: ValueKey(
-                                              'icon-${widget.index}-$hoverOrSelected',
-                                            ),
-                                            size: 18,
-                                            color: leadingColor,
-                                          )
-                                      : SizedBox(
-                                        key: ValueKey('index-${widget.index}'),
-                                        width: 26,
-                                        child: Text(
-                                          '${widget.index + 1}',
-                                          textAlign: TextAlign.center,
-                                          style: theme.textTheme.labelMedium
-                                              ?.copyWith(
-                                                color: Colors.white.withValues(
-                                                  alpha: 0.38,
+                                              width: 18,
+                                              height: 18,
+                                              child: Center(
+                                                child: StreamBuilder<bool>(
+                                                  stream:
+                                                      ref
+                                                          .read(
+                                                            playbackEngineProvider,
+                                                          )
+                                                          .playing,
+                                                  initialData: false,
+                                                  builder: (context, snap) {
+                                                    return _NowPlayingWave(
+                                                      color: leadingColor,
+                                                      active:
+                                                          snap.data ?? false,
+                                                    );
+                                                  },
                                                 ),
                                               ),
+                                            )
+                                            : Icon(
+                                              Icons.play_arrow_rounded,
+                                              key: ValueKey(
+                                                'icon-${widget.index}-$hoverOrSelected',
+                                              ),
+                                              size: 18,
+                                              color: leadingColor,
+                                            )
+                                        : SizedBox(
+                                          key: ValueKey(
+                                            'index-${widget.index}',
+                                          ),
+                                          width: 26,
+                                          child: Text(
+                                            '${widget.index + 1}',
+                                            textAlign: TextAlign.center,
+                                            style: theme.textTheme.labelMedium
+                                                ?.copyWith(
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.38),
+                                                ),
+                                          ),
                                         ),
-                                      ),
-                            ),
-                            const SizedBox(width: 8),
-                            AnimatedContainer(
-                              duration: _hoverDuration,
-                              width: 28,
-                              height: 28,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color:
-                                    playing
-                                        ? Theme.of(context).colorScheme.primary
-                                            .withValues(alpha: 0.14)
-                                        : checked
-                                        ? Colors.white.withValues(alpha: 0.14)
-                                        : Colors.white.withValues(
-                                          alpha: hoverOrSelected ? 0.16 : 0.07,
-                                        ),
-                                borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Icon(
-                                widget.item.kind == MediaKind.video
-                                    ? Icons.movie_outlined
-                                    : Icons.music_note_outlined,
-                                size: 14,
-                                color:
-                                    playing
-                                        ? heniAccentOnGlass(
-                                          Theme.of(context).colorScheme.primary,
-                                        )
-                                        : Colors.white.withValues(alpha: 0.82),
+                              const SizedBox(width: 10),
+                              AnimatedContainer(
+                                duration: _hoverDuration,
+                                width: 30,
+                                height: 30,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color:
+                                      playing
+                                          ? Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                              .withValues(alpha: 0.14)
+                                          : checked
+                                          ? Colors.white.withValues(alpha: 0.14)
+                                          : Colors.white.withValues(
+                                            alpha:
+                                                hoverOrSelected ? 0.16 : 0.07,
+                                          ),
+                                  borderRadius: BorderRadius.circular(11),
+                                ),
+                                child: Icon(
+                                  widget.item.kind == MediaKind.video
+                                      ? Icons.movie_outlined
+                                      : Icons.music_note_outlined,
+                                  size: 14,
+                                  color:
+                                      playing
+                                          ? heniAccentOnGlass(
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                          )
+                                          : Colors.white.withValues(
+                                            alpha: 0.82,
+                                          ),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              widget.item.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontSize: 14.5,
-                                fontWeight:
-                                    playing ? FontWeight.w800 : FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              p.dirname(widget.item.path),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontSize: 11.5,
-                                color:
-                                    checked
-                                        ? Colors.white.withValues(alpha: 0.58)
-                                        : Colors.white.withValues(alpha: 0.42),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: _libraryDurationColumnWidth,
-                        child: Text(
-                          _formatDuration(widget.item.duration),
-                          textAlign: TextAlign.right,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.55),
-                            fontFeatures: const [
-                              ui.FontFeature.tabularFigures(),
                             ],
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: _libraryActionColumnWidth,
-                        child:
-                            widget.selectionMode
-                                ? Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: AnimatedContainer(
-                                    duration: _hoverDuration,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          widget.checked
-                                              ? Theme.of(context)
-                                                  .colorScheme
-                                                  .primary
-                                                  .withValues(alpha: 0.14)
-                                              : Colors.white.withValues(
-                                                alpha: 0.04,
-                                              ),
-                                      borderRadius: BorderRadius.circular(999),
-                                      border: Border.all(
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                widget.item.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontSize: 14.2,
+                                  fontWeight:
+                                      playing
+                                          ? FontWeight.w800
+                                          : FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                p.dirname(widget.item.path),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 11.2,
+                                  color:
+                                      checked
+                                          ? Colors.white.withValues(alpha: 0.58)
+                                          : Colors.white.withValues(
+                                            alpha: 0.42,
+                                          ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: _libraryDurationColumnWidth,
+                          child: Text(
+                            _formatDuration(widget.item.duration),
+                            textAlign: TextAlign.right,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.55),
+                              fontFeatures: const [
+                                ui.FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: _libraryActionColumnWidth,
+                          child:
+                              widget.selectionMode
+                                  ? Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: AnimatedContainer(
+                                      duration: _hoverDuration,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
                                         color:
                                             widget.checked
                                                 ? Theme.of(context)
                                                     .colorScheme
                                                     .primary
-                                                    .withValues(alpha: 0.22)
+                                                    .withValues(alpha: 0.14)
                                                 : Colors.white.withValues(
-                                                  alpha: 0.05,
+                                                  alpha: 0.04,
                                                 ),
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                        border: Border.all(
+                                          color:
+                                              widget.checked
+                                                  ? Theme.of(context)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.22)
+                                                  : Colors.white.withValues(
+                                                    alpha: 0.05,
+                                                  ),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        widget.checked ? '已选择' : '选择',
+                                        style: theme.textTheme.labelMedium
+                                            ?.copyWith(
+                                              color:
+                                                  widget.checked
+                                                      ? heniAccentOnGlass(
+                                                        Theme.of(
+                                                          context,
+                                                        ).colorScheme.primary,
+                                                      )
+                                                      : Colors.white.withValues(
+                                                        alpha: 0.42,
+                                                      ),
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                       ),
                                     ),
-                                    child: Text(
-                                      widget.checked ? '已选择' : '选择',
-                                      style: theme.textTheme.labelMedium
-                                          ?.copyWith(
-                                            color:
-                                                widget.checked
-                                                    ? heniAccentOnGlass(
-                                                      Theme.of(
-                                                        context,
-                                                      ).colorScheme.primary,
-                                                    )
-                                                    : Colors.white.withValues(
-                                                      alpha: 0.42,
-                                                    ),
-                                            fontWeight: FontWeight.w700,
-                                          ),
+                                  )
+                                  : widget.browsingLibrary
+                                  ? Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: AnimatedOpacity(
+                                      duration: _hoverDuration,
+                                      opacity: hoverOrSelected ? 1 : 0.82,
+                                      child: _AddToPlaylistMenu(
+                                        playlists: widget.playlists,
+                                        onSelected: widget.onAddToPlaylist,
+                                      ),
+                                    ),
+                                  )
+                                  : Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Tooltip(
+                                      message:
+                                          widget.browsingPlaybackQueue
+                                              ? '从当前播放列表移除'
+                                              : '从当前歌单移除',
+                                      child: _InlineActionButton(
+                                        icon: Icons.remove_circle_outline,
+                                        active: hoverOrSelected,
+                                        danger: true,
+                                        onPressed: widget.onRemoveFromPlaylist,
+                                      ),
                                     ),
                                   ),
-                                )
-                                : widget.browsingLibrary
-                                ? Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: AnimatedOpacity(
-                                    duration: _hoverDuration,
-                                    opacity: hoverOrSelected ? 1 : 0.82,
-                                    child: _AddToPlaylistMenu(
-                                      playlists: widget.playlists,
-                                      onSelected: widget.onAddToPlaylist,
-                                    ),
-                                  ),
-                                )
-                                : Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Tooltip(
-                                    message:
-                                        widget.browsingPlaybackQueue
-                                            ? '从当前播放列表移除'
-                                            : '从当前歌单移除',
-                                    child: _InlineActionButton(
-                                      icon: Icons.remove_circle_outline,
-                                      active: hoverOrSelected,
-                                      danger: true,
-                                      onPressed: widget.onRemoveFromPlaylist,
-                                    ),
-                                  ),
-                                ),
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -4779,7 +4987,8 @@ class _BottomPlayerBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final focusMode = ref.watch(focusModeProvider);
-    final compactBottom = focusMode;
+    final windowWidth = MediaQuery.sizeOf(context).width;
+    final compactBottom = focusMode || windowWidth < 1180;
 
     return _ShellBand(
       palette: palette,
@@ -4795,10 +5004,7 @@ class _BottomPlayerBar extends ConsumerWidget {
         layout.quiet ? 14 : 18,
         compactBottom ? 6 : (layout.quiet ? 8 : 10),
       ),
-      height:
-          compactBottom
-              ? (layout.quiet ? 64 : 72)
-              : layout.bottomHeight,
+      height: compactBottom ? (layout.quiet ? 64 : 72) : layout.bottomHeight,
       emphasis: 0.9,
       child:
           compactBottom
@@ -4901,7 +5107,6 @@ class _CompactBottomBar extends StatelessWidget {
               isPlaying: isPlaying,
               hasMedia: currentMedia != null,
               palette: palette,
-              engine: engine,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -4941,9 +5146,7 @@ class _CompactBottomBar extends StatelessWidget {
                 }
               },
               icon: Icon(
-                isPlaying
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
+                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                 size: 22,
               ),
             ),
@@ -4995,10 +5198,10 @@ class _NowPlayingSummary extends StatelessWidget {
     return SizedBox(
       width:
           layout.quiet
-              ? 236
+              ? 224
               : layout.compact
-              ? 268
-              : 300,
+              ? 248
+              : 284,
       child: StreamBuilder<bool>(
         stream: engine.playing,
         initialData: false,
@@ -5016,7 +5219,6 @@ class _NowPlayingSummary extends StatelessWidget {
                 isPlaying: isPlaying,
                 hasMedia: currentMedia != null,
                 palette: palette,
-                engine: engine,
               ),
               SizedBox(width: layout.quiet ? 10 : 12),
               Expanded(
@@ -5047,7 +5249,7 @@ class _NowPlayingSummary extends StatelessWidget {
                             theme.textTheme.labelMedium?.copyWith(
                               color: heniAccentOnGlass(
                                 palette.accent,
-                                alpha: isPlaying ? 0.95 : 0.78,
+                                alpha: isPlaying ? 0.88 : 0.7,
                               ),
                               fontWeight: FontWeight.w800,
                             ) ??
@@ -5064,6 +5266,7 @@ class _NowPlayingSummary extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleMedium?.copyWith(
+                          fontSize: layout.quiet ? 14.2 : 14.8,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -5078,7 +5281,7 @@ class _NowPlayingSummary extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.52),
+                            color: Colors.white.withValues(alpha: 0.46),
                           ),
                         ),
                       ],
@@ -5101,7 +5304,6 @@ class _NowPlayingArtwork extends StatefulWidget {
     required this.isPlaying,
     required this.hasMedia,
     required this.palette,
-    required this.engine,
   });
 
   final double size;
@@ -5109,7 +5311,6 @@ class _NowPlayingArtwork extends StatefulWidget {
   final bool isPlaying;
   final bool hasMedia;
   final HeniPalette palette;
-  final PlaybackEngine engine;
 
   @override
   State<_NowPlayingArtwork> createState() => _NowPlayingArtworkState();
@@ -5169,8 +5370,7 @@ class _NowPlayingArtworkState extends State<_NowPlayingArtwork>
                   boxShadow: [
                     BoxShadow(
                       color: p.seed.withValues(
-                        alpha:
-                            widget.isPlaying ? 0.22 + 0.18 * pulse : 0.10,
+                        alpha: widget.isPlaying ? 0.22 + 0.18 * pulse : 0.10,
                       ),
                       blurRadius: 18 + 8 * pulse,
                       spreadRadius: widget.isPlaying ? 1 : 0,
@@ -5180,38 +5380,16 @@ class _NowPlayingArtworkState extends State<_NowPlayingArtwork>
               );
             },
           ),
-          StreamBuilder<Duration>(
-            stream: widget.engine.position,
-            initialData: Duration.zero,
-            builder: (context, posSnap) {
-              return StreamBuilder<Duration>(
-                stream: widget.engine.duration,
-                initialData: Duration.zero,
-                builder: (context, durSnap) {
-                  final pos = posSnap.data ?? Duration.zero;
-                  final dur = durSnap.data ?? Duration.zero;
-                  final fraction =
-                      dur.inMilliseconds <= 0
-                          ? 0.0
-                          : (pos.inMilliseconds / dur.inMilliseconds).clamp(
-                            0.0,
-                            1.0,
-                          );
-                  return SizedBox(
-                    width: ringSize,
-                    height: ringSize,
-                    child: CustomPaint(
-                      painter: _ArtworkRingPainter(
-                        fraction: fraction,
-                        seedColor: p.seed,
-                        accentColor: p.accent,
-                        active: widget.hasMedia,
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
+          SizedBox(
+            width: ringSize,
+            height: ringSize,
+            child: CustomPaint(
+              painter: _ArtworkRingPainter(
+                seedColor: p.seed,
+                accentColor: p.accent,
+                active: widget.hasMedia,
+              ),
+            ),
           ),
           widget.isVideo
               ? Container(
@@ -5220,9 +5398,7 @@ class _NowPlayingArtworkState extends State<_NowPlayingArtwork>
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: Color.alphaBlend(
-                    p.seed.withValues(
-                      alpha: widget.isPlaying ? 0.24 : 0.18,
-                    ),
+                    p.seed.withValues(alpha: widget.isPlaying ? 0.24 : 0.18),
                     p.surfaceAlt,
                   ),
                   borderRadius: BorderRadius.circular(14),
@@ -5232,10 +5408,7 @@ class _NowPlayingArtworkState extends State<_NowPlayingArtwork>
                     ),
                   ),
                 ),
-                child: Icon(
-                  Icons.movie_outlined,
-                  size: widget.size * 0.42,
-                ),
+                child: Icon(Icons.movie_outlined, size: widget.size * 0.42),
               )
               : _VinylDisc(
                 size: widget.size,
@@ -5250,13 +5423,11 @@ class _NowPlayingArtworkState extends State<_NowPlayingArtwork>
 
 class _ArtworkRingPainter extends CustomPainter {
   const _ArtworkRingPainter({
-    required this.fraction,
     required this.seedColor,
     required this.accentColor,
     required this.active,
   });
 
-  final double fraction;
   final Color seedColor;
   final Color accentColor;
   final bool active;
@@ -5267,51 +5438,42 @@ class _ArtworkRingPainter extends CustomPainter {
     final radius = size.width / 2 - 1.5;
     final rect = Rect.fromCircle(center: center, radius: radius);
 
+    final outerHint =
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0
+          ..color = seedColor.withValues(alpha: active ? 0.14 : 0.06);
+    canvas.drawCircle(center, radius + 0.4, outerHint);
+
     final trackPaint =
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.6
-          ..color = Colors.white.withValues(alpha: active ? 0.12 : 0.07);
+          ..strokeWidth = 1.4
+          ..color = Colors.white.withValues(alpha: active ? 0.11 : 0.065);
     canvas.drawCircle(center, radius, trackPaint);
 
-    if (!active || fraction <= 0) return;
+    if (!active) return;
 
-    final sweep = 2 * math.pi * fraction;
-    final start = -math.pi / 2;
-
-    final progressPaint =
+    final accentRing =
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4
-          ..strokeCap = StrokeCap.round
+          ..strokeWidth = 1.1
           ..shader = SweepGradient(
             startAngle: 0,
             endAngle: 2 * math.pi,
             colors: [
-              seedColor,
-              Color.lerp(seedColor, accentColor, 0.55)!,
-              accentColor,
-              seedColor,
+              seedColor.withValues(alpha: 0.35),
+              accentColor.withValues(alpha: 0.22),
+              seedColor.withValues(alpha: 0.35),
             ],
             transform: const GradientRotation(-math.pi / 2),
           ).createShader(rect);
-
-    canvas.drawArc(rect, start, sweep, false, progressPaint);
-
-    final glow =
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 4
-          ..strokeCap = StrokeCap.round
-          ..color = seedColor.withValues(alpha: 0.32)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-    canvas.drawArc(rect, start, sweep, false, glow);
+    canvas.drawCircle(center, radius, accentRing);
   }
 
   @override
   bool shouldRepaint(covariant _ArtworkRingPainter old) {
-    return old.fraction != fraction ||
-        old.seedColor != seedColor ||
+    return old.seedColor != seedColor ||
         old.accentColor != accentColor ||
         old.active != active;
   }
@@ -5387,7 +5549,9 @@ class _VinylDiscState extends State<_VinylDisc>
               ),
               boxShadow: [
                 BoxShadow(
-                  color: p.seed.withValues(alpha: widget.spinning ? 0.32 : 0.18),
+                  color: p.seed.withValues(
+                    alpha: widget.spinning ? 0.32 : 0.18,
+                  ),
                   blurRadius: widget.spinning ? 18 : 10,
                   spreadRadius: 0,
                 ),
@@ -5407,10 +5571,7 @@ class _VinylDiscState extends State<_VinylDisc>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
-                      colors: [
-                        Color.lerp(p.accent, p.seed, 0.3)!,
-                        p.seed,
-                      ],
+                      colors: [Color.lerp(p.accent, p.seed, 0.3)!, p.seed],
                     ),
                     border: Border.all(
                       color: Colors.black.withValues(alpha: 0.42),
@@ -5580,15 +5741,15 @@ class _UtilityControls extends StatelessWidget {
           hasCurrent: queue.currentItem != null,
           onPressed: onShowPlaybackQueue,
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 4),
         _PlaybackModeIconButton(mode: mode, onPressed: onCyclePlaybackMode),
-        const SizedBox(width: 6),
+        const SizedBox(width: 4),
         _VolumeMenuButton(
           engine: engine,
           palette: palette,
           onVolumeChanged: onPersistVolume,
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 4),
         _ExportActions(
           state: state,
           sourceDuration: sourceDuration,
@@ -5622,8 +5783,8 @@ class _CurrentQueueButton extends StatelessWidget {
         decoration: BoxDecoration(
           color:
               hasCurrent
-                  ? theme.colorScheme.primary.withValues(alpha: 0.16)
-                  : Colors.white.withValues(alpha: 0.03),
+                  ? theme.colorScheme.primary.withValues(alpha: 0.13)
+                  : Colors.white.withValues(alpha: 0.024),
           borderRadius: BorderRadius.circular(999),
         ),
         child: IconButton(
@@ -5642,8 +5803,8 @@ class _CurrentQueueButton extends StatelessWidget {
                   top: -7,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 2,
+                      horizontal: 4.5,
+                      vertical: 1.5,
                     ),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primary,
@@ -5654,6 +5815,7 @@ class _CurrentQueueButton extends StatelessWidget {
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onPrimary,
                         fontWeight: FontWeight.w800,
+                        fontSize: 10,
                       ),
                     ),
                   ),
@@ -5856,20 +6018,14 @@ class _VolumeBubbleState extends State<_VolumeBubble> {
           Colors.black.withValues(alpha: 0.86),
         ),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: p.seed.withValues(alpha: 0.22),
-          width: 1,
-        ),
+        border: Border.all(color: p.seed.withValues(alpha: 0.22), width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.36),
             blurRadius: 22,
             offset: const Offset(0, 10),
           ),
-          BoxShadow(
-            color: p.seed.withValues(alpha: 0.16),
-            blurRadius: 18,
-          ),
+          BoxShadow(color: p.seed.withValues(alpha: 0.16), blurRadius: 18),
         ],
       ),
       child: Row(
@@ -6423,115 +6579,119 @@ class _PlaybackQueueRowState extends ConsumerState<_PlaybackQueueRow> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
-          children: [
-            SizedBox(
-              width: 28,
-              child: AnimatedSwitcher(
-                duration: _hoverDuration,
-                child:
-                    active
-                        ? SizedBox(
-                          key: ValueKey('queue-wave-${widget.index}'),
-                          width: 18,
-                          height: 18,
-                          child: Center(
-                            child: StreamBuilder<bool>(
-                              stream: ref.read(playbackEngineProvider).playing,
-                              initialData: false,
-                              builder: (context, snap) {
-                                return _NowPlayingWave(
-                                  color: palette.seed,
-                                  active: snap.data ?? false,
-                                );
-                              },
-                            ),
+                children: [
+                  SizedBox(
+                    width: 28,
+                    child: AnimatedSwitcher(
+                      duration: _hoverDuration,
+                      child:
+                          active
+                              ? SizedBox(
+                                key: ValueKey('queue-wave-${widget.index}'),
+                                width: 18,
+                                height: 18,
+                                child: Center(
+                                  child: StreamBuilder<bool>(
+                                    stream:
+                                        ref
+                                            .read(playbackEngineProvider)
+                                            .playing,
+                                    initialData: false,
+                                    builder: (context, snap) {
+                                      return _NowPlayingWave(
+                                        color: palette.seed,
+                                        active: snap.data ?? false,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              )
+                              : emphasized
+                              ? Icon(
+                                Icons.play_arrow_rounded,
+                                key: ValueKey(
+                                  'queue-icon-${widget.index}-$emphasized',
+                                ),
+                                size: 18,
+                                color: Colors.white.withValues(alpha: 0.72),
+                              )
+                              : Text(
+                                '${widget.index + 1}',
+                                key: ValueKey('queue-index-${widget.index}'),
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.46),
+                                ),
+                              ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  AnimatedContainer(
+                    duration: _hoverDuration,
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color:
+                          active
+                              ? palette.seed.withValues(alpha: 0.18)
+                              : Colors.white.withValues(
+                                alpha: emphasized ? 0.14 : 0.08,
+                              ),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(
+                      widget.item.kind == MediaKind.video
+                          ? Icons.movie_outlined
+                          : Icons.music_note_outlined,
+                      size: 16,
+                      color:
+                          active
+                              ? palette.seed
+                              : Colors.white.withValues(alpha: 0.82),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight:
+                                active ? FontWeight.w800 : FontWeight.w700,
+                            color:
+                                active
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.92),
                           ),
-                        )
-                        : emphasized
-                        ? Icon(
-                          Icons.play_arrow_rounded,
-                          key: ValueKey(
-                            'queue-icon-${widget.index}-$emphasized',
-                          ),
-                          size: 18,
-                          color: Colors.white.withValues(alpha: 0.72),
-                        )
-                        : Text(
-                          '${widget.index + 1}',
-                          key: ValueKey('queue-index-${widget.index}'),
-                          style: theme.textTheme.labelMedium?.copyWith(
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          p.dirname(widget.item.path),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 11.5,
                             color: Colors.white.withValues(alpha: 0.46),
                           ),
                         ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            AnimatedContainer(
-              duration: _hoverDuration,
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color:
-                    active
-                        ? palette.seed.withValues(alpha: 0.18)
-                        : Colors.white.withValues(
-                          alpha: emphasized ? 0.14 : 0.08,
-                        ),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(
-                widget.item.kind == MediaKind.video
-                    ? Icons.movie_outlined
-                    : Icons.music_note_outlined,
-                size: 16,
-                color:
-                    active
-                        ? palette.seed
-                        : Colors.white.withValues(alpha: 0.82),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: active ? FontWeight.w800 : FontWeight.w700,
-                      color:
-                          active
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.92),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    p.dirname(widget.item.path),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 11.5,
-                      color: Colors.white.withValues(alpha: 0.46),
+                  const SizedBox(width: 12),
+                  Tooltip(
+                    message: '从当前播放列表移除',
+                    child: _InlineActionButton(
+                      icon: Icons.remove_circle_outline,
+                      active: emphasized,
+                      danger: true,
+                      onPressed: widget.onRemove,
                     ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Tooltip(
-              message: '从当前播放列表移除',
-              child: _InlineActionButton(
-                icon: Icons.remove_circle_outline,
-                active: emphasized,
-                danger: true,
-                onPressed: widget.onRemove,
-              ),
-            ),
-              ],
               ),
             ),
           ),
@@ -6898,10 +7058,10 @@ class _ProgressWithTime extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final timeStyle = TextStyle(
-      fontSize: 10.5,
+      fontSize: 10.2,
       fontWeight: FontWeight.w700,
-      letterSpacing: 0.2,
-      color: Colors.white.withValues(alpha: 0.62),
+      letterSpacing: 0.1,
+      color: Colors.white.withValues(alpha: 0.58),
       fontFeatures: const [ui.FontFeature.tabularFigures()],
     );
     return Row(
@@ -6912,24 +7072,26 @@ class _ProgressWithTime extends StatelessWidget {
           initialData: Duration.zero,
           builder: (context, snap) {
             return SizedBox(
-              width: 38,
+              width: 40,
               child: Text(
                 _formatProgressTime(snap.data ?? Duration.zero),
                 textAlign: TextAlign.right,
-                style: timeStyle.copyWith(color: Colors.white.withValues(alpha: 0.82)),
+                style: timeStyle.copyWith(
+                  color: Colors.white.withValues(alpha: 0.76),
+                ),
               ),
             );
           },
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         Expanded(child: _ProgressBar(engine: engine, palette: palette)),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         StreamBuilder<Duration>(
           stream: engine.duration,
           initialData: Duration.zero,
           builder: (context, snap) {
             return SizedBox(
-              width: 38,
+              width: 40,
               child: Text(
                 _formatProgressTime(snap.data ?? Duration.zero),
                 textAlign: TextAlign.left,
@@ -6970,12 +7132,6 @@ class _ProgressBarState extends State<_ProgressBar> {
   double? _hoverFraction;
   double? _dragFraction;
 
-  String _fmt(Duration d) {
-    final m = d.inMinutes;
-    final s = d.inSeconds.remainder(60);
-    return '$m:${s.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<Duration>(
@@ -6989,141 +7145,106 @@ class _ProgressBarState extends State<_ProgressBar> {
           initialData: Duration.zero,
           builder: (context, posSnap) {
             final position = posSnap.data ?? Duration.zero;
-            final totalMs =
-                total.inMilliseconds.toDouble().clamp(1.0, double.infinity);
+            final totalMs = total.inMilliseconds.toDouble().clamp(
+              1.0,
+              double.infinity,
+            );
             final posMs =
                 position.inMilliseconds.clamp(0, totalMs.toInt()).toDouble();
             final playFraction = posMs / totalMs;
             final displayFraction =
                 _dragging ? (_dragFraction ?? playFraction) : playFraction;
 
-            final displayPosition =
-                _dragging && _dragFraction != null
-                    ? Duration(
-                      milliseconds: (_dragFraction! * totalMs).round(),
-                    )
-                    : position;
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final barW = constraints.maxWidth;
 
-            return Row(
-              children: [
-                SizedBox(
-                  width: 50,
-                  child: Text(
-                    _fmt(displayPosition),
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.64),
-                      fontFeatures: const [ui.FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final barW = constraints.maxWidth;
+                void seekToFraction(double f) {
+                  final ms = (f.clamp(0.0, 1.0) * totalMs).round();
+                  widget.engine.seek(Duration(milliseconds: ms));
+                }
 
-                      void seekToFraction(double f) {
-                        final ms = (f.clamp(0.0, 1.0) * totalMs).round();
-                        widget.engine.seek(Duration(milliseconds: ms));
-                      }
+                void updateDrag(double localX) {
+                  setState(() {
+                    _dragFraction = (localX / barW).clamp(0.0, 1.0);
+                  });
+                }
 
-                      void updateDrag(double localX) {
+                final hoverDuration =
+                    _hoverFraction != null
+                        ? Duration(
+                          milliseconds: (_hoverFraction! * totalMs).round(),
+                        )
+                        : null;
+
+                return Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      onEnter: (_) => setState(() => _hovering = true),
+                      onExit:
+                          (_) => setState(() {
+                            _hovering = false;
+                            _hoverFraction = null;
+                          }),
+                      onHover: (event) {
                         setState(() {
-                          _dragFraction =
-                              (localX / barW).clamp(0.0, 1.0);
+                          _hoverFraction = (event.localPosition.dx / barW)
+                              .clamp(0.0, 1.0);
                         });
-                      }
-
-                      final hoverDuration =
-                          _hoverFraction != null
-                              ? Duration(
-                                milliseconds:
-                                    (_hoverFraction! * totalMs).round(),
-                              )
-                              : null;
-
-                      return Stack(
-                        clipBehavior: Clip.none,
-                        alignment: Alignment.center,
-                        children: [
-                          MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            onEnter:
-                                (_) => setState(() => _hovering = true),
-                            onExit: (_) => setState(() {
-                              _hovering = false;
-                              _hoverFraction = null;
-                            }),
-                            onHover: (event) {
-                              setState(() {
-                                _hoverFraction =
-                                    (event.localPosition.dx / barW)
-                                        .clamp(0.0, 1.0);
-                              });
-                            },
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTapDown: (d) => seekToFraction(
-                                d.localPosition.dx / barW,
-                              ),
-                              onHorizontalDragStart: (d) {
-                                setState(() => _dragging = true);
-                                updateDrag(d.localPosition.dx);
-                              },
-                              onHorizontalDragUpdate: (d) =>
-                                  updateDrag(d.localPosition.dx),
-                              onHorizontalDragEnd: (_) {
-                                if (_dragFraction != null) {
-                                  seekToFraction(_dragFraction!);
-                                }
-                                setState(() {
-                                  _dragging = false;
-                                  _dragFraction = null;
-                                });
-                              },
-                              child: SizedBox(
-                                height: 26,
-                                width: barW,
-                                child: CustomPaint(
-                                  painter: _ProgressBarPainter(
-                                    fraction: displayFraction,
-                                    hovering: _hovering || _dragging,
-                                    seedColor: widget.palette.seed,
-                                    accentColor: widget.palette.accent,
-                                  ),
-                                ),
-                              ),
+                      },
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTapDown:
+                            (d) => seekToFraction(d.localPosition.dx / barW),
+                        onHorizontalDragStart: (d) {
+                          setState(() => _dragging = true);
+                          updateDrag(d.localPosition.dx);
+                        },
+                        onHorizontalDragUpdate:
+                            (d) => updateDrag(d.localPosition.dx),
+                        onHorizontalDragEnd: (_) {
+                          if (_dragFraction != null) {
+                            seekToFraction(_dragFraction!);
+                          }
+                          setState(() {
+                            _dragging = false;
+                            _dragFraction = null;
+                          });
+                        },
+                        child: SizedBox(
+                          height: 26,
+                          width: barW,
+                          child: CustomPaint(
+                            painter: _ProgressBarPainter(
+                              fraction: displayFraction,
+                              hovering: _hovering || _dragging,
+                              seedColor: widget.palette.seed,
+                              accentColor: widget.palette.accent,
                             ),
                           ),
-                          if ((_hovering || _dragging) &&
-                              hoverDuration != null)
-                            Positioned(
-                              top: -34,
-                              left: ((_hoverFraction ?? displayFraction) *
-                                          barW)
-                                      .clamp(24.0, barW - 24.0) -
-                                  24,
-                              child: _TimeTooltip(
-                                duration: hoverDuration,
-                                seedColor: widget.palette.seed,
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: 50,
-                  child: Text(
-                    _fmt(total),
-                    textAlign: TextAlign.end,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.64),
-                      fontFeatures: const [ui.FontFeature.tabularFigures()],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ],
+                    if ((_hovering || _dragging) && hoverDuration != null)
+                      Positioned(
+                        top: -34,
+                        left:
+                            ((_hoverFraction ?? displayFraction) * barW).clamp(
+                              24.0,
+                              barW - 24.0,
+                            ) -
+                            24,
+                        child: _TimeTooltip(
+                          duration: hoverDuration,
+                          seedColor: widget.palette.seed,
+                        ),
+                      ),
+                  ],
+                );
+              },
             );
           },
         );
@@ -7140,9 +7261,7 @@ class _TimeTooltip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final m = duration.inMinutes;
-    final s = duration.inSeconds.remainder(60);
-    final text = '$m:${s.toString().padLeft(2, '0')}';
+    final text = _formatProgressTime(duration);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
@@ -7185,8 +7304,8 @@ class _ProgressBarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const trackH = 3.5;
-    const hoverTrackH = 5.5;
+    const trackH = 3.0;
+    const hoverTrackH = 4.6;
     final h = hovering ? hoverTrackH : trackH;
     final cy = size.height / 2;
     const radius = Radius.circular(6);
@@ -7196,7 +7315,7 @@ class _ProgressBarPainter extends CustomPainter {
 
     canvas.drawRRect(
       trackRRect,
-      Paint()..color = Colors.white.withValues(alpha: 0.13),
+      Paint()..color = Colors.white.withValues(alpha: 0.11),
     );
 
     final f = fraction.clamp(0.0, 1.0);
@@ -7209,7 +7328,10 @@ class _ProgressBarPainter extends CustomPainter {
         fillRRect,
         Paint()
           ..shader = LinearGradient(
-            colors: [seedColor, blended],
+            colors: [
+              seedColor.withValues(alpha: 0.92),
+              blended.withValues(alpha: 0.96),
+            ],
           ).createShader(Rect.fromLTWH(0, 0, size.width, h)),
       );
     }
@@ -7219,12 +7341,12 @@ class _ProgressBarPainter extends CustomPainter {
       final center = Offset(thumbX, cy);
       canvas.drawCircle(
         center,
-        9,
+        7.5,
         Paint()
-          ..color = seedColor.withValues(alpha: 0.26)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+          ..color = seedColor.withValues(alpha: 0.18)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
       );
-      canvas.drawCircle(center, 5.5, Paint()..color = Colors.white);
+      canvas.drawCircle(center, 4.5, Paint()..color = Colors.white);
     }
   }
 
@@ -7295,8 +7417,7 @@ class _PulseRingState extends State<_PulseRing>
           builder: (context, _) {
             final t = _ctrl.value;
             final scale = 1.0 + t * 0.56;
-            final opacity =
-                (1.0 - t) * (widget.active ? 0.42 : 0.0);
+            final opacity = (1.0 - t) * (widget.active ? 0.42 : 0.0);
             return Transform.scale(
               scale: scale,
               child: Container(
@@ -7347,7 +7468,7 @@ class _TransportControls extends StatelessWidget {
               icon: Icons.skip_previous_rounded,
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: _PulseRing(
                 color: Theme.of(context).colorScheme.primary,
                 active: playing,
@@ -7361,13 +7482,10 @@ class _TransportControls extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primary.withValues(
-                            alpha: playing ? 0.32 : 0.18,
-                          ),
-                          blurRadius: playing ? 24 : 14,
-                          spreadRadius: playing ? 3 : 0,
+                          color: Theme.of(context).colorScheme.primary
+                              .withValues(alpha: playing ? 0.26 : 0.14),
+                          blurRadius: playing ? 20 : 12,
+                          spreadRadius: playing ? 2 : 0,
                         ),
                       ],
                     ),
@@ -7381,13 +7499,12 @@ class _TransportControls extends StatelessWidget {
                         }
                       },
                       style: IconButton.styleFrom(
-                        fixedSize: const Size.square(48),
-                        backgroundColor:
-                            Theme.of(context).colorScheme.primary,
+                        fixedSize: const Size.square(46),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor:
                             Theme.of(context).colorScheme.onPrimary,
                       ),
-                      iconSize: 24,
+                      iconSize: 22,
                       icon: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 160),
                         transitionBuilder:
@@ -7439,9 +7556,9 @@ class _TransportButton extends StatelessWidget {
       message: tooltip,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
+          color: Colors.white.withValues(alpha: 0.03),
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         ),
         child: IconButton(
           onPressed: onPressed,
@@ -7450,7 +7567,7 @@ class _TransportButton extends StatelessWidget {
             padding: EdgeInsets.zero,
             foregroundColor: _primaryGlassText(),
           ),
-          icon: Icon(icon, size: 24),
+          icon: Icon(icon, size: 22),
         ),
       ),
     );
@@ -7512,8 +7629,7 @@ class _CompactPaletteButton extends ConsumerStatefulWidget {
       _CompactPaletteButtonState();
 }
 
-class _CompactPaletteButtonState
-    extends ConsumerState<_CompactPaletteButton> {
+class _CompactPaletteButtonState extends ConsumerState<_CompactPaletteButton> {
   bool _hovered = false;
 
   @override
@@ -7637,20 +7753,17 @@ class _PaletteSwatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = selected ? 34.0 : 24.0;
-    final height = selected ? 28.0 : 22.0;
-
     return AnimatedContainer(
       duration: _hoverDuration,
       curve: _hoverCurve,
-      width: width,
-      height: height,
+      width: 24,
+      height: 24,
       decoration: BoxDecoration(
         color: palette.seed,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: selected ? Colors.white : Colors.white.withValues(alpha: 0.24),
-          width: selected ? 2 : 1,
+          width: selected ? 2.2 : 1,
         ),
         boxShadow: [
           if (selected)
@@ -7661,15 +7774,21 @@ class _PaletteSwatch extends StatelessWidget {
             ),
         ],
       ),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Container(
-          width: selected ? 18 : 14,
-          height: 1.5,
-          margin: const EdgeInsets.only(top: 3),
+      child: Center(
+        child: AnimatedContainer(
+          duration: _hoverDuration,
+          curve: _hoverCurve,
+          width: selected ? 7 : 0,
+          height: selected ? 7 : 0,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            color: Colors.white.withValues(alpha: selected ? 0.42 : 0.18),
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.92),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.26),
+                blurRadius: 6,
+              ),
+            ],
           ),
         ),
       ),
