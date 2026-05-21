@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heni/design/app_theme.dart';
@@ -239,20 +241,86 @@ void main() {
         expect(store.latest?.playlists, isEmpty);
       },
     );
+
+    test('launch media paths are imported and played on startup', () async {
+      final directory = await Directory.systemTemp.createTemp('heni-launch-');
+      addTearDown(() => directory.delete(recursive: true));
+      final launchFile = File(
+        '${directory.path}${Platform.pathSeparator}launch.mp4',
+      );
+      await launchFile.writeAsBytes(const []);
+
+      final engine = _FakePlaybackEngine();
+      final container = _container(engine, launchMediaPaths: [launchFile.path]);
+      addTearDown(container.dispose);
+
+      container.read(playbackQueueControllerProvider.notifier);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      final state = container.read(playbackQueueControllerProvider);
+      expect(state.library.items.map((item) => item.path), [launchFile.path]);
+      expect(state.currentItem?.path, launchFile.path);
+      expect(state.libraryFilePaths, [launchFile.path]);
+      expect(engine.opened.map((item) => item.path), [launchFile.path]);
+    });
+
+    test(
+      'caches inspected media duration back into visible playlists',
+      () async {
+        final engine = _FakePlaybackEngine();
+        final container = _container(
+          engine,
+          inspector: const _FakeMediaInspector(
+            duration: Duration(minutes: 3, seconds: 42),
+          ),
+        );
+        addTearDown(container.dispose);
+
+        final controller = container.read(
+          playbackQueueControllerProvider.notifier,
+        );
+        await controller.addItems(_items);
+        await controller.createPlaylist('收藏');
+        final playlistId =
+            container.read(playbackQueueControllerProvider).playlists.single.id;
+        controller.addItemToPlaylist(playlistId, _items.first);
+
+        await controller.playIndex(0);
+        await Future<void>.delayed(Duration.zero);
+
+        final state = container.read(playbackQueueControllerProvider);
+        expect(
+          state.library.items.first.duration,
+          const Duration(seconds: 222),
+        );
+        expect(
+          state.playlists.single.items.first.duration,
+          const Duration(seconds: 222),
+        );
+        expect(
+          state.playbackQueue.items.first.duration,
+          const Duration(seconds: 222),
+        );
+        expect(state.currentItem?.duration, const Duration(seconds: 222));
+      },
+    );
   });
 }
 
 ProviderContainer _container(
   _FakePlaybackEngine engine, {
   _MemoryLibraryStore? store,
+  List<String> launchMediaPaths = const [],
+  MediaInspector inspector = const _FakeMediaInspector(),
 }) {
   return ProviderContainer(
     overrides: [
       playbackEngineProvider.overrideWithValue(engine),
-      mediaInspectorProvider.overrideWithValue(const _FakeMediaInspector()),
+      mediaInspectorProvider.overrideWithValue(inspector),
       heniLibraryStoreProvider.overrideWithValue(
         store ?? _MemoryLibraryStore(),
       ),
+      launchMediaPathsProvider.overrideWithValue(launchMediaPaths),
     ],
   );
 }
@@ -315,7 +383,9 @@ class _FakePlaybackEngine implements PlaybackEngine {
 }
 
 class _FakeMediaInspector implements MediaInspector {
-  const _FakeMediaInspector();
+  const _FakeMediaInspector({this.duration});
+
+  final Duration? duration;
 
   @override
   Future<MediaProbe> inspectPath(String path) async {
@@ -324,6 +394,7 @@ class _FakeMediaInspector implements MediaInspector {
       streams: const [],
       chapters: const [],
       tags: const {},
+      duration: duration,
     );
   }
 }

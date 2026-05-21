@@ -124,11 +124,11 @@ class HeniPalette {
 
   static const nocturne = HeniPalette(
     name: '深夜',
-    seed: Color(0xFF5EC8A7),
-    surface: Color(0xFF101316),
-    surfaceAlt: Color(0xFF182026),
-    accent: Color(0xFFF0C66B),
-    glow: Color(0xFF5EC8A7),
+    seed: Color(0xFF4F8A78),
+    surface: Color(0xFF0E1214),
+    surfaceAlt: Color(0xFF161E22),
+    accent: Color(0xFFD8BC7A),
+    glow: Color(0xFF4F8A78),
   );
 
   static const ember = HeniPalette(
@@ -160,11 +160,11 @@ class HeniPalette {
 
   static const forest = HeniPalette(
     name: '森林',
-    seed: Color(0xFF74A66A),
-    surface: Color(0xFF111510),
-    surfaceAlt: Color(0xFF1B241A),
-    accent: Color(0xFFE4C06A),
-    glow: Color(0xFF74A66A),
+    seed: Color(0xFF678E63),
+    surface: Color(0xFF101410),
+    surfaceAlt: Color(0xFF182019),
+    accent: Color(0xFFD8B874),
+    glow: Color(0xFF678E63),
   );
 
   static const graphite = HeniPalette(
@@ -291,53 +291,53 @@ class HeniTheme {
       scaffoldBackgroundColor: palette.surface,
       textTheme: textTheme.copyWith(
         headlineMedium: textTheme.headlineMedium?.copyWith(
-          fontSize: 31,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0,
-          height: 1.08,
+          fontSize: 30,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+          height: 1.1,
         ),
         headlineSmall: textTheme.headlineSmall?.copyWith(
-          fontSize: 24,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0,
-          height: 1.12,
+          fontSize: 23,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.15,
+          height: 1.14,
         ),
         titleLarge: textTheme.titleLarge?.copyWith(
-          fontSize: 21,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.1,
         ),
         titleMedium: textTheme.titleMedium?.copyWith(
-          fontSize: 16,
+          fontSize: 15.5,
           fontWeight: FontWeight.w700,
-          letterSpacing: 0,
+          letterSpacing: 0.05,
         ),
         titleSmall: textTheme.titleSmall?.copyWith(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.06,
         ),
         bodyMedium: textTheme.bodyMedium?.copyWith(
           fontSize: 14,
           fontWeight: FontWeight.w500,
-          letterSpacing: 0,
-          height: 1.35,
+          letterSpacing: 0.08,
+          height: 1.42,
         ),
         bodySmall: textTheme.bodySmall?.copyWith(
-          fontSize: 12,
+          fontSize: 11.6,
           fontWeight: FontWeight.w500,
-          letterSpacing: 0,
-          height: 1.3,
+          letterSpacing: 0.08,
+          height: 1.34,
         ),
         labelLarge: textTheme.labelLarge?.copyWith(
-          fontSize: 12,
+          fontSize: 11.8,
           fontWeight: FontWeight.w700,
-          letterSpacing: 0,
+          letterSpacing: 0.12,
         ),
         labelMedium: textTheme.labelMedium?.copyWith(
-          fontSize: 11,
+          fontSize: 10.8,
           fontWeight: FontWeight.w700,
-          letterSpacing: 0,
+          letterSpacing: 0.16,
         ),
       ),
       dividerColor: Colors.white.withValues(alpha: 0.08),
@@ -357,11 +357,11 @@ class HeniTheme {
         style: FilledButton.styleFrom(
           backgroundColor: palette.accent,
           foregroundColor: scheme.onPrimary,
-          minimumSize: const Size(46, 40),
-          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
+          minimumSize: const Size(44, 38),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
           textStyle: textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.08,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),
@@ -371,12 +371,12 @@ class HeniTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: scheme.onSurface,
-          minimumSize: const Size(46, 40),
-          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+          minimumSize: const Size(44, 38),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
           textStyle: textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w700,
-            letterSpacing: 0,
+            letterSpacing: 0.08,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),
@@ -391,7 +391,7 @@ class HeniTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 14,
+          vertical: 13,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),

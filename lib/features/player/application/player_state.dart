@@ -69,11 +69,16 @@ class CurrentMediaProbe extends Notifier<AsyncValue<MediaProbe?>> {
   @override
   AsyncValue<MediaProbe?> build() => const AsyncData(null);
 
-  Future<void> inspect(String path) async {
+  Future<MediaProbe?> inspect(String path) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() {
-      return ref.read(mediaInspectorProvider).inspectPath(path);
-    });
+    try {
+      final probe = await ref.read(mediaInspectorProvider).inspectPath(path);
+      state = AsyncData(probe);
+      return probe;
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+      return null;
+    }
   }
 
   void clear() {

@@ -33,15 +33,95 @@ const _libraryLeadColumnWidth = 64.0;
 const _libraryDurationColumnWidth = 64.0;
 const _libraryActionColumnWidth = 92.0;
 
+class _LibraryTableColumns {
+  const _LibraryTableColumns({
+    required this.leadWidth,
+    required this.durationWidth,
+    required this.actionWidth,
+    required this.gap,
+    required this.showPath,
+    required this.showAction,
+    required this.compactAction,
+  });
+
+  factory _LibraryTableColumns.forWidth(double width) {
+    if (width < 300) {
+      return const _LibraryTableColumns(
+        leadWidth: 48,
+        durationWidth: 52,
+        actionWidth: 0,
+        gap: 6,
+        showPath: false,
+        showAction: false,
+        compactAction: true,
+      );
+    }
+
+    if (width < 520) {
+      return const _LibraryTableColumns(
+        leadWidth: 52,
+        durationWidth: 54,
+        actionWidth: 38,
+        gap: 6,
+        showPath: false,
+        showAction: true,
+        compactAction: true,
+      );
+    }
+
+    if (width < 640) {
+      return const _LibraryTableColumns(
+        leadWidth: 58,
+        durationWidth: 58,
+        actionWidth: 42,
+        gap: 8,
+        showPath: false,
+        showAction: true,
+        compactAction: true,
+      );
+    }
+
+    if (width < 760) {
+      return const _LibraryTableColumns(
+        leadWidth: 60,
+        durationWidth: 60,
+        actionWidth: 44,
+        gap: 10,
+        showPath: true,
+        showAction: true,
+        compactAction: true,
+      );
+    }
+
+    return const _LibraryTableColumns(
+      leadWidth: _libraryLeadColumnWidth,
+      durationWidth: _libraryDurationColumnWidth,
+      actionWidth: _libraryActionColumnWidth,
+      gap: 12,
+      showPath: true,
+      showAction: true,
+      compactAction: false,
+    );
+  }
+
+  final double leadWidth;
+  final double durationWidth;
+  final double actionWidth;
+  final double gap;
+  final bool showPath;
+  final bool showAction;
+  final bool compactAction;
+}
+
 Color _shellGlassFill(HeniPalette palette, {double emphasis = 1}) {
   return Color.alphaBlend(
-    palette.surfaceAlt.withValues(alpha: 0.52 + 0.04 * emphasis),
+    palette.surfaceAlt.withValues(alpha: 0.44 + 0.035 * emphasis),
     palette.surface,
   );
 }
 
 Color _shellGlassBorder(HeniPalette palette, {double emphasis = 1}) {
-  return palette.seed.withValues(alpha: 0.10 + 0.018 * emphasis);
+  return palette.seed.withValues(alpha: 0.075 + 0.014 * emphasis);
 }
 
 Color _primaryGlassText({double emphasis = 1}) {
@@ -113,25 +193,25 @@ class _ShellLayout {
 
   double get topHeight =>
       quiet
-          ? 58
+          ? 54
           : compact
-          ? 62
-          : 66;
+          ? 58
+          : 60;
   double get bottomHeight =>
       quiet
-          ? 96
+          ? 92
           : compact
-          ? 104
-          : 112;
+          ? 98
+          : 104;
   double get sidebarWidth =>
       quiet
-          ? 196
+          ? 182
           : compact
-          ? 212
-          : 228;
-  double get sidebarPadding => quiet ? 12 : 14;
-  double get topHorizontalMargin => quiet ? 12 : 16;
-  double get contentGap => quiet ? 8 : 12;
+          ? 194
+          : 206;
+  double get sidebarPadding => quiet ? 10 : 12;
+  double get topHorizontalMargin => quiet ? 12 : 14;
+  double get contentGap => quiet ? 10 : 14;
   bool get showSidebarStatus => !quiet;
   bool get useDenseHeader => compact;
   bool get showSceneryOrb => !quiet;
@@ -192,49 +272,60 @@ class _GlassPanelState extends State<_GlassPanel> {
 
     final shadows = <BoxShadow>[
       BoxShadow(
-        color: Colors.black.withValues(alpha: 0.22),
-        blurRadius: 30,
-        offset: const Offset(0, 14),
+        color: Colors.black.withValues(alpha: 0.16),
+        blurRadius: 24,
+        offset: const Offset(0, 12),
       ),
       if (_hover && accent != null)
         BoxShadow(
-          color: accent.seed.withValues(alpha: 0.15),
-          blurRadius: 28,
+          color: accent.seed.withValues(alpha: 0.10),
+          blurRadius: 24,
           spreadRadius: -8,
-          offset: const Offset(0, 12),
+          offset: const Offset(0, 10),
         ),
     ];
 
-    Widget core = ClipRRect(
-      borderRadius: BorderRadius.circular(widget.radius),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 26, sigmaY: 26),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            color: resolvedFill,
-            borderRadius: BorderRadius.circular(widget.radius),
-            border: Border.all(color: borderCol),
-            boxShadow: shadows,
-          ),
-          child: Stack(
-            children: [
-              if (widget.auroraPalette != null)
-                Positioned(
-                  left: 14,
-                  right: 14,
-                  top: 0,
-                  height: 1,
-                  child: IgnorePointer(
-                    child: _AuroraBar(palette: widget.auroraPalette!),
-                  ),
-                ),
-              Padding(
-                padding: widget.padding ?? EdgeInsets.zero,
-                child: widget.child,
+    Widget core = AnimatedScale(
+      duration: _hoverDuration,
+      curve: _hoverCurve,
+      scale: _hover && accent != null ? 1.002 : 1.0,
+      child: AnimatedSlide(
+        duration: _hoverDuration,
+        curve: _hoverCurve,
+        offset:
+            _hover && accent != null ? const Offset(0, -0.002) : Offset.zero,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(widget.radius),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 26, sigmaY: 26),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              decoration: BoxDecoration(
+                color: resolvedFill,
+                borderRadius: BorderRadius.circular(widget.radius),
+                border: Border.all(color: borderCol),
+                boxShadow: shadows,
               ),
-            ],
+              child: Stack(
+                children: [
+                  if (widget.auroraPalette != null)
+                    Positioned(
+                      left: 14,
+                      right: 14,
+                      top: 0,
+                      height: 1,
+                      child: IgnorePointer(
+                        child: _AuroraBar(palette: widget.auroraPalette!),
+                      ),
+                    ),
+                  Padding(
+                    padding: widget.padding ?? EdgeInsets.zero,
+                    child: widget.child,
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -1366,16 +1457,16 @@ class _TopNavigation extends ConsumerWidget {
       palette: palette,
       margin: EdgeInsets.fromLTRB(
         layout.topHorizontalMargin,
-        10,
+        8,
         layout.topHorizontalMargin,
         4,
       ),
       padding: EdgeInsets.symmetric(
-        horizontal: layout.quiet ? 11 : 14,
-        vertical: layout.quiet ? 7 : 9,
+        horizontal: layout.quiet ? 10 : 12,
+        vertical: layout.quiet ? 6 : 7,
       ),
       height: layout.topHeight - 4,
-      emphasis: 0.94,
+      emphasis: 0.84,
       child: Row(
         children: [
           _TopBrand(palette: palette, layout: layout),
@@ -1446,28 +1537,24 @@ class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOutCubic,
-      height: widget.layout.quiet ? 34 : 38,
+      height: widget.layout.quiet ? 32 : 36,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: _focused ? 0.055 : 0.032),
+        color: Colors.white.withValues(alpha: _focused ? 0.045 : 0.022),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color:
               _focused
-                  ? palette.seed.withValues(alpha: 0.34)
-                  : Colors.white.withValues(alpha: 0.06),
-          width: _focused ? 1.2 : 1,
+                  ? palette.seed.withValues(alpha: 0.26)
+                  : Colors.white.withValues(alpha: 0.045),
+          width: _focused ? 1.0 : 1,
         ),
         boxShadow:
             _focused
                 ? [
                   BoxShadow(
-                    color: palette.seed.withValues(alpha: 0.18),
-                    blurRadius: 14,
+                    color: palette.seed.withValues(alpha: 0.10),
+                    blurRadius: 12,
                     spreadRadius: 0,
-                  ),
-                  BoxShadow(
-                    color: palette.accent.withValues(alpha: 0.08),
-                    blurRadius: 18,
                   ),
                 ]
                 : const [],
@@ -1480,7 +1567,7 @@ class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
         },
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
           color: _primaryGlassText(),
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
           border: InputBorder.none,
@@ -1490,11 +1577,11 @@ class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
           ).textTheme.bodyMedium?.copyWith(color: _tertiaryGlassText()),
           prefixIcon: Icon(
             Icons.search_rounded,
-            size: 20,
+            size: 18,
             color:
                 _focused
                     ? palette.seed.withValues(alpha: 0.92)
-                    : _secondaryGlassText(emphasis: 0.92),
+                    : _secondaryGlassText(emphasis: 0.82),
           ),
           suffixIcon:
               _controller.text.isEmpty
@@ -1510,7 +1597,7 @@ class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 14,
-            vertical: 8,
+            vertical: 7,
           ),
         ),
       ),
@@ -1529,7 +1616,7 @@ class _TopBrand extends StatelessWidget {
     final theme = Theme.of(context);
 
     return SizedBox(
-      width: layout.quiet ? 104 : 120,
+      width: layout.quiet ? 98 : 110,
       child: Row(
         children: [
           TweenAnimationBuilder<double>(
@@ -1541,8 +1628,8 @@ class _TopBrand extends StatelessWidget {
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
-              width: 28,
-              height: 28,
+              width: 26,
+              height: 26,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -1559,7 +1646,7 @@ class _TopBrand extends StatelessWidget {
                 boxShadow: [
                   BoxShadow(
                     color: palette.seed.withValues(alpha: 0.22),
-                    blurRadius: 10,
+                    blurRadius: 8,
                     spreadRadius: 0,
                   ),
                 ],
@@ -1568,21 +1655,21 @@ class _TopBrand extends StatelessWidget {
                 'H',
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w900,
-                  fontSize: 14,
+                  fontSize: 13.5,
                   color: heniReadableForegroundOn(palette.seed),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Heni',
               style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w900,
-                fontSize: 16,
-                letterSpacing: 0.25,
-                color: _primaryGlassText(emphasis: 0.98),
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                letterSpacing: 0.18,
+                color: _primaryGlassText(emphasis: 0.94),
               ),
             ),
           ),
@@ -1638,36 +1725,17 @@ class _Sidebar extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Positioned(
-            right: -8,
-            top: 44,
-            bottom: 44,
-            child: Container(
-              width: 24,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    palette.seed.withValues(alpha: 0.08),
-                    palette.seed.withValues(alpha: 0.025),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
           _GlassPanel(
-            radius: 26,
-            fillColor: _shellGlassFill(palette, emphasis: 0.96),
-            borderColor: _shellGlassBorder(palette, emphasis: 0.96),
+            radius: 28,
+            fillColor: _shellGlassFill(palette, emphasis: 0.8),
+            borderColor: _shellGlassBorder(palette, emphasis: 0.74),
             auroraPalette: palette,
             hoverAccentPalette: palette,
             padding: EdgeInsets.fromLTRB(
               layout.quiet ? 10 : 12,
-              layout.quiet ? 10 : 12,
+              layout.quiet ? 12 : 14,
               layout.quiet ? 8 : 10,
-              layout.quiet ? 10 : 12,
+              layout.quiet ? 12 : 14,
             ),
             child: AnimatedContainer(
               duration: _contentSwitchDuration,
@@ -1822,10 +1890,10 @@ class _SidebarSectionHeader extends StatelessWidget {
             child: Text(
               title,
               style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                fontSize: 11.8,
-                letterSpacing: 0.2,
-                color: _secondaryGlassText(emphasis: 0.82),
+                fontWeight: FontWeight.w700,
+                fontSize: 11.1,
+                letterSpacing: 0.7,
+                color: _secondaryGlassText(emphasis: 0.62),
               ),
             ),
           ),
@@ -1878,175 +1946,208 @@ class _PlaylistTileState extends ConsumerState<_PlaylistTile> {
       child: AnimatedScale(
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOutCubic,
-        scale: widget.selected ? 1.0 : (_hovered ? 1.006 : 1.0),
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 3),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOutCubic,
-            height: 38,
-            decoration: BoxDecoration(
-              color: tint.withValues(
-                alpha:
-                    widget.selected
-                        ? 0.14
-                        : _hovered
-                        ? 0.05
-                        : 0.0,
+        scale: widget.selected ? 1.0 : (_hovered ? 1.004 : 1.0),
+        child: AnimatedSlide(
+          duration: _hoverDuration,
+          curve: _hoverCurve,
+          offset:
+              _hovered && !widget.selected
+                  ? const Offset(0.006, 0)
+                  : Offset.zero,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 5),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              height: 40,
+              decoration: BoxDecoration(
+                color: tint.withValues(
+                  alpha:
+                      widget.selected
+                          ? 0.11
+                          : _hovered
+                          ? 0.038
+                          : 0.0,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color:
+                      widget.selected
+                          ? tint.withValues(alpha: 0.16)
+                          : Colors.white.withValues(
+                            alpha: _hovered ? 0.06 : 0.0,
+                          ),
+                ),
+                boxShadow: [
+                  if (_hovered || widget.selected)
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: widget.selected ? 0.12 : 0.06,
+                      ),
+                      blurRadius: widget.selected ? 14 : 10,
+                      offset: const Offset(0, 4),
+                    ),
+                ],
               ),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(11),
-                onTap: widget.onTap,
-                child: Stack(
-                  children: [
-                    Positioned(
-                      left: 0,
-                      top: 8,
-                      bottom: 8,
-                      child: AnimatedContainer(
-                        duration: _hoverDuration,
-                        curve: _hoverCurve,
-                        width: widget.selected ? 3 : (_hovered ? 1.5 : 0),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(999),
-                          color:
-                              widget.selected
-                                  ? tint
-                                  : Colors.white.withValues(alpha: 0.18),
-                          boxShadow: [
-                            if (widget.selected)
-                              BoxShadow(
-                                color: tint.withValues(alpha: 0.34),
-                                blurRadius: 5,
-                              ),
-                          ],
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  hoverColor: tint.withValues(alpha: 0.04),
+                  splashColor: tint.withValues(alpha: 0.10),
+                  highlightColor: tint.withValues(alpha: 0.06),
+                  onTap: widget.onTap,
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        left: 0,
+                        top: 8,
+                        bottom: 8,
+                        child: AnimatedContainer(
+                          duration: _hoverDuration,
+                          curve: _hoverCurve,
+                          width: widget.selected ? 2.5 : (_hovered ? 1.5 : 0),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(999),
+                            color:
+                                widget.selected
+                                    ? tint
+                                    : Colors.white.withValues(alpha: 0.18),
+                            boxShadow: [
+                              if (widget.selected)
+                                BoxShadow(
+                                  color: tint.withValues(alpha: 0.34),
+                                  blurRadius: 6,
+                                ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 0, 4, 0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            AnimatedContainer(
-                              duration: _hoverDuration,
-                              width: 24,
-                              height: 24,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: tint.withValues(
-                                  alpha: active ? 0.18 : 0.07,
-                                ),
-                                borderRadius: BorderRadius.circular(7),
-                              ),
-                              child: Icon(
-                                widget.onDelete == null
-                                    ? Icons.library_music_outlined
-                                    : Icons.queue_music_rounded,
-                                size: 13,
-                                color: _primaryGlassText(
-                                  emphasis: active ? 1.0 : 0.9,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 9),
-                            Expanded(
-                              child: Text(
-                                widget.playlist.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12.6,
-                                  height: 1.15,
-                                  fontWeight:
-                                      widget.selected
-                                          ? FontWeight.w800
-                                          : FontWeight.w600,
-                                  color: _primaryGlassText(
-                                    emphasis: widget.selected ? 1.0 : 0.9,
-                                  ),
-                                  letterSpacing: 0.05,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            if (widget.isPlayingHere)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: StreamBuilder<bool>(
-                                  stream:
-                                      ref.read(playbackEngineProvider).playing,
-                                  initialData: false,
-                                  builder: (context, snap) {
-                                    return _NowPlayingWave(
-                                      color: widget.palette.seed,
-                                      active: snap.data ?? false,
-                                    );
-                                  },
-                                ),
-                              ),
-                            _CountBadge(count: widget.playlist.items.length),
-                            if (widget.onDelete != null)
-                              AnimatedOpacity(
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 0, 4, 0),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              AnimatedContainer(
                                 duration: _hoverDuration,
-                                opacity: _hovered ? 1 : 0,
-                                child: SizedBox(
-                                  width: _hovered ? 24 : 0,
-                                  height: 24,
-                                  child: PopupMenuButton<_PlaylistAction>(
-                                    tooltip: '歌单选项',
-                                    padding: EdgeInsets.zero,
-                                    icon: const Icon(
-                                      Icons.more_horiz,
-                                      size: 16,
-                                    ),
-                                    iconSize: 16,
-                                    onSelected: (action) {
-                                      switch (action) {
-                                        case _PlaylistAction.addFromLibrary:
-                                          widget.onAddFromLibrary?.call();
-                                        case _PlaylistAction.rename:
-                                          widget.onRename?.call();
-                                        case _PlaylistAction.description:
-                                          widget.onEditDescription?.call();
-                                        case _PlaylistAction.delete:
-                                          widget.onDelete?.call();
-                                      }
-                                    },
-                                    itemBuilder:
-                                        (context) => const [
-                                          PopupMenuItem<_PlaylistAction>(
-                                            value:
-                                                _PlaylistAction.addFromLibrary,
-                                            child: Text('添加歌曲'),
-                                          ),
-                                          PopupMenuItem<_PlaylistAction>(
-                                            value: _PlaylistAction.rename,
-                                            child: Text('重命名'),
-                                          ),
-                                          PopupMenuItem<_PlaylistAction>(
-                                            value: _PlaylistAction.description,
-                                            child: Text('编辑说明'),
-                                          ),
-                                          PopupMenuDivider(),
-                                          PopupMenuItem<_PlaylistAction>(
-                                            value: _PlaylistAction.delete,
-                                            child: Text('删除'),
-                                          ),
-                                        ],
+                                width: 25,
+                                height: 25,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: tint.withValues(
+                                    alpha: active ? 0.18 : 0.07,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  widget.onDelete == null
+                                      ? Icons.library_music_outlined
+                                      : Icons.queue_music_rounded,
+                                  size: 12.5,
+                                  color: _primaryGlassText(
+                                    emphasis: active ? 1.0 : 0.9,
                                   ),
                                 ),
                               ),
-                          ],
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  widget.playlist.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12.4,
+                                    height: 1.15,
+                                    fontWeight:
+                                        widget.selected
+                                            ? FontWeight.w700
+                                            : FontWeight.w600,
+                                    color: _primaryGlassText(
+                                      emphasis: widget.selected ? 0.98 : 0.88,
+                                    ),
+                                    letterSpacing: 0.08,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              if (widget.isPlayingHere)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: StreamBuilder<bool>(
+                                    stream:
+                                        ref
+                                            .read(playbackEngineProvider)
+                                            .playing,
+                                    initialData: false,
+                                    builder: (context, snap) {
+                                      return _NowPlayingWave(
+                                        color: widget.palette.seed,
+                                        active: snap.data ?? false,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              _CountBadge(count: widget.playlist.items.length),
+                              if (widget.onDelete != null)
+                                AnimatedOpacity(
+                                  duration: _hoverDuration,
+                                  opacity: _hovered ? 1 : 0,
+                                  child: SizedBox(
+                                    width: _hovered ? 24 : 0,
+                                    height: 24,
+                                    child: PopupMenuButton<_PlaylistAction>(
+                                      tooltip: '歌单选项',
+                                      padding: EdgeInsets.zero,
+                                      icon: const Icon(
+                                        Icons.more_horiz,
+                                        size: 16,
+                                      ),
+                                      iconSize: 16,
+                                      onSelected: (action) {
+                                        switch (action) {
+                                          case _PlaylistAction.addFromLibrary:
+                                            widget.onAddFromLibrary?.call();
+                                          case _PlaylistAction.rename:
+                                            widget.onRename?.call();
+                                          case _PlaylistAction.description:
+                                            widget.onEditDescription?.call();
+                                          case _PlaylistAction.delete:
+                                            widget.onDelete?.call();
+                                        }
+                                      },
+                                      itemBuilder:
+                                          (context) => const [
+                                            PopupMenuItem<_PlaylistAction>(
+                                              value:
+                                                  _PlaylistAction
+                                                      .addFromLibrary,
+                                              child: Text('添加歌曲'),
+                                            ),
+                                            PopupMenuItem<_PlaylistAction>(
+                                              value: _PlaylistAction.rename,
+                                              child: Text('重命名'),
+                                            ),
+                                            PopupMenuItem<_PlaylistAction>(
+                                              value:
+                                                  _PlaylistAction.description,
+                                              child: Text('编辑说明'),
+                                            ),
+                                            PopupMenuDivider(),
+                                            PopupMenuItem<_PlaylistAction>(
+                                              value: _PlaylistAction.delete,
+                                              child: Text('删除'),
+                                            ),
+                                          ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -2070,9 +2171,9 @@ class _InfoPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.032),
+        color: Colors.white.withValues(alpha: 0.024),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.065)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2082,8 +2183,8 @@ class _InfoPill extends StatelessWidget {
           Text(
             label,
             style: theme.textTheme.labelMedium?.copyWith(
-              color: _secondaryGlassText(emphasis: 0.92),
-              fontWeight: FontWeight.w700,
+              color: _secondaryGlassText(emphasis: 0.82),
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -2199,12 +2300,29 @@ class _SidebarEmptyState extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Color.alphaBlend(
-          palette.seed.withValues(alpha: 0.08),
-          palette.surfaceAlt,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.alphaBlend(
+              palette.seed.withValues(alpha: 0.10),
+              palette.surfaceAlt,
+            ),
+            Color.alphaBlend(
+              palette.seed.withValues(alpha: 0.04),
+              palette.surface,
+            ),
+          ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2245,9 +2363,23 @@ class _SongsEmptyState extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.035),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withValues(alpha: 0.045),
+              Colors.white.withValues(alpha: 0.024),
+            ],
+          ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 20,
+              offset: const Offset(0, 12),
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -2257,8 +2389,9 @@ class _SongsEmptyState extends StatelessWidget {
               height: 52,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
+                color: Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
               ),
               child: const Icon(Icons.library_music_outlined),
             ),
@@ -2463,15 +2596,18 @@ class _ContentHeader extends StatelessWidget {
       HeniUiStyle.library => '我的歌单',
     };
 
+    if (uiStyle == HeniUiStyle.scenery) {
+      return _StageHeaderDock(
+        palette: palette,
+        headingLabel: headingLabel,
+        active: uiStyle,
+        onPickScenery: onPickScenery,
+        onSelectUiStyle: onSelectUiStyle,
+      );
+    }
+
     final actionButtons =
-        uiStyle == HeniUiStyle.scenery
-            ? <Widget>[
-              OutlinedButton(
-                onPressed: onPickScenery,
-                child: const Text('更换背景'),
-              ),
-            ]
-            : browsingLibrary
+        browsingLibrary
             ? <Widget>[
               OutlinedButton(
                 onPressed: queue.isScanning ? null : onRefreshLibrary,
@@ -2510,60 +2646,6 @@ class _ContentHeader extends StatelessWidget {
         final width = constraints.maxWidth;
         final stackedHeader = width < 940;
         final compactHeader = width < 760;
-
-        if (uiStyle == HeniUiStyle.scenery) {
-          if (compactHeader) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    _HeadingChip(label: headingLabel, palette: palette),
-                    const Spacer(),
-                    _UiStyleSwitch(
-                      palette: palette,
-                      active: uiStyle,
-                      onSelect: onSelectUiStyle,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.end,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (refreshStatus != null) refreshStatus,
-                    ...actionButtons,
-                  ],
-                ),
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              _HeadingChip(label: headingLabel, palette: palette),
-              const SizedBox(width: 10),
-              if (refreshStatus != null) refreshStatus,
-              const Spacer(),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: actionButtons,
-              ),
-              const SizedBox(width: 12),
-              _UiStyleSwitch(
-                palette: palette,
-                active: uiStyle,
-                onSelect: onSelectUiStyle,
-              ),
-            ],
-          );
-        }
 
         final infoPills =
             browsingLibrary
@@ -2717,6 +2799,127 @@ class _ContentHeader extends StatelessWidget {
   }
 }
 
+class _StageHeaderDock extends StatelessWidget {
+  const _StageHeaderDock({
+    required this.palette,
+    required this.headingLabel,
+    required this.active,
+    required this.onPickScenery,
+    required this.onSelectUiStyle,
+  });
+
+  final HeniPalette palette;
+  final String headingLabel;
+  final HeniUiStyle active;
+  final VoidCallback onPickScenery;
+  final ValueChanged<HeniUiStyle> onSelectUiStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tight = constraints.maxWidth < 520;
+        final veryTight = constraints.maxWidth < 380;
+
+        return AnimatedContainer(
+          duration: _contentSwitchDuration,
+          curve: _hoverCurve,
+          padding: EdgeInsets.fromLTRB(
+            tight ? 8 : 10,
+            tight ? 6 : 8,
+            tight ? 8 : 10,
+            tight ? 6 : 8,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: tight ? 0.022 : 0.03),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.055)),
+            boxShadow: [
+              BoxShadow(
+                color: palette.seed.withValues(alpha: 0.06),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              if (!veryTight) ...[
+                _HeadingChip(label: headingLabel, palette: palette),
+                if (!tight) ...[
+                  const SizedBox(width: 10),
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: Text(
+                      '安静播放 · 专注当前声音',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.38),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ] else
+                Container(
+                  width: 30,
+                  height: 30,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: palette.seed.withValues(alpha: 0.14),
+                    border: Border.all(
+                      color: palette.seed.withValues(alpha: 0.22),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.graphic_eq_rounded,
+                    size: 15,
+                    color: heniAccentOnGlass(palette.seed),
+                  ),
+                ),
+              const Spacer(),
+              _UiStyleSwitch(
+                palette: palette,
+                active: active,
+                onSelect: onSelectUiStyle,
+              ),
+              SizedBox(width: tight ? 6 : 8),
+              Tooltip(
+                message: '更换背景',
+                child: AnimatedContainer(
+                  duration: _hoverDuration,
+                  curve: _hoverCurve,
+                  decoration: BoxDecoration(
+                    color: palette.accent.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: palette.accent.withValues(alpha: 0.22),
+                    ),
+                  ),
+                  child: IconButton(
+                    onPressed: onPickScenery,
+                    style: IconButton.styleFrom(
+                      fixedSize: Size.square(tight ? 34 : 36),
+                      padding: EdgeInsets.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      foregroundColor: heniAccentOnGlass(palette.accent),
+                    ),
+                    icon: const Icon(Icons.image_outlined, size: 18),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 String _formatTotalDuration(Duration total) {
   if (total == Duration.zero) return '--';
   final h = total.inHours;
@@ -2802,33 +3005,33 @@ class _LibraryHeroBanner extends StatelessWidget {
     );
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(28),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                palette.seed.withValues(alpha: 0.20),
+                palette.seed.withValues(alpha: 0.15),
                 Color.alphaBlend(
-                  palette.accent.withValues(alpha: 0.10),
-                  Colors.black.withValues(alpha: 0.38),
+                  palette.accent.withValues(alpha: 0.07),
+                  Colors.black.withValues(alpha: 0.32),
                 ),
-                Colors.black.withValues(alpha: 0.46),
+                Colors.black.withValues(alpha: 0.42),
               ],
               stops: const [0.0, 0.55, 1.0],
             ),
             border: Border.all(
-              color: palette.seed.withValues(alpha: 0.18),
+              color: palette.seed.withValues(alpha: 0.12),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: palette.seed.withValues(alpha: 0.10),
-                blurRadius: 18,
+                color: palette.seed.withValues(alpha: 0.07),
+                blurRadius: 16,
               ),
             ],
           ),
@@ -2842,13 +3045,13 @@ class _LibraryHeroBanner extends StatelessWidget {
                 child: IgnorePointer(child: _AuroraBar(palette: palette)),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(18, 15, 12, 15),
+                padding: const EdgeInsets.fromLTRB(22, 18, 16, 18),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      width: 44,
-                      height: 44,
+                      width: 50,
+                      height: 50,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -2859,22 +3062,22 @@ class _LibraryHeroBanner extends StatelessWidget {
                             Color.lerp(palette.seed, palette.accent, 0.55)!,
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: palette.seed.withValues(alpha: 0.24),
-                            blurRadius: 10,
+                            color: palette.seed.withValues(alpha: 0.18),
+                            blurRadius: 12,
                             spreadRadius: 0,
                           ),
                         ],
                       ),
                       child: Icon(
                         heroIcon,
-                        size: 20,
+                        size: 22,
                         color: heniReadableForegroundOn(palette.seed),
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2904,20 +3107,20 @@ class _LibraryHeroBanner extends StatelessWidget {
                               ],
                             ],
                           ),
-                          const SizedBox(height: 5),
+                          const SizedBox(height: 6),
                           Text(
                             activePlaylist.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.headlineSmall?.copyWith(
-                              fontSize: 19.5,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.2,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.25,
                               height: 1.08,
                               shadows: [
                                 Shadow(
-                                  color: Colors.black.withValues(alpha: 0.32),
-                                  blurRadius: 8,
+                                  color: Colors.black.withValues(alpha: 0.24),
+                                  blurRadius: 10,
                                   offset: const Offset(0, 2),
                                 ),
                               ],
@@ -2929,10 +3132,10 @@ class _LibraryHeroBanner extends StatelessWidget {
                               final subtitleStyle = theme.textTheme.bodySmall
                                   ?.copyWith(
                                     fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w500,
                                     height: 1.2,
-                                    color: Colors.white.withValues(alpha: 0.50),
-                                    letterSpacing: 0.15,
+                                    color: Colors.white.withValues(alpha: 0.44),
+                                    letterSpacing: 0.12,
                                   );
                               final text = Text(
                                 subtitleLine,
@@ -3140,26 +3343,48 @@ class _SceneryContent extends ConsumerWidget {
                 palette: palette,
                 isPlaying: isPlaying,
               ),
-              Positioned.fill(
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 500),
-                  opacity: isPlaying ? 1 : 0.72,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.05),
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.14),
-                        ],
-                        stops: const [0.0, 0.42, 1.0],
+              if (!focusMode)
+                Positioned.fill(
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 500),
+                    opacity: isPlaying ? 1 : 0.72,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.14),
+                            Colors.black.withValues(alpha: 0.05),
+                            Colors.black.withValues(alpha: 0.20),
+                          ],
+                          stops: const [0.0, 0.46, 1.0],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              if (!focusMode)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: const Alignment(-0.22, 0.15),
+                          radius: 1.05,
+                          colors: [
+                            palette.seed.withValues(
+                              alpha: isPlaying ? 0.13 : 0.08,
+                            ),
+                            palette.accent.withValues(alpha: 0.03),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.36, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               if (isVideo)
                 Align(
                   alignment: Alignment.center,
@@ -3174,14 +3399,15 @@ class _SceneryContent extends ConsumerWidget {
                     ),
                   ),
                 )
-              else
+              else if (!focusMode)
                 _AudioHero(
                   palette: palette,
                   currentMedia: currentMedia,
                   mediaProbe: mediaProbe,
                   layout: layout,
+                  isPlaying: isPlaying,
                 ),
-              if (currentMedia != null && isVideo)
+              if (!focusMode && currentMedia != null && isVideo)
                 Positioned(
                   left: 24,
                   bottom: hasLyrics ? 28 : 24,
@@ -3192,7 +3418,7 @@ class _SceneryContent extends ConsumerWidget {
                     compact: hasLyrics,
                   ),
                 ),
-              if (currentMedia != null && hasLyrics)
+              if (!focusMode && currentMedia != null && hasLyrics)
                 Positioned(
                   right: 24,
                   bottom: isVideo ? 28 : 24,
@@ -3611,25 +3837,301 @@ class _AudioHero extends StatelessWidget {
     required this.currentMedia,
     required this.mediaProbe,
     required this.layout,
+    required this.isPlaying,
   });
 
   final HeniPalette palette;
   final MediaItem? currentMedia;
   final AsyncValue<MediaProbe?> mediaProbe;
   final _ShellLayout layout;
+  final bool isPlaying;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(36, 28, 36, 32),
-      child: Align(
-        alignment: Alignment.bottomLeft,
-        child: _SceneryInfoBlock(
-          palette: palette,
-          currentMedia: currentMedia,
-          mediaProbe: mediaProbe,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 1100;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            narrow ? 26 : 36,
+            26,
+            narrow ? 26 : 36,
+            34,
+          ),
+          child: Align(
+            alignment: narrow ? Alignment.bottomLeft : Alignment.centerLeft,
+            child: _ListeningLoungeCard(
+              palette: palette,
+              currentMedia: currentMedia,
+              mediaProbe: mediaProbe,
+              compact: narrow,
+              isPlaying: isPlaying,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ListeningLoungeCard extends StatelessWidget {
+  const _ListeningLoungeCard({
+    required this.palette,
+    required this.currentMedia,
+    required this.mediaProbe,
+    required this.compact,
+    required this.isPlaying,
+  });
+
+  final HeniPalette palette;
+  final MediaItem? currentMedia;
+  final AsyncValue<MediaProbe?> mediaProbe;
+  final bool compact;
+  final bool isPlaying;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasMedia = currentMedia != null;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: compact ? 520 : 760),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(compact ? 30 : 34),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          child: Container(
+            padding: EdgeInsets.fromLTRB(
+              compact ? 18 : 24,
+              compact ? 18 : 22,
+              compact ? 18 : 24,
+              compact ? 18 : 22,
+            ),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.black.withValues(alpha: 0.14),
+                  Color.alphaBlend(
+                    palette.seed.withValues(alpha: 0.09),
+                    Colors.black.withValues(alpha: 0.18),
+                  ),
+                  Colors.black.withValues(alpha: 0.24),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(compact ? 30 : 34),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.14),
+                  blurRadius: 28,
+                  offset: const Offset(0, 16),
+                ),
+              ],
+            ),
+            child:
+                compact
+                    ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _ListeningScopeLabel(
+                          palette: palette,
+                          hasMedia: hasMedia,
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            _NowPlayingArtwork(
+                              size: 88,
+                              isVideo: currentMedia?.kind == MediaKind.video,
+                              isPlaying: isPlaying,
+                              hasMedia: hasMedia,
+                              palette: palette,
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _ListeningTextColumn(
+                                palette: palette,
+                                currentMedia: currentMedia,
+                                mediaProbe: mediaProbe,
+                                compact: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                    : Row(
+                      children: [
+                        SizedBox(
+                          width: 170,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _ListeningScopeLabel(
+                                palette: palette,
+                                hasMedia: hasMedia,
+                              ),
+                              const SizedBox(height: 18),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: _NowPlayingArtwork(
+                                  size: 126,
+                                  isVideo:
+                                      currentMedia?.kind == MediaKind.video,
+                                  isPlaying: isPlaying,
+                                  hasMedia: hasMedia,
+                                  palette: palette,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 26),
+                        Expanded(
+                          child: _ListeningTextColumn(
+                            palette: palette,
+                            currentMedia: currentMedia,
+                            mediaProbe: mediaProbe,
+                            compact: false,
+                          ),
+                        ),
+                      ],
+                    ),
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _ListeningScopeLabel extends StatelessWidget {
+  const _ListeningScopeLabel({required this.palette, required this.hasMedia});
+
+  final HeniPalette palette;
+  final bool hasMedia;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: palette.accent.withValues(alpha: hasMedia ? 0.86 : 0.42),
+            boxShadow: [
+              BoxShadow(
+                color: palette.accent.withValues(alpha: hasMedia ? 0.26 : 0.12),
+                blurRadius: 10,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          hasMedia ? 'LISTENING ROOM' : 'QUIET ROOM',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: Colors.white.withValues(alpha: 0.54),
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.1,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ListeningTextColumn extends StatelessWidget {
+  const _ListeningTextColumn({
+    required this.palette,
+    required this.currentMedia,
+    required this.mediaProbe,
+    required this.compact,
+  });
+
+  final HeniPalette palette;
+  final MediaItem? currentMedia;
+  final AsyncValue<MediaProbe?> mediaProbe;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (currentMedia != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+            decoration: BoxDecoration(
+              color: palette.seed.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: palette.seed.withValues(alpha: 0.16)),
+            ),
+            child: Text(
+              '正在播放',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: heniAccentOnGlass(palette.accent, alpha: 0.96),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        if (currentMedia != null) const SizedBox(height: 14),
+        Text(
+          currentMedia?.title ?? '还没有播放内容',
+          maxLines: compact ? 2 : 3,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontSize: compact ? 28 : 40,
+            fontWeight: FontWeight.w700,
+            height: 1.08,
+            letterSpacing: -0.45,
+            shadows: [
+              Shadow(
+                color: Colors.black.withValues(alpha: 0.34),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          currentMedia == null
+              ? '选择一首本地音频或视频，开始安静地播放。'
+              : currentMedia!.kind == MediaKind.video
+              ? '本地视频 · 低扰沉浸播放'
+              : '本地音频 · 安静聆听模式',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: Colors.white.withValues(alpha: 0.56),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: compact ? 120 : 160,
+          height: 1,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                palette.accent.withValues(alpha: 0.28),
+                Colors.white.withValues(alpha: 0.06),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _MediaProbeDetails(probe: mediaProbe),
+      ],
     );
   }
 }
@@ -3655,20 +4157,20 @@ class _SceneryInfoBlock extends StatelessWidget {
       constraints: BoxConstraints(maxWidth: compact ? 420 : 560),
       child: Container(
         padding: EdgeInsets.fromLTRB(
-          18,
-          compact ? 13 : 14,
-          18,
-          compact ? 13 : 14,
+          compact ? 18 : 22,
+          compact ? 14 : 18,
+          compact ? 18 : 22,
+          compact ? 14 : 18,
         ),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          color: Colors.black.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.042)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
+              color: Colors.black.withValues(alpha: 0.10),
+              blurRadius: 24,
+              offset: const Offset(0, 14),
             ),
           ],
         ),
@@ -3693,7 +4195,7 @@ class _SceneryInfoBlock extends StatelessWidget {
                   '正在播放',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: heniAccentOnGlass(palette.accent, alpha: 0.96),
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -3703,14 +4205,14 @@ class _SceneryInfoBlock extends StatelessWidget {
               maxLines: compact ? 1 : 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w900,
-                fontSize: compact ? 32 : 42,
-                height: 1.05,
+                fontWeight: FontWeight.w700,
+                fontSize: compact ? 29 : 38,
+                height: 1.08,
                 letterSpacing: -0.5,
                 shadows: [
                   Shadow(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    blurRadius: 18,
+                    color: Colors.black.withValues(alpha: 0.36),
+                    blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -3721,11 +4223,11 @@ class _SceneryInfoBlock extends StatelessWidget {
               Text(
                 currentMedia!.kind == MediaKind.video ? '本地视频' : '本地音频',
                 style: theme.textTheme.titleSmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.7),
-                  fontWeight: FontWeight.w700,
+                  color: Colors.white.withValues(alpha: 0.64),
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             _MediaProbeDetails(probe: mediaProbe),
           ],
         ),
@@ -3904,9 +4406,9 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
         SizedBox(height: widget.layout.contentGap),
         Expanded(
           child: _GlassPanel(
-            radius: 22,
-            fillColor: _shellGlassFill(widget.palette, emphasis: 0.82),
-            borderColor: _shellGlassBorder(widget.palette, emphasis: 0.82),
+            radius: 26,
+            fillColor: _shellGlassFill(widget.palette, emphasis: 0.74),
+            borderColor: _shellGlassBorder(widget.palette, emphasis: 0.7),
             auroraPalette: widget.palette,
             hoverAccentPalette: widget.palette,
             child: Column(
@@ -4048,40 +4550,50 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                   ),
                 ),
                 Container(
-                  height: 30,
+                  height: 24,
                   margin: const EdgeInsets.fromLTRB(12, 0, 12, 2),
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
-                    children: [
-                      SizedBox(width: _libraryLeadColumnWidth),
-                      Expanded(
-                        child: Text(
-                          '曲目',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                            color: Colors.white.withValues(alpha: 0.40),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final columns = _LibraryTableColumns.forWidth(
+                        constraints.maxWidth,
+                      );
+
+                      return Row(
+                        children: [
+                          SizedBox(width: columns.leadWidth),
+                          Expanded(
+                            child: Text(
+                              '曲目',
+                              style: TextStyle(
+                                fontSize: 10.2,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.9,
+                                color: Colors.white.withValues(alpha: 0.28),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: _libraryDurationColumnWidth,
-                        child: Text(
-                          '时长',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                            color: Colors.white.withValues(alpha: 0.34),
+                          SizedBox(width: columns.gap),
+                          SizedBox(
+                            width: columns.durationWidth,
+                            child: Text(
+                              '时长',
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
+                                fontSize: 10.2,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.9,
+                                color: Colors.white.withValues(alpha: 0.24),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const SizedBox(width: _libraryActionColumnWidth),
-                    ],
+                          if (columns.showAction) ...[
+                            SizedBox(width: columns.gap),
+                            SizedBox(width: columns.actionWidth),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                 ),
                 Expanded(
@@ -4277,20 +4789,20 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
     final evenRow = widget.index.isEven;
     final rowColor =
         playing
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.10)
             : checked
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.075)
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.06)
             : _hovered
-            ? Colors.white.withValues(alpha: 0.05)
-            : Colors.white.withValues(alpha: evenRow ? 0.03 : 0.018);
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.white.withValues(alpha: evenRow ? 0.025 : 0.014);
     final borderColor =
         playing
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.28)
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.22)
             : checked
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.18)
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.14)
             : _hovered
-            ? Colors.white.withValues(alpha: 0.1)
-            : Colors.white.withValues(alpha: 0.04);
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.white.withValues(alpha: 0.032);
     final leadingColor =
         playing
             ? heniAccentOnGlass(Theme.of(context).colorScheme.primary)
@@ -4304,358 +4816,468 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
       child: AnimatedScale(
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOutCubic,
-        scale: playing ? 1.0 : (_hovered ? 1.006 : 1.0),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [
-                if (playing || checked)
-                  Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: playing ? 0.09 : 0.05)
-                else
-                  Colors.white.withValues(alpha: evenRow ? 0.014 : 0.004),
-                rowColor,
-                rowColor,
-              ],
-              stops: const [0.0, 0.08, 1.0],
-            ),
-            borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: borderColor),
-            boxShadow: [
-              if (hoverOrSelected)
-                BoxShadow(
-                  color: Colors.black.withValues(
-                    alpha:
-                        playing
-                            ? 0.14
-                            : checked
-                            ? 0.10
-                            : 0.07,
-                  ),
-                  blurRadius: playing ? 12 : 8,
-                  offset: const Offset(0, 4),
-                ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                left: 0,
-                top: playing ? 6 : 10,
-                bottom: playing ? 6 : 10,
-                child: AnimatedContainer(
-                  duration: _hoverDuration,
-                  width:
-                      playing
-                          ? 4
-                          : checked
-                          ? 3
-                          : _hovered
-                          ? 2
-                          : 0,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    color:
-                        playing || checked
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.white.withValues(alpha: 0.22),
-                    boxShadow: [
-                      if (playing)
-                        BoxShadow(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primary.withValues(alpha: 0.5),
-                          blurRadius: 8,
-                          spreadRadius: 1,
-                        ),
-                    ],
-                  ),
-                ),
+        scale: playing ? 1.0 : (_hovered ? 1.004 : 1.0),
+        child: AnimatedSlide(
+          duration: _hoverDuration,
+          curve: _hoverCurve,
+          offset: _hovered && !playing ? const Offset(0.006, 0) : Offset.zero,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  if (playing || checked)
+                    Theme.of(context).colorScheme.primary.withValues(
+                      alpha: playing ? 0.08 : 0.04,
+                    )
+                  else
+                    Colors.white.withValues(alpha: evenRow ? 0.012 : 0.002),
+                  rowColor,
+                  rowColor,
+                ],
+                stops: const [0.0, 0.08, 1.0],
               ),
-              Positioned(
-                left: 18,
-                right: 18,
-                top: 0,
-                child: AnimatedOpacity(
-                  duration: _hoverDuration,
-                  opacity: hoverOrSelected ? 0.11 : 0.06,
-                  child: Container(
-                    height: 1,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor),
+              boxShadow: [
+                if (hoverOrSelected)
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                      alpha:
+                          playing
+                              ? 0.14
+                              : checked
+                              ? 0.10
+                              : 0.07,
+                    ),
+                    blurRadius: playing ? 12 : 8,
+                    offset: const Offset(0, 4),
+                  ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  top: playing ? 6 : 10,
+                  bottom: playing ? 6 : 10,
+                  child: AnimatedContainer(
+                    duration: _hoverDuration,
+                    width:
+                        playing
+                            ? 4
+                            : checked
+                            ? 3
+                            : _hovered
+                            ? 2
+                            : 0,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(999),
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(17),
-                  onTap: widget.onPlay,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 9, 4, 9),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: _libraryLeadColumnWidth,
-                          child: Row(
-                            children: [
-                              AnimatedSwitcher(
-                                duration: _hoverDuration,
-                                child:
-                                    widget.selectionMode
-                                        ? Checkbox(
-                                          key: ValueKey(
-                                            'check-${widget.index}-${widget.checked}',
-                                          ),
-                                          value: widget.checked,
-                                          onChanged:
-                                              (_) => widget.onToggleSelect(),
-                                        )
-                                        : hoverOrSelected
-                                        ? widget.selected
-                                            ? SizedBox(
-                                              key: ValueKey(
-                                                'wave-${widget.index}',
-                                              ),
-                                              width: 18,
-                                              height: 18,
-                                              child: Center(
-                                                child: StreamBuilder<bool>(
-                                                  stream:
-                                                      ref
-                                                          .read(
-                                                            playbackEngineProvider,
-                                                          )
-                                                          .playing,
-                                                  initialData: false,
-                                                  builder: (context, snap) {
-                                                    return _NowPlayingWave(
-                                                      color: leadingColor,
-                                                      active:
-                                                          snap.data ?? false,
-                                                    );
-                                                  },
-                                                ),
-                                              ),
-                                            )
-                                            : Icon(
-                                              Icons.play_arrow_rounded,
-                                              key: ValueKey(
-                                                'icon-${widget.index}-$hoverOrSelected',
-                                              ),
-                                              size: 18,
-                                              color: leadingColor,
-                                            )
-                                        : SizedBox(
-                                          key: ValueKey(
-                                            'index-${widget.index}',
-                                          ),
-                                          width: 26,
-                                          child: Text(
-                                            '${widget.index + 1}',
-                                            textAlign: TextAlign.center,
-                                            style: theme.textTheme.labelMedium
-                                                ?.copyWith(
-                                                  color: Colors.white
-                                                      .withValues(alpha: 0.38),
-                                                ),
-                                          ),
-                                        ),
-                              ),
-                              const SizedBox(width: 10),
-                              AnimatedContainer(
-                                duration: _hoverDuration,
-                                width: 30,
-                                height: 30,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color:
-                                      playing
-                                          ? Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                              .withValues(alpha: 0.14)
-                                          : checked
-                                          ? Colors.white.withValues(alpha: 0.14)
-                                          : Colors.white.withValues(
-                                            alpha:
-                                                hoverOrSelected ? 0.16 : 0.07,
-                                          ),
-                                  borderRadius: BorderRadius.circular(11),
-                                ),
-                                child: Icon(
-                                  widget.item.kind == MediaKind.video
-                                      ? Icons.movie_outlined
-                                      : Icons.music_note_outlined,
-                                  size: 14,
-                                  color:
-                                      playing
-                                          ? heniAccentOnGlass(
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
-                                          )
-                                          : Colors.white.withValues(
-                                            alpha: 0.82,
-                                          ),
-                                ),
-                              ),
-                            ],
+                      color:
+                          playing || checked
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.white.withValues(alpha: 0.22),
+                      boxShadow: [
+                        if (playing)
+                          BoxShadow(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.5),
+                            blurRadius: 8,
+                            spreadRadius: 1,
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                widget.item.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontSize: 14.2,
-                                  fontWeight:
-                                      playing
-                                          ? FontWeight.w800
-                                          : FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                p.dirname(widget.item.path),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontSize: 11.2,
-                                  color:
-                                      checked
-                                          ? Colors.white.withValues(alpha: 0.58)
-                                          : Colors.white.withValues(
-                                            alpha: 0.42,
-                                          ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: _libraryDurationColumnWidth,
-                          child: Text(
-                            _formatDuration(widget.item.duration),
-                            textAlign: TextAlign.right,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.55),
-                              fontFeatures: const [
-                                ui.FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: _libraryActionColumnWidth,
-                          child:
-                              widget.selectionMode
-                                  ? Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: AnimatedContainer(
-                                      duration: _hoverDuration,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color:
-                                            widget.checked
-                                                ? Theme.of(context)
-                                                    .colorScheme
-                                                    .primary
-                                                    .withValues(alpha: 0.14)
-                                                : Colors.white.withValues(
-                                                  alpha: 0.04,
-                                                ),
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                        border: Border.all(
-                                          color:
-                                              widget.checked
-                                                  ? Theme.of(context)
-                                                      .colorScheme
-                                                      .primary
-                                                      .withValues(alpha: 0.22)
-                                                  : Colors.white.withValues(
-                                                    alpha: 0.05,
-                                                  ),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        widget.checked ? '已选择' : '选择',
-                                        style: theme.textTheme.labelMedium
-                                            ?.copyWith(
-                                              color:
-                                                  widget.checked
-                                                      ? heniAccentOnGlass(
-                                                        Theme.of(
-                                                          context,
-                                                        ).colorScheme.primary,
-                                                      )
-                                                      : Colors.white.withValues(
-                                                        alpha: 0.42,
-                                                      ),
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                      ),
-                                    ),
-                                  )
-                                  : widget.browsingLibrary
-                                  ? Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: AnimatedOpacity(
-                                      duration: _hoverDuration,
-                                      opacity: hoverOrSelected ? 1 : 0.82,
-                                      child: _AddToPlaylistMenu(
-                                        playlists: widget.playlists,
-                                        onSelected: widget.onAddToPlaylist,
-                                      ),
-                                    ),
-                                  )
-                                  : Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Tooltip(
-                                      message:
-                                          widget.browsingPlaybackQueue
-                                              ? '从当前播放列表移除'
-                                              : '从当前歌单移除',
-                                      child: _InlineActionButton(
-                                        icon: Icons.remove_circle_outline,
-                                        active: hoverOrSelected,
-                                        danger: true,
-                                        onPressed: widget.onRemoveFromPlaylist,
-                                      ),
-                                    ),
-                                  ),
-                        ),
                       ],
                     ),
                   ),
                 ),
-              ),
-            ],
+                Positioned(
+                  left: 18,
+                  right: 18,
+                  top: 0,
+                  child: AnimatedOpacity(
+                    duration: _hoverDuration,
+                    opacity: hoverOrSelected ? 0.08 : 0.04,
+                    child: Container(
+                      height: 1,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    hoverColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.018),
+                    splashColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.08),
+                    highlightColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.04),
+                    onTap: widget.onPlay,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final columns = _LibraryTableColumns.forWidth(
+                          constraints.maxWidth,
+                        );
+                        final compactLead = columns.leadWidth < 58;
+
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 12, 4, 12),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: columns.leadWidth,
+                                child: Row(
+                                  mainAxisAlignment:
+                                      compactLead
+                                          ? MainAxisAlignment.center
+                                          : MainAxisAlignment.start,
+                                  children: [
+                                    AnimatedSwitcher(
+                                      duration: _hoverDuration,
+                                      child:
+                                          widget.selectionMode
+                                              ? Checkbox(
+                                                key: ValueKey(
+                                                  'check-${widget.index}-${widget.checked}',
+                                                ),
+                                                value: widget.checked,
+                                                onChanged:
+                                                    (_) =>
+                                                        widget.onToggleSelect(),
+                                              )
+                                              : hoverOrSelected
+                                              ? widget.selected
+                                                  ? SizedBox(
+                                                    key: ValueKey(
+                                                      'wave-${widget.index}',
+                                                    ),
+                                                    width: 18,
+                                                    height: 18,
+                                                    child: Center(
+                                                      child: StreamBuilder<
+                                                        bool
+                                                      >(
+                                                        stream:
+                                                            ref
+                                                                .read(
+                                                                  playbackEngineProvider,
+                                                                )
+                                                                .playing,
+                                                        initialData: false,
+                                                        builder: (
+                                                          context,
+                                                          snap,
+                                                        ) {
+                                                          return _NowPlayingWave(
+                                                            color: leadingColor,
+                                                            active:
+                                                                snap.data ??
+                                                                false,
+                                                          );
+                                                        },
+                                                      ),
+                                                    ),
+                                                  )
+                                                  : Icon(
+                                                    Icons.play_arrow_rounded,
+                                                    key: ValueKey(
+                                                      'icon-${widget.index}-$hoverOrSelected',
+                                                    ),
+                                                    size: 18,
+                                                    color: leadingColor,
+                                                  )
+                                              : SizedBox(
+                                                key: ValueKey(
+                                                  'index-${widget.index}',
+                                                ),
+                                                width: 26,
+                                                child: Text(
+                                                  '${widget.index + 1}',
+                                                  textAlign: TextAlign.center,
+                                                  style: theme
+                                                      .textTheme
+                                                      .labelMedium
+                                                      ?.copyWith(
+                                                        color: Colors.white
+                                                            .withValues(
+                                                              alpha: 0.34,
+                                                            ),
+                                                      ),
+                                                ),
+                                              ),
+                                    ),
+                                    if (!compactLead) ...[
+                                      SizedBox(
+                                        width: columns.compactAction ? 6 : 10,
+                                      ),
+                                      AnimatedContainer(
+                                        duration: _hoverDuration,
+                                        width: columns.compactAction ? 26 : 30,
+                                        height: columns.compactAction ? 30 : 32,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color:
+                                              playing
+                                                  ? Theme.of(context)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.14)
+                                                  : checked
+                                                  ? Colors.white.withValues(
+                                                    alpha: 0.14,
+                                                  )
+                                                  : Colors.white.withValues(
+                                                    alpha:
+                                                        hoverOrSelected
+                                                            ? 0.16
+                                                            : 0.07,
+                                                  ),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          widget.item.kind == MediaKind.video
+                                              ? Icons.movie_outlined
+                                              : Icons.music_note_outlined,
+                                          size: 13.5,
+                                          color:
+                                              playing
+                                                  ? heniAccentOnGlass(
+                                                    Theme.of(
+                                                      context,
+                                                    ).colorScheme.primary,
+                                                  )
+                                                  : Colors.white.withValues(
+                                                    alpha: 0.82,
+                                                  ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      widget.item.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                            fontSize: 14.4,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                    if (columns.showPath) ...[
+                                      const SizedBox(height: 5),
+                                      Text(
+                                        p.dirname(widget.item.path),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              fontSize: 10.9,
+                                              color:
+                                                  checked
+                                                      ? Colors.white.withValues(
+                                                        alpha: 0.52,
+                                                      )
+                                                      : Colors.white.withValues(
+                                                        alpha: 0.34,
+                                                      ),
+                                            ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              SizedBox(width: columns.gap),
+                              SizedBox(
+                                width: columns.durationWidth,
+                                child: _StableTimeText(
+                                  text: _formatDuration(widget.item.duration),
+                                  textAlign: TextAlign.right,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.42),
+                                    fontFeatures: const [
+                                      ui.FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              if (columns.showAction) ...[
+                                SizedBox(width: columns.gap),
+                                SizedBox(
+                                  width: columns.actionWidth,
+                                  child:
+                                      widget.selectionMode
+                                          ? Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: AnimatedContainer(
+                                              duration: _hoverDuration,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 6,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color:
+                                                    widget.checked
+                                                        ? Theme.of(context)
+                                                            .colorScheme
+                                                            .primary
+                                                            .withValues(
+                                                              alpha: 0.14,
+                                                            )
+                                                        : Colors.white
+                                                            .withValues(
+                                                              alpha: 0.04,
+                                                            ),
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                                border: Border.all(
+                                                  color:
+                                                      widget.checked
+                                                          ? Theme.of(context)
+                                                              .colorScheme
+                                                              .primary
+                                                              .withValues(
+                                                                alpha: 0.22,
+                                                              )
+                                                          : Colors.white
+                                                              .withValues(
+                                                                alpha: 0.05,
+                                                              ),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                columns.compactAction
+                                                    ? (widget.checked
+                                                        ? '已选'
+                                                        : '选')
+                                                    : (widget.checked
+                                                        ? '已选择'
+                                                        : '选择'),
+                                                style: theme
+                                                    .textTheme
+                                                    .labelMedium
+                                                    ?.copyWith(
+                                                      color:
+                                                          widget.checked
+                                                              ? heniAccentOnGlass(
+                                                                Theme.of(
+                                                                      context,
+                                                                    )
+                                                                    .colorScheme
+                                                                    .primary,
+                                                              )
+                                                              : Colors.white
+                                                                  .withValues(
+                                                                    alpha: 0.42,
+                                                                  ),
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                              ),
+                                            ),
+                                          )
+                                          : widget.browsingLibrary
+                                          ? Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: AnimatedOpacity(
+                                              duration: _hoverDuration,
+                                              opacity:
+                                                  hoverOrSelected ? 1 : 0.82,
+                                              child: _AddToPlaylistMenu(
+                                                playlists: widget.playlists,
+                                                onSelected:
+                                                    widget.onAddToPlaylist,
+                                                compact: columns.compactAction,
+                                              ),
+                                            ),
+                                          )
+                                          : Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: Tooltip(
+                                              message:
+                                                  widget.browsingPlaybackQueue
+                                                      ? '从当前播放列表移除'
+                                                      : '从当前歌单移除',
+                                              child: _InlineActionButton(
+                                                icon:
+                                                    Icons.remove_circle_outline,
+                                                active: hoverOrSelected,
+                                                danger: true,
+                                                onPressed:
+                                                    widget.onRemoveFromPlaylist,
+                                              ),
+                                            ),
+                                          ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StableTimeText extends StatelessWidget {
+  const _StableTimeText({
+    required this.text,
+    required this.textAlign,
+    required this.style,
+  });
+
+  final String text;
+  final TextAlign textAlign;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final alignment =
+        textAlign == TextAlign.right
+            ? Alignment.centerRight
+            : Alignment.centerLeft;
+
+    return Align(
+      alignment: alignment,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: alignment,
+        child: Text(
+          text,
+          textAlign: textAlign,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.visible,
+          style: style,
         ),
       ),
     );
@@ -4678,10 +5300,15 @@ String _formatDuration(Duration? duration) {
 }
 
 class _AddToPlaylistMenu extends StatelessWidget {
-  const _AddToPlaylistMenu({required this.playlists, required this.onSelected});
+  const _AddToPlaylistMenu({
+    required this.playlists,
+    required this.onSelected,
+    this.compact = false,
+  });
 
   final List<HeniPlaylist> playlists;
   final ValueChanged<String> onSelected;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -4703,27 +5330,56 @@ class _AddToPlaylistMenu extends StatelessWidget {
                 child: Text(playlist.name),
               ),
           ],
-      child: Container(
-        height: 30,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: Theme.of(
-              context,
-            ).colorScheme.primary.withValues(alpha: 0.26),
-          ),
-        ),
-        child: Text(
-          '加入歌单',
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: heniAccentOnGlass(Theme.of(context).colorScheme.primary),
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+      child:
+          compact
+              ? Container(
+                width: 36,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.26),
+                  ),
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  size: 16,
+                  color: heniAccentOnGlass(
+                    Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              )
+              : Container(
+                height: 30,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.26),
+                  ),
+                ),
+                child: Text(
+                  '加入歌单',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: heniAccentOnGlass(
+                      Theme.of(context).colorScheme.primary,
+                    ),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
     );
   }
 }
@@ -4759,31 +5415,51 @@ class _InlineActionButtonState extends State<_InlineActionButton> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
+      child: AnimatedScale(
         duration: _hoverDuration,
-        decoration: BoxDecoration(
-          color:
-              highlighted
-                  ? foreground.withValues(alpha: widget.danger ? 0.14 : 0.16)
-                  : Colors.white.withValues(alpha: 0.02),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
+        curve: _hoverCurve,
+        scale: highlighted ? 1.02 : 1.0,
+        child: AnimatedContainer(
+          duration: _hoverDuration,
+          curve: _hoverCurve,
+          decoration: BoxDecoration(
             color:
                 highlighted
-                    ? foreground.withValues(alpha: widget.danger ? 0.24 : 0.22)
-                    : Colors.white.withValues(alpha: 0.04),
+                    ? foreground.withValues(alpha: widget.danger ? 0.14 : 0.16)
+                    : Colors.white.withValues(alpha: 0.02),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color:
+                  highlighted
+                      ? foreground.withValues(
+                        alpha: widget.danger ? 0.24 : 0.22,
+                      )
+                      : Colors.white.withValues(alpha: 0.04),
+            ),
+            boxShadow: [
+              if (highlighted)
+                BoxShadow(
+                  color: foreground.withValues(
+                    alpha: widget.danger ? 0.10 : 0.08,
+                  ),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+            ],
           ),
-        ),
-        child: IconButton(
-          onPressed: widget.onPressed,
-          style: IconButton.styleFrom(
-            foregroundColor:
-                highlighted ? foreground : Colors.white.withValues(alpha: 0.62),
-            fixedSize: const Size.square(_denseIconButtonSize),
-            padding: EdgeInsets.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          child: IconButton(
+            onPressed: widget.onPressed,
+            style: IconButton.styleFrom(
+              foregroundColor:
+                  highlighted
+                      ? foreground
+                      : Colors.white.withValues(alpha: 0.62),
+              fixedSize: const Size.square(_denseIconButtonSize),
+              padding: EdgeInsets.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: Icon(widget.icon, size: _compactIconSize),
           ),
-          icon: Icon(widget.icon, size: _compactIconSize),
         ),
       ),
     );
@@ -5040,7 +5716,17 @@ class _BottomPlayerBar extends ConsumerWidget {
                           onNextTrack: onNextTrack,
                         ),
                         const SizedBox(height: 4),
-                        _ProgressWithTime(engine: engine, palette: palette),
+                        _ProgressWithTime(
+                          engine: engine,
+                          palette: palette,
+                          fallbackDuration:
+                              currentMedia?.duration ??
+                              mediaProbe.when(
+                                data: (probe) => probe?.duration,
+                                error: (error, stackTrace) => null,
+                                loading: () => null,
+                              ),
+                        ),
                       ],
                     ),
                   ),
@@ -5099,76 +5785,127 @@ class _CompactBottomBar extends StatelessWidget {
       initialData: false,
       builder: (context, snap) {
         final isPlaying = snap.data ?? false;
-        return Row(
-          children: [
-            _NowPlayingArtwork(
-              size: 40,
-              isVideo: currentMedia?.kind == MediaKind.video,
-              isPlaying: isPlaying,
-              hasMedia: currentMedia != null,
-              palette: palette,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    currentMedia?.title ?? '未播放',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final tight = constraints.maxWidth < 780;
+            final veryTight = constraints.maxWidth < 680;
+            final tiny = constraints.maxWidth < 560;
+            final ultraTiny = constraints.maxWidth < 460;
+            final controlSize = tight ? 36.0 : _regularIconButtonSize;
+            final playSize = tight ? 38.0 : 42.0;
+            final iconSize = tight ? 20.0 : 22.0;
+            final artworkSize = tight ? 34.0 : 40.0;
+
+            Widget compactIcon({
+              required String tooltip,
+              required VoidCallback onPressed,
+              required IconData icon,
+            }) {
+              return IconButton(
+                tooltip: tooltip,
+                onPressed: onPressed,
+                icon: Icon(icon, size: iconSize),
+                style: IconButton.styleFrom(
+                  fixedSize: Size.square(controlSize),
+                  padding: EdgeInsets.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              );
+            }
+
+            return Row(
+              children: [
+                if (!veryTight) ...[
+                  _NowPlayingArtwork(
+                    size: artworkSize,
+                    isVideo: currentMedia?.kind == MediaKind.video,
+                    isPlaying: isPlaying,
+                    hasMedia: currentMedia != null,
+                    palette: palette,
                   ),
-                  const SizedBox(height: 4),
-                  _ProgressWithTime(engine: engine, palette: palette),
+                  SizedBox(width: tight ? 8 : 10),
                 ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            IconButton(
-              tooltip: '上一首',
-              onPressed: onPreviousTrack,
-              icon: const Icon(Icons.skip_previous_rounded),
-              iconSize: 22,
-            ),
-            IconButton.filled(
-              tooltip: isPlaying ? '暂停' : '播放',
-              onPressed: () {
-                if (isPlaying) {
-                  unawaited(engine.pause());
-                } else {
-                  unawaited(engine.play());
-                }
-              },
-              icon: Icon(
-                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                size: 22,
-              ),
-            ),
-            IconButton(
-              tooltip: '下一首',
-              onPressed: onNextTrack,
-              icon: const Icon(Icons.skip_next_rounded),
-              iconSize: 22,
-            ),
-            const SizedBox(width: 6),
-            _VolumeMenuButton(
-              engine: engine,
-              palette: palette,
-              onVolumeChanged: onPersistVolume,
-            ),
-            IconButton(
-              tooltip: '播放队列',
-              onPressed: onShowPlaybackQueue,
-              icon: const Icon(Icons.queue_music_rounded),
-              iconSize: 20,
-            ),
-          ],
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        currentMedia?.title ?? '未播放',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: tight ? 12.8 : 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      _ProgressWithTime(
+                        engine: engine,
+                        palette: palette,
+                        fallbackDuration: currentMedia?.duration,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: tight ? 8 : 12),
+                if (!tiny)
+                  compactIcon(
+                    tooltip: '上一首',
+                    onPressed: onPreviousTrack,
+                    icon: Icons.skip_previous_rounded,
+                  ),
+                IconButton.filled(
+                  tooltip: isPlaying ? '暂停' : '播放',
+                  onPressed: () {
+                    if (isPlaying) {
+                      unawaited(engine.pause());
+                    } else {
+                      unawaited(engine.play());
+                    }
+                  },
+                  style: IconButton.styleFrom(
+                    fixedSize: Size.square(playSize),
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    size: iconSize,
+                  ),
+                ),
+                if (!tiny)
+                  compactIcon(
+                    tooltip: '下一首',
+                    onPressed: onNextTrack,
+                    icon: Icons.skip_next_rounded,
+                  ),
+                SizedBox(width: tight ? 2 : 6),
+                if (!ultraTiny)
+                  _PlaybackModeIconButton(
+                    mode: queue.playbackMode,
+                    onPressed: onCyclePlaybackMode,
+                    size: controlSize,
+                    iconSize: tight ? 18 : 20,
+                  ),
+                if (!veryTight) ...[
+                  const SizedBox(width: 4),
+                  _VolumeMenuButton(
+                    engine: engine,
+                    palette: palette,
+                    onVolumeChanged: onPersistVolume,
+                  ),
+                ],
+                if (!tiny)
+                  compactIcon(
+                    tooltip: '播放队列',
+                    onPressed: onShowPlaybackQueue,
+                    icon: Icons.queue_music_rounded,
+                  ),
+              ],
+            );
+          },
         );
       },
     );
@@ -5251,7 +5988,7 @@ class _NowPlayingSummary extends StatelessWidget {
                                 palette.accent,
                                 alpha: isPlaying ? 0.88 : 0.7,
                               ),
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                             ) ??
                             const TextStyle(),
                         child: Text(
@@ -5267,7 +6004,7 @@ class _NowPlayingSummary extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontSize: layout.quiet ? 14.2 : 14.8,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       if (layout.showNowPlayingDetails) ...[
@@ -5780,12 +6517,19 @@ class _CurrentQueueButton extends StatelessWidget {
       message: count == 0 ? '当前播放列表为空' : '当前播放列表 $count 首',
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
+        curve: _hoverCurve,
         decoration: BoxDecoration(
           color:
               hasCurrent
-                  ? theme.colorScheme.primary.withValues(alpha: 0.13)
-                  : Colors.white.withValues(alpha: 0.024),
+                  ? theme.colorScheme.primary.withValues(alpha: 0.11)
+                  : Colors.white.withValues(alpha: 0.018),
           borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color:
+                hasCurrent
+                    ? theme.colorScheme.primary.withValues(alpha: 0.16)
+                    : Colors.white.withValues(alpha: 0.04),
+          ),
         ),
         child: IconButton(
           onPressed: onPressed,
@@ -7050,59 +7794,135 @@ class _MetadataLine extends StatelessWidget {
 }
 
 class _ProgressWithTime extends StatelessWidget {
-  const _ProgressWithTime({required this.engine, required this.palette});
+  const _ProgressWithTime({
+    required this.engine,
+    required this.palette,
+    this.fallbackDuration,
+  });
 
   final PlaybackEngine engine;
   final HeniPalette palette;
+  final Duration? fallbackDuration;
 
   @override
   Widget build(BuildContext context) {
     final timeStyle = TextStyle(
-      fontSize: 10.2,
-      fontWeight: FontWeight.w700,
+      fontSize: 10.0,
+      fontWeight: FontWeight.w600,
       letterSpacing: 0.1,
-      color: Colors.white.withValues(alpha: 0.58),
+      color: Colors.white.withValues(alpha: 0.48),
       fontFeatures: const [ui.FontFeature.tabularFigures()],
     );
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        StreamBuilder<Duration>(
-          stream: engine.position,
-          initialData: Duration.zero,
-          builder: (context, snap) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 150) {
+          return _CompactProgressTimeLabel(
+            engine: engine,
+            style: timeStyle,
+            fallbackDuration: fallbackDuration,
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            StreamBuilder<Duration>(
+              stream: engine.position,
+              initialData: Duration.zero,
+              builder: (context, snap) {
+                return SizedBox(
+                  width: 46,
+                  child: _StableTimeText(
+                    text: _formatProgressTime(snap.data ?? Duration.zero),
+                    textAlign: TextAlign.right,
+                    style: timeStyle.copyWith(
+                      color: Colors.white.withValues(alpha: 0.70),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: _ProgressBar(engine: engine, palette: palette)),
+            const SizedBox(width: 8),
+            StreamBuilder<Duration>(
+              stream: engine.duration,
+              initialData: fallbackDuration ?? Duration.zero,
+              builder: (context, snap) {
+                final duration = _resolveDisplayDuration(
+                  snap.data,
+                  fallbackDuration,
+                );
+                return SizedBox(
+                  width: 46,
+                  child: _StableTimeText(
+                    text: _formatProgressTime(duration),
+                    textAlign: TextAlign.left,
+                    style: timeStyle,
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CompactProgressTimeLabel extends StatelessWidget {
+  const _CompactProgressTimeLabel({
+    required this.engine,
+    required this.style,
+    this.fallbackDuration,
+  });
+
+  final PlaybackEngine engine;
+  final TextStyle style;
+  final Duration? fallbackDuration;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Duration>(
+      stream: engine.position,
+      initialData: Duration.zero,
+      builder: (context, positionSnap) {
+        return StreamBuilder<Duration>(
+          stream: engine.duration,
+          initialData: fallbackDuration ?? Duration.zero,
+          builder: (context, durationSnap) {
+            final position = _formatProgressTime(
+              positionSnap.data ?? Duration.zero,
+            );
+            final duration = _formatProgressTime(
+              _resolveDisplayDuration(durationSnap.data, fallbackDuration),
+            );
+
             return SizedBox(
-              width: 40,
-              child: Text(
-                _formatProgressTime(snap.data ?? Duration.zero),
-                textAlign: TextAlign.right,
-                style: timeStyle.copyWith(
-                  color: Colors.white.withValues(alpha: 0.76),
+              width: double.infinity,
+              child: _StableTimeText(
+                text: '$position / $duration',
+                textAlign: TextAlign.left,
+                style: style.copyWith(
+                  color: Colors.white.withValues(alpha: 0.64),
                 ),
               ),
             );
           },
-        ),
-        const SizedBox(width: 10),
-        Expanded(child: _ProgressBar(engine: engine, palette: palette)),
-        const SizedBox(width: 10),
-        StreamBuilder<Duration>(
-          stream: engine.duration,
-          initialData: Duration.zero,
-          builder: (context, snap) {
-            return SizedBox(
-              width: 40,
-              child: Text(
-                _formatProgressTime(snap.data ?? Duration.zero),
-                textAlign: TextAlign.left,
-                style: timeStyle,
-              ),
-            );
-          },
-        ),
-      ],
+        );
+      },
     );
   }
+}
+
+Duration _resolveDisplayDuration(Duration? streamed, Duration? fallback) {
+  if (streamed != null && streamed > Duration.zero) {
+    return streamed;
+  }
+  if (fallback != null && fallback > Duration.zero) {
+    return fallback;
+  }
+  return Duration.zero;
 }
 
 String _formatProgressTime(Duration d) {
@@ -7266,12 +8086,16 @@ class _TimeTooltip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: seedColor,
-        borderRadius: BorderRadius.circular(8),
+        color: Color.alphaBlend(
+          seedColor.withValues(alpha: 0.72),
+          Colors.black.withValues(alpha: 0.26),
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
-            color: seedColor.withValues(alpha: 0.38),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: 0.24),
+            blurRadius: 14,
             offset: const Offset(0, 3),
           ),
         ],
@@ -7279,7 +8103,7 @@ class _TimeTooltip extends StatelessWidget {
       child: Text(
         text,
         style: TextStyle(
-          fontSize: 11,
+          fontSize: 10.6,
           fontWeight: FontWeight.w700,
           color: heniReadableForegroundOn(seedColor),
           fontFeatures: const [ui.FontFeature.tabularFigures()],
@@ -7304,8 +8128,8 @@ class _ProgressBarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const trackH = 3.0;
-    const hoverTrackH = 4.6;
+    const trackH = 2.5;
+    const hoverTrackH = 4.0;
     final h = hovering ? hoverTrackH : trackH;
     final cy = size.height / 2;
     const radius = Radius.circular(6);
@@ -7315,7 +8139,7 @@ class _ProgressBarPainter extends CustomPainter {
 
     canvas.drawRRect(
       trackRRect,
-      Paint()..color = Colors.white.withValues(alpha: 0.11),
+      Paint()..color = Colors.white.withValues(alpha: 0.085),
     );
 
     final f = fraction.clamp(0.0, 1.0);
@@ -7329,8 +8153,8 @@ class _ProgressBarPainter extends CustomPainter {
         Paint()
           ..shader = LinearGradient(
             colors: [
-              seedColor.withValues(alpha: 0.92),
-              blended.withValues(alpha: 0.96),
+              seedColor.withValues(alpha: 0.88),
+              blended.withValues(alpha: 0.92),
             ],
           ).createShader(Rect.fromLTWH(0, 0, size.width, h)),
       );
@@ -7343,10 +8167,10 @@ class _ProgressBarPainter extends CustomPainter {
         center,
         7.5,
         Paint()
-          ..color = seedColor.withValues(alpha: 0.18)
+          ..color = seedColor.withValues(alpha: 0.14)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
       );
-      canvas.drawCircle(center, 4.5, Paint()..color = Colors.white);
+      canvas.drawCircle(center, 4.2, Paint()..color = Colors.white);
     }
   }
 
@@ -7483,8 +8307,8 @@ class _TransportControls extends StatelessWidget {
                       boxShadow: [
                         BoxShadow(
                           color: Theme.of(context).colorScheme.primary
-                              .withValues(alpha: playing ? 0.26 : 0.14),
-                          blurRadius: playing ? 20 : 12,
+                              .withValues(alpha: playing ? 0.20 : 0.10),
+                          blurRadius: playing ? 18 : 10,
                           spreadRadius: playing ? 2 : 0,
                         ),
                       ],
@@ -7499,7 +8323,7 @@ class _TransportControls extends StatelessWidget {
                         }
                       },
                       style: IconButton.styleFrom(
-                        fixedSize: const Size.square(46),
+                        fixedSize: const Size.square(44),
                         backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor:
                             Theme.of(context).colorScheme.onPrimary,
@@ -7556,9 +8380,9 @@ class _TransportButton extends StatelessWidget {
       message: tooltip,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.03),
+          color: Colors.white.withValues(alpha: 0.022),
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
         ),
         child: IconButton(
           onPressed: onPressed,
@@ -7575,10 +8399,17 @@ class _TransportButton extends StatelessWidget {
 }
 
 class _PlaybackModeIconButton extends StatelessWidget {
-  const _PlaybackModeIconButton({required this.mode, required this.onPressed});
+  const _PlaybackModeIconButton({
+    required this.mode,
+    required this.onPressed,
+    this.size = _regularIconButtonSize,
+    this.iconSize = 20,
+  });
 
   final HeniPlaybackMode mode;
   final VoidCallback onPressed;
+  final double size;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -7589,29 +8420,35 @@ class _PlaybackModeIconButton extends StatelessWidget {
       message: '播放模式：${mode.label}',
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
+        curve: _hoverCurve,
         decoration: BoxDecoration(
           color:
               active
-                  ? theme.colorScheme.primary.withValues(alpha: 0.16)
-                  : Colors.white.withValues(alpha: 0.03),
+                  ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                  : Colors.white.withValues(alpha: 0.022),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color:
                 active
-                    ? theme.colorScheme.primary.withValues(alpha: 0.22)
-                    : Colors.white.withValues(alpha: 0.06),
+                    ? theme.colorScheme.primary.withValues(alpha: 0.16)
+                    : Colors.white.withValues(alpha: 0.04),
           ),
         ),
         child: IconButton(
           isSelected: active,
           onPressed: onPressed,
           style: IconButton.styleFrom(
-            fixedSize: const Size.square(_regularIconButtonSize),
+            fixedSize: Size.square(size),
             padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           icon: AnimatedSwitcher(
             duration: const Duration(milliseconds: 160),
-            child: Icon(_playbackModeIcon(mode), key: ValueKey(mode), size: 20),
+            child: Icon(
+              _playbackModeIcon(mode),
+              key: ValueKey(mode),
+              size: iconSize,
+            ),
           ),
         ),
       ),

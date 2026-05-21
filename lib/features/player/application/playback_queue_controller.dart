@@ -25,6 +25,8 @@ final localMediaScannerProvider = Provider<LocalMediaScanner>((ref) {
   return const LocalMediaScanner();
 });
 
+final launchMediaPathsProvider = Provider<List<String>>((ref) => const []);
+
 final playbackQueueControllerProvider =
     NotifierProvider<PlaybackQueueController, PlaybackQueueState>(
       PlaybackQueueController.new,
@@ -34,6 +36,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   StreamSubscription<bool>? _completedSubscription;
   Timer? _volumePersistTimer;
   final _random = Random();
+  bool _launchMediaHandled = false;
   String? _persistedPaletteName;
   String? _persistedUiStyleName;
   List<String> _persistedSceneryImagePaths = const [];
@@ -658,7 +661,30 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
         statusMessage: '曲库恢复失败',
         lastError: error.toString(),
       );
+    } finally {
+      await _applyLaunchMediaPathsIfAny();
     }
+  }
+
+  Future<void> _applyLaunchMediaPathsIfAny() async {
+    if (_launchMediaHandled || !ref.mounted) {
+      return;
+    }
+    _launchMediaHandled = true;
+
+    final launchPaths = [
+      for (final path in ref.read(launchMediaPathsProvider))
+        if (File(path).existsSync() && isSupportedMediaPath(path)) path,
+    ];
+    if (launchPaths.isEmpty) {
+      return;
+    }
+
+    final items = [
+      for (final path in launchPaths)
+        MediaItem.fromPath(path, kind: mediaKindFromPath(path)),
+    ];
+    await addItems(items, playFirst: true);
   }
 
   Future<void> _playLibraryItemByPath(String path) async {
@@ -699,9 +725,100 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     );
 
     ref.read(currentMediaProvider.notifier).set(item);
-    unawaited(ref.read(currentMediaProbeProvider.notifier).inspect(item.path));
     unawaited(ref.read(currentLyricsProvider.notifier).loadFor(item.path));
     await ref.read(playbackEngineProvider).openItem(item, play: true);
+    unawaited(_inspectAndCacheDuration(item.path));
+    unawaited(_cacheEngineDurationWhenAvailable(item.path));
+  }
+
+  Future<void> _inspectAndCacheDuration(String path) async {
+    final probe = await ref
+        .read(currentMediaProbeProvider.notifier)
+        .inspect(path);
+    if (!ref.mounted) {
+      return;
+    }
+    if (probe?.duration case final Duration duration
+        when duration > Duration.zero) {
+      _cacheMediaDuration(path, duration);
+    }
+  }
+
+  Future<void> _cacheEngineDurationWhenAvailable(String path) async {
+    try {
+      final duration = await ref
+          .read(playbackEngineProvider)
+          .duration
+          .firstWhere((duration) => duration > Duration.zero)
+          .timeout(const Duration(seconds: 5));
+      if (!ref.mounted) {
+        return;
+      }
+      if (state.currentItem case final MediaItem current
+          when _pathKey(current.path) != _pathKey(path)) {
+        return;
+      }
+      _cacheMediaDuration(path, duration);
+    } on TimeoutException {
+      return;
+    } on StateError {
+      return;
+    }
+  }
+
+  void _cacheMediaDuration(String path, Duration duration) {
+    if (duration <= Duration.zero) {
+      return;
+    }
+
+    var changed = false;
+    MediaItem updateItem(MediaItem item) {
+      if (_pathKey(item.path) != _pathKey(path) || item.duration == duration) {
+        return item;
+      }
+      changed = true;
+      return item.copyWith(duration: duration);
+    }
+
+    HeniPlaylist updatePlaylist(HeniPlaylist playlist) {
+      final nextItems = [for (final item in playlist.items) updateItem(item)];
+      return _identicalItems(nextItems, playlist.items)
+          ? playlist
+          : playlist.copyWith(items: List.unmodifiable(nextItems));
+    }
+
+    final nextLibrary = updatePlaylist(state.library);
+    final nextPlaybackQueue = updatePlaylist(state.playbackQueue);
+    final nextPlaylists = [
+      for (final playlist in state.playlists) updatePlaylist(playlist),
+    ];
+
+    if (!changed) {
+      return;
+    }
+
+    state = state.copyWith(
+      library: nextLibrary,
+      playbackQueue: nextPlaybackQueue,
+      playlists: List.unmodifiable(nextPlaylists),
+    );
+
+    final current = ref.read(currentMediaProvider);
+    if (current != null && _pathKey(current.path) == _pathKey(path)) {
+      ref.read(currentMediaProvider.notifier).set(updateItem(current));
+    }
+  }
+
+  bool _identicalItems(List<MediaItem> a, List<MediaItem> b) {
+    if (a.length != b.length) {
+      return false;
+    }
+    for (var i = 0; i < a.length; i += 1) {
+      if (!identical(a[i], b[i])) {
+        return false;
+      }
+    }
+    return true;
   }
 
   HeniPlaylist _libraryWithMergedItems(List<MediaItem> items) {
