@@ -38,6 +38,9 @@ class MediaKitPlaybackEngine implements PlaybackEngine {
   double get currentVolume => _currentVolume;
 
   @override
+  bool get currentPlaying => _player.state.playing;
+
+  @override
   Future<void> openPath(String path, {bool play = false}) {
     return _player.open(Media(path), play: play);
   }

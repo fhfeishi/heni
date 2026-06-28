@@ -11,6 +11,7 @@ import '../../../domain/media/media_path.dart';
 import '../../../domain/playback/heni_playlist.dart';
 import '../../../domain/playback/playback_mode.dart';
 import '../../../domain/playback/playback_order.dart';
+import '../../../services/ffmpeg/media_inspector_provider.dart';
 import '../../../services/media/local_media_scanner.dart';
 import '../../../services/media/playback_providers.dart';
 import '../../../services/storage/heni_library_store.dart';
@@ -93,6 +94,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
       lastError: null,
     );
     unawaited(_persistState());
+    unawaited(_inspectMissingDurations(items));
 
     if (shouldStart) {
       await _playLibraryItemByPath(items.first.path);
@@ -214,6 +216,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
         lastError: null,
       );
       unawaited(_persistState());
+      unawaited(_inspectMissingDurations(items));
 
       if (items.isNotEmpty && shouldStart) {
         await _playLibraryItemByPath(items.first.path);
@@ -254,6 +257,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
         ],
         activePlaylistId: state.activePlaylistId,
         playbackModeName: state.playbackMode.name,
+        mediaDurations: _mediaDurationsFromState(),
         recursiveScan: state.recursiveScan,
         includeVideo: state.includeVideo,
         autoplayOnLoad: state.autoplayOnLoad,
@@ -285,6 +289,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
         lastError: null,
       );
       unawaited(_persistState());
+      unawaited(_inspectMissingDurations(libraryItems));
     } catch (error) {
       state = state.copyWith(
         isScanning: false,
@@ -433,6 +438,103 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
 
   Future<void> playQueueIndex(int index) async {
     await _playQueueIndex(index);
+  }
+
+  void enqueueItem(MediaItem item) => enqueueItems([item]);
+
+  /// 加到“当前播放列表”（追加到队列末尾）。
+  /// 若队列为空或当前没有在播放，则从新加入的第一首开始播放。
+  void enqueueItems(List<MediaItem> items) {
+    if (items.isEmpty) {
+      return;
+    }
+
+    final queue = List<MediaItem>.of(state.playbackQueue.items);
+    final seen = queue.map((item) => _pathKey(item.path)).toSet();
+    final additions = <MediaItem>[];
+    for (final item in items) {
+      if (seen.add(_pathKey(item.path))) {
+        additions.add(item);
+      }
+    }
+
+    if (additions.isEmpty) {
+      state = state.copyWith(
+        statusMessage: '所选歌曲已在当前播放列表中',
+        lastError: null,
+      );
+      return;
+    }
+
+    final nextItems = [...queue, ...additions];
+    final nextQueue = state.playbackQueue.copyWith(items: nextItems);
+
+    if (queue.isEmpty || state.currentIndex < 0) {
+      unawaited(
+        _playQueueIndex(
+          queue.length,
+          playbackQueue: nextQueue,
+          playbackSourceId: state.playbackQueue.id,
+          order: _buildOrder(nextItems.length, queue.length),
+        ),
+      );
+      return;
+    }
+
+    state = state.copyWith(
+      playbackQueue: nextQueue,
+      order: _buildOrder(nextItems.length, state.currentIndex),
+      statusMessage:
+          additions.length == 1
+              ? '已加入当前播放列表'
+              : '已加入当前播放列表 ${additions.length} 首',
+      lastError: null,
+    );
+  }
+
+  void playItemNext(MediaItem item) => playItemsNext([item]);
+
+  /// “下一首播放”：插入到当前播放项之后。
+  /// 若队列为空或当前没有在播放，则等同于加入并立即播放。
+  void playItemsNext(List<MediaItem> items) {
+    if (items.isEmpty) {
+      return;
+    }
+
+    final queue = List<MediaItem>.of(state.playbackQueue.items);
+    if (queue.isEmpty || state.currentIndex < 0) {
+      enqueueItems(items);
+      return;
+    }
+
+    final current = state.currentIndex;
+    final seen = queue.map((item) => _pathKey(item.path)).toSet();
+    final additions = <MediaItem>[];
+    for (final item in items) {
+      if (seen.add(_pathKey(item.path))) {
+        additions.add(item);
+      }
+    }
+
+    if (additions.isEmpty) {
+      state = state.copyWith(
+        statusMessage: '所选歌曲已在当前播放列表中',
+        lastError: null,
+      );
+      return;
+    }
+
+    queue.insertAll(current + 1, additions);
+    final nextQueue = state.playbackQueue.copyWith(items: queue);
+    state = state.copyWith(
+      playbackQueue: nextQueue,
+      order: _buildOrder(queue.length, current),
+      statusMessage:
+          additions.length == 1
+              ? '下一首将播放“${additions.first.title}”'
+              : '已设为接下来播放 ${additions.length} 首',
+      lastError: null,
+    );
   }
 
   Future<void> removePlaybackQueueItemAt(int index) async {
@@ -652,6 +754,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
                 : '曲库已恢复 ${libraryItems.length} 首',
         lastError: null,
       );
+      unawaited(_inspectMissingDurations(libraryItems));
     } catch (error) {
       if (!ref.mounted) {
         return;
@@ -766,6 +869,35 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     }
   }
 
+  Future<void> _inspectMissingDurations(Iterable<MediaItem> items) async {
+    final pending = [
+      for (final item in items)
+        if (item.duration == null || item.duration == Duration.zero) item,
+    ];
+    if (pending.isEmpty) {
+      return;
+    }
+
+    final inspector = ref.read(mediaInspectorProvider);
+    for (final item in pending) {
+      if (!ref.mounted) {
+        return;
+      }
+      try {
+        final probe = await inspector.inspectPath(item.path);
+        if (!ref.mounted) {
+          return;
+        }
+        if (probe.duration case final Duration duration
+            when duration > Duration.zero) {
+          _cacheMediaDuration(item.path, duration);
+        }
+      } catch (_) {
+        // Missing ffprobe metadata should not block library browsing.
+      }
+    }
+  }
+
   void _cacheMediaDuration(String path, Duration duration) {
     if (duration <= Duration.zero) {
       return;
@@ -807,6 +939,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     if (current != null && _pathKey(current.path) == _pathKey(path)) {
       ref.read(currentMediaProvider.notifier).set(updateItem(current));
     }
+    unawaited(_persistState());
   }
 
   bool _identicalItems(List<MediaItem> a, List<MediaItem> b) {
@@ -824,14 +957,58 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   HeniPlaylist _libraryWithMergedItems(List<MediaItem> items) {
     final merged = List<MediaItem>.of(state.library.items);
     final seen = merged.map((item) => _pathKey(item.path)).toSet();
+    final knownDurations = _mediaDurationsFromState();
 
     for (final item in items) {
+      final normalized = _itemWithKnownDuration(item, knownDurations);
       if (seen.add(_pathKey(item.path))) {
-        merged.add(item);
+        merged.add(normalized);
       }
     }
 
     return state.library.copyWith(items: merged);
+  }
+
+  MediaItem _itemWithKnownDuration(
+    MediaItem item,
+    Map<String, int> mediaDurations,
+  ) {
+    if (item.duration != null && item.duration! > Duration.zero) {
+      return item;
+    }
+    final milliseconds =
+        mediaDurations[item.path] ?? mediaDurations[_pathKey(item.path)];
+    if (milliseconds == null || milliseconds <= 0) {
+      return item;
+    }
+    return item.copyWith(duration: Duration(milliseconds: milliseconds));
+  }
+
+  Map<String, int> _mediaDurationsFromState() {
+    final durations = <String, int>{};
+
+    void collect(MediaItem item) {
+      final duration = item.duration;
+      if (duration == null || duration <= Duration.zero) {
+        return;
+      }
+      durations[item.path] = duration.inMilliseconds;
+      durations[_pathKey(item.path)] = duration.inMilliseconds;
+    }
+
+    for (final item in state.library.items) {
+      collect(item);
+    }
+    for (final playlist in state.playlists) {
+      for (final item in playlist.items) {
+        collect(item);
+      }
+    }
+    for (final item in state.playbackQueue.items) {
+      collect(item);
+    }
+
+    return durations;
   }
 
   List<String> _libraryFilesWith(Iterable<String> filePaths) {
@@ -873,7 +1050,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
         recursive: config.recursiveScan,
         includeVideo: config.includeVideo,
       );
-      _mergeItems(items, seen, scanned);
+      _mergeItems(items, seen, scanned, config.mediaDurations);
     }
 
     final restoredFiles = [
@@ -882,7 +1059,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
             isSupportedMediaPath(path, includeVideo: config.includeVideo))
           MediaItem.fromPath(path, kind: mediaKindFromPath(path)),
     ];
-    _mergeItems(items, seen, restoredFiles);
+    _mergeItems(items, seen, restoredFiles, config.mediaDurations);
     items.sort((a, b) => _pathKey(a.path).compareTo(_pathKey(b.path)));
     return List.unmodifiable(items);
   }
@@ -891,10 +1068,11 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     List<MediaItem> target,
     Set<String> seen,
     Iterable<MediaItem> items,
+    Map<String, int> mediaDurations,
   ) {
     for (final item in items) {
       if (seen.add(_pathKey(item.path))) {
-        target.add(item);
+        target.add(_itemWithKnownDuration(item, mediaDurations));
       }
     }
   }
@@ -918,6 +1096,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     final config = HeniLibraryConfig(
       libraryDirectories: state.libraryDirectories,
       libraryFiles: state.libraryFilePaths,
+      mediaDurations: _mediaDurationsFromState(),
       playlists: [
         for (final playlist in state.playlists)
           HeniPlaylistConfig(

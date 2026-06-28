@@ -138,6 +138,248 @@ Color _tertiaryGlassText() {
   return Colors.white.withValues(alpha: 0.42);
 }
 
+Color _accentControlForeground(BuildContext context) {
+  return heniReadableForegroundOn(Theme.of(context).colorScheme.primary);
+}
+
+Color _stateIconOnGlass(BuildContext context, {bool active = false}) {
+  final primary = Theme.of(context).colorScheme.primary;
+  return heniAccentOnGlass(primary, alpha: active ? 0.96 : 0.82);
+}
+
+/// Heni 统一间距节奏：保持 4 的倍数，避免“贴边/过空”随手取值。
+class _Gap {
+  const _Gap._();
+  static const xs = 4.0;
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 20.0;
+}
+
+/// 品牌主渐变：seed → accent 的方向性渐变，贯穿主操作控件，
+/// 让颜色形成“调性”而非零散点缀。
+LinearGradient heniBrandGradient(
+  HeniPalette palette, {
+  double opacity = 1,
+  AlignmentGeometry begin = Alignment.topLeft,
+  AlignmentGeometry end = Alignment.bottomRight,
+}) {
+  return LinearGradient(
+    begin: begin,
+    end: end,
+    colors: [
+      palette.seed.withValues(alpha: opacity),
+      Color.lerp(palette.seed, palette.accent, 0.85)!.withValues(
+        alpha: opacity,
+      ),
+    ],
+  );
+}
+
+/// 品牌渐变的柔和叠层（用于选中态/高亮底色）。
+LinearGradient heniBrandWash(HeniPalette palette, {double opacity = 0.16}) {
+  return LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [
+      palette.seed.withValues(alpha: opacity),
+      palette.accent.withValues(alpha: opacity * 0.7),
+    ],
+  );
+}
+
+/// 监听控制器状态消息，在底栏上方浮出一枚短暂的 Toast 气泡，
+/// 给“已加入《xx》”这类操作即时反馈。
+class _ToastOverlay extends ConsumerStatefulWidget {
+  const _ToastOverlay({required this.palette});
+
+  final HeniPalette palette;
+
+  @override
+  ConsumerState<_ToastOverlay> createState() => _ToastOverlayState();
+}
+
+class _ToastOverlayState extends ConsumerState<_ToastOverlay> {
+  String? _message;
+  bool _isError = false;
+  bool _visible = false;
+  Timer? _dismissTimer;
+  int _token = 0;
+
+  void _show(String message, {required bool isError}) {
+    _dismissTimer?.cancel();
+    final token = ++_token;
+    setState(() {
+      _message = message;
+      _isError = isError;
+      _visible = true;
+    });
+    _dismissTimer = Timer(const Duration(milliseconds: 2600), () {
+      if (!mounted || token != _token) return;
+      setState(() => _visible = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _dismissTimer?.cancel();
+    super.dispose();
+  }
+
+  IconData _iconFor(String message, bool isError) {
+    if (isError) return Icons.error_outline_rounded;
+    if (message.contains('已加入') || message.contains('已创建')) {
+      return Icons.playlist_add_check_rounded;
+    }
+    if (message.contains('已删除') || message.contains('移除')) {
+      return Icons.delete_outline_rounded;
+    }
+    if (message.contains('正在')) return Icons.sync_rounded;
+    return Icons.check_circle_outline_rounded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<PlaybackQueueState>(playbackQueueControllerProvider, (
+      prev,
+      next,
+    ) {
+      if (next.lastError != null && next.lastError != prev?.lastError) {
+        _show(next.lastError!, isError: true);
+      } else if (next.statusMessage != null &&
+          next.statusMessage != prev?.statusMessage) {
+        _show(next.statusMessage!, isError: false);
+      }
+    });
+
+    final palette = widget.palette;
+    final message = _message;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 104),
+        child: AnimatedSlide(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+          offset: _visible ? Offset.zero : const Offset(0, 0.4),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 240),
+            opacity: _visible ? 1 : 0,
+            child:
+                message == null
+                    ? const SizedBox.shrink()
+                    : _ToastBubble(
+                      palette: palette,
+                      message: message,
+                      icon: _iconFor(message, _isError),
+                      isError: _isError,
+                    ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ToastBubble extends StatelessWidget {
+  const _ToastBubble({
+    required this.palette,
+    required this.message,
+    required this.icon,
+    required this.isError,
+  });
+
+  final HeniPalette palette;
+  final String message;
+  final IconData icon;
+  final bool isError;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = isError ? const Color(0xFFFF8C8C) : palette.accent;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 460),
+          padding: const EdgeInsets.fromLTRB(_Gap.md, _Gap.sm + 2, _Gap.lg, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                Color.alphaBlend(
+                  palette.seed.withValues(alpha: 0.20),
+                  palette.surfaceAlt.withValues(alpha: 0.86),
+                ),
+                Color.alphaBlend(
+                  palette.surfaceAlt.withValues(alpha: 0.9),
+                  Colors.black.withValues(alpha: 0.2),
+                ),
+              ],
+            ),
+            border: Border.all(
+              color: accent.withValues(alpha: 0.30),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: palette.seed.withValues(alpha: 0.28),
+                blurRadius: 26,
+                spreadRadius: -2,
+                offset: const Offset(0, 10),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.32),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: heniBrandGradient(palette, opacity: 0.9),
+                ),
+                child: Icon(
+                  icon,
+                  size: 16,
+                  color: heniReadableForegroundOn(palette.seed),
+                ),
+              ),
+              const SizedBox(width: _Gap.sm + 2),
+              Flexible(
+                child: Text(
+                  message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.1,
+                    color: Colors.white.withValues(alpha: 0.94),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 final librarySearchQueryProvider = NotifierProvider<LibrarySearchQuery, String>(
   LibrarySearchQuery.new,
 );
@@ -163,6 +405,25 @@ class FocusMode extends Notifier<bool> {
 
   void toggle() {
     state = !state;
+  }
+}
+
+final _activeModalActionProvider = NotifierProvider<ActiveModalAction, String?>(
+  ActiveModalAction.new,
+);
+
+class ActiveModalAction extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void start(String actionId) {
+    state = actionId;
+  }
+
+  void finish(String actionId) {
+    if (state == actionId) {
+      state = null;
+    }
   }
 }
 
@@ -648,6 +909,8 @@ class _AmbientBackdropState extends ConsumerState<_AmbientBackdrop>
     )..repeat();
 
     final engine = ref.read(playbackEngineProvider);
+    _playing = engine.currentPlaying;
+    _ctrl.duration = Duration(seconds: _playing ? 14 : 24);
     _sub = engine.playing.listen((v) {
       if (!mounted) return;
       setState(() {
@@ -797,7 +1060,10 @@ class _CornerGlowState extends ConsumerState<_CornerGlow>
       duration: const Duration(milliseconds: 3200),
     )..repeat(reverse: true);
 
-    _sub = ref.read(playbackEngineProvider).playing.listen((v) {
+    final engine = ref.read(playbackEngineProvider);
+    _playing = engine.currentPlaying;
+    _ctrl.duration = Duration(milliseconds: _playing ? 1800 : 3200);
+    _sub = engine.playing.listen((v) {
       if (!mounted) return;
       setState(() {
         _playing = v;
@@ -1137,6 +1403,22 @@ class PlayerScreen extends ConsumerWidget {
                                         .removePlaybackQueueItemAt(index),
                                   );
                                 },
+                                onPlayNext: (item) {
+                                  ref
+                                      .read(
+                                        playbackQueueControllerProvider
+                                            .notifier,
+                                      )
+                                      .playItemNext(item);
+                                },
+                                onEnqueue: (item) {
+                                  ref
+                                      .read(
+                                        playbackQueueControllerProvider
+                                            .notifier,
+                                      )
+                                      .enqueueItem(item);
+                                },
                                 onSelectUiStyle: (style) {
                                   ref
                                       .read(activeUiStyleProvider.notifier)
@@ -1212,106 +1494,121 @@ class PlayerScreen extends ConsumerWidget {
               ),
             ),
           ),
+          Positioned.fill(
+            child: IgnorePointer(child: _ToastOverlay(palette: palette)),
+          ),
         ],
       ),
     );
   }
 
   Future<void> _pickMedia(WidgetRef ref) async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowMultiple: true,
-      allowedExtensions: [...audioExtensions, ...videoExtensions],
-      dialogTitle: '添加音视频文件',
-    );
-    final paths =
-        result?.files
-            .map((file) => file.path)
-            .whereType<String>()
-            .where(isSupportedMediaPath)
-            .toList();
-    if (paths == null || paths.isEmpty) {
-      return;
-    }
+    await _runModalAction(ref, 'pick-media', () async {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowMultiple: true,
+        allowedExtensions: [...audioExtensions, ...videoExtensions],
+        dialogTitle: '添加音视频文件',
+        lockParentWindow: true,
+      );
+      final paths =
+          result?.files
+              .map((file) => file.path)
+              .whereType<String>()
+              .where(isSupportedMediaPath)
+              .toList();
+      if (paths == null || paths.isEmpty) {
+        return;
+      }
 
-    await ref.read(playbackQueueControllerProvider.notifier).addItems([
-      for (final path in paths)
-        MediaItem.fromPath(path, kind: mediaKindFromPath(path)),
-    ], playFirst: true);
+      await ref.read(playbackQueueControllerProvider.notifier).addItems([
+        for (final path in paths)
+          MediaItem.fromPath(path, kind: mediaKindFromPath(path)),
+      ], playFirst: true);
+    });
   }
 
   Future<void> _pickFolder(WidgetRef ref) async {
-    final path = await FilePicker.getDirectoryPath(
-      dialogTitle: '打开本地媒体文件夹',
-      lockParentWindow: true,
-    );
-    if (path == null) {
-      return;
-    }
+    await _runModalAction(ref, 'pick-folder', () async {
+      final path = await FilePicker.getDirectoryPath(
+        dialogTitle: '打开本地媒体文件夹',
+        lockParentWindow: true,
+      );
+      if (path == null) {
+        return;
+      }
 
-    await ref
-        .read(playbackQueueControllerProvider.notifier)
-        .loadDirectory(path);
+      await ref
+          .read(playbackQueueControllerProvider.notifier)
+          .loadDirectory(path);
+    });
   }
 
   Future<void> _pickScenery(WidgetRef ref) async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowMultiple: true,
-      allowedExtensions: const ['bmp', 'jpeg', 'jpg', 'png', 'webp'],
-      dialogTitle: '选择播放背景图片',
-    );
-    final paths =
-        result?.files
-            .map((file) => file.path)
-            .whereType<String>()
-            .where((path) => File(path).existsSync())
-            .toList();
+    await _runModalAction(ref, 'pick-scenery', () async {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowMultiple: true,
+        allowedExtensions: const ['bmp', 'jpeg', 'jpg', 'png', 'webp'],
+        dialogTitle: '选择播放背景图片',
+        lockParentWindow: true,
+      );
+      final paths =
+          result?.files
+              .map((file) => file.path)
+              .whereType<String>()
+              .where((path) => File(path).existsSync())
+              .toList();
 
-    if (paths == null || paths.isEmpty) {
-      return;
-    }
+      if (paths == null || paths.isEmpty) {
+        return;
+      }
 
-    ref.read(sceneryImagePathsProvider.notifier).replaceAll(paths);
-    unawaited(
-      ref
-          .read(playbackQueueControllerProvider.notifier)
-          .persistShellPreferences(sceneryImagePaths: paths),
-    );
+      ref.read(sceneryImagePathsProvider.notifier).replaceAll(paths);
+      unawaited(
+        ref
+            .read(playbackQueueControllerProvider.notifier)
+            .persistShellPreferences(sceneryImagePaths: paths),
+      );
+    });
   }
 
   Future<void> _extractAudio(WidgetRef ref, MediaItem item) async {
-    final outputPath = await FilePicker.saveFile(
-      dialogTitle: '导出音频',
-      fileName: '${item.title}.flac',
-      initialDirectory: p.dirname(item.path),
-      type: FileType.custom,
-      allowedExtensions: const ['flac'],
-      lockParentWindow: true,
-    );
-    if (outputPath == null) {
-      return;
-    }
+    await _runModalAction(ref, 'extract-audio', () async {
+      final outputPath = await FilePicker.saveFile(
+        dialogTitle: '导出音频',
+        fileName: '${item.title}.flac',
+        initialDirectory: p.dirname(item.path),
+        type: FileType.custom,
+        allowedExtensions: const ['flac'],
+        lockParentWindow: true,
+      );
+      if (outputPath == null) {
+        return;
+      }
 
-    unawaited(
-      ref
-          .read(audioExportControllerProvider.notifier)
-          .extractAudio(inputPath: item.path, outputPath: outputPath),
-    );
+      unawaited(
+        ref
+            .read(audioExportControllerProvider.notifier)
+            .extractAudio(inputPath: item.path, outputPath: outputPath),
+      );
+    });
   }
 
   Future<void> _createPlaylist(BuildContext context, WidgetRef ref) async {
-    final result = await showDialog<_CreatePlaylistResult>(
-      context: context,
-      builder: (context) => const _CreatePlaylistDialog(),
-    );
-    if (result == null) {
-      return;
-    }
+    await _runModalAction(ref, 'create-playlist', () async {
+      final result = await showDialog<_CreatePlaylistResult>(
+        context: context,
+        builder: (context) => const _CreatePlaylistDialog(),
+      );
+      if (result == null) {
+        return;
+      }
 
-    await ref
-        .read(playbackQueueControllerProvider.notifier)
-        .createPlaylist(result.name);
+      await ref
+          .read(playbackQueueControllerProvider.notifier)
+          .createPlaylist(result.name);
+    });
   }
 
   Future<void> _addFromLibrary(
@@ -1319,18 +1616,20 @@ class PlayerScreen extends ConsumerWidget {
     WidgetRef ref,
     String playlistId,
   ) async {
-    final queue = ref.read(playbackQueueControllerProvider);
-    final items = await showDialog<List<MediaItem>>(
-      context: context,
-      builder: (context) => _AddFromLibraryDialog(queue: queue),
-    );
-    if (items == null || items.isEmpty) {
-      return;
-    }
+    await _runModalAction(ref, 'add-from-library', () async {
+      final queue = ref.read(playbackQueueControllerProvider);
+      final items = await showDialog<List<MediaItem>>(
+        context: context,
+        builder: (context) => _AddFromLibraryDialog(queue: queue),
+      );
+      if (items == null || items.isEmpty) {
+        return;
+      }
 
-    ref
-        .read(playbackQueueControllerProvider.notifier)
-        .addItemsToPlaylist(playlistId, items);
+      ref
+          .read(playbackQueueControllerProvider.notifier)
+          .addItemsToPlaylist(playlistId, items);
+    });
   }
 
   Future<void> _renamePlaylist(
@@ -1338,23 +1637,25 @@ class PlayerScreen extends ConsumerWidget {
     WidgetRef ref,
     HeniPlaylist playlist,
   ) async {
-    final name = await showDialog<String>(
-      context: context,
-      builder:
-          (context) => _TextEditDialog(
-            title: '重命名歌单',
-            initialValue: playlist.name,
-            hintText: '歌单名称',
-            actionText: '保存',
-          ),
-    );
-    if (name == null) {
-      return;
-    }
+    await _runModalAction(ref, 'rename-playlist', () async {
+      final name = await showDialog<String>(
+        context: context,
+        builder:
+            (context) => _TextEditDialog(
+              title: '重命名歌单',
+              initialValue: playlist.name,
+              hintText: '歌单名称',
+              actionText: '保存',
+            ),
+      );
+      if (name == null) {
+        return;
+      }
 
-    ref
-        .read(playbackQueueControllerProvider.notifier)
-        .renamePlaylist(playlist.id, name);
+      ref
+          .read(playbackQueueControllerProvider.notifier)
+          .renamePlaylist(playlist.id, name);
+    });
   }
 
   Future<void> _editPlaylistDescription(
@@ -1362,24 +1663,26 @@ class PlayerScreen extends ConsumerWidget {
     WidgetRef ref,
     HeniPlaylist playlist,
   ) async {
-    final description = await showDialog<String>(
-      context: context,
-      builder:
-          (context) => _TextEditDialog(
-            title: '歌单说明',
-            initialValue: playlist.description,
-            hintText: '写一点关于这个歌单的说明',
-            actionText: '保存',
-            maxLines: 4,
-          ),
-    );
-    if (description == null) {
-      return;
-    }
+    await _runModalAction(ref, 'edit-playlist-description', () async {
+      final description = await showDialog<String>(
+        context: context,
+        builder:
+            (context) => _TextEditDialog(
+              title: '歌单说明',
+              initialValue: playlist.description,
+              hintText: '写一点关于这个歌单的说明',
+              actionText: '保存',
+              maxLines: 4,
+            ),
+      );
+      if (description == null) {
+        return;
+      }
 
-    ref
-        .read(playbackQueueControllerProvider.notifier)
-        .updatePlaylistDescription(playlist.id, description);
+      ref
+          .read(playbackQueueControllerProvider.notifier)
+          .updatePlaylistDescription(playlist.id, description);
+    });
   }
 
   Future<void> _confirmDeletePlaylist(
@@ -1387,31 +1690,33 @@ class PlayerScreen extends ConsumerWidget {
     WidgetRef ref,
     HeniPlaylist playlist,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder:
-          (context) => _HeniDialog(
-            title: const Text('删除歌单'),
-            content: Text('确定删除“${playlist.name}”吗？不会删除本地音频文件。'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('删除'),
-              ),
-            ],
-          ),
-    );
-    if (confirmed != true) {
-      return;
-    }
+    await _runModalAction(ref, 'delete-playlist', () async {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder:
+            (context) => _HeniDialog(
+              title: const Text('删除歌单'),
+              content: Text('确定删除“${playlist.name}”吗？不会删除本地音频文件。'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('删除'),
+                ),
+              ],
+            ),
+      );
+      if (confirmed != true) {
+        return;
+      }
 
-    ref
-        .read(playbackQueueControllerProvider.notifier)
-        .deletePlaylist(playlist.id);
+      ref
+          .read(playbackQueueControllerProvider.notifier)
+          .deletePlaylist(playlist.id);
+    });
   }
 
   Future<void> _managePlaylistItems(
@@ -1419,24 +1724,46 @@ class PlayerScreen extends ConsumerWidget {
     WidgetRef ref,
     HeniPlaylist playlist,
   ) async {
-    final items = await showDialog<List<MediaItem>>(
-      context: context,
-      builder: (context) => _ManagePlaylistDialog(playlist: playlist),
-    );
-    if (items == null || items.isEmpty) {
-      return;
-    }
+    await _runModalAction(ref, 'manage-playlist-items', () async {
+      final items = await showDialog<List<MediaItem>>(
+        context: context,
+        builder: (context) => _ManagePlaylistDialog(playlist: playlist),
+      );
+      if (items == null || items.isEmpty) {
+        return;
+      }
 
-    ref
-        .read(playbackQueueControllerProvider.notifier)
-        .removeItemsFromPlaylist(playlist.id, items);
+      ref
+          .read(playbackQueueControllerProvider.notifier)
+          .removeItemsFromPlaylist(playlist.id, items);
+    });
   }
 
   Future<void> _showPlaybackQueue(BuildContext context, WidgetRef ref) async {
-    await showDialog<void>(
-      context: context,
-      builder: (context) => const _PlaybackQueueDialog(),
-    );
+    await _runModalAction(ref, 'show-playback-queue', () async {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => const _PlaybackQueueDialog(),
+      );
+    });
+  }
+
+  Future<void> _runModalAction(
+    WidgetRef ref,
+    String actionId,
+    Future<void> Function() action,
+  ) async {
+    final activeAction = ref.read(_activeModalActionProvider);
+    if (activeAction != null) {
+      return;
+    }
+
+    ref.read(_activeModalActionProvider.notifier).start(actionId);
+    try {
+      await action();
+    } finally {
+      ref.read(_activeModalActionProvider.notifier).finish(actionId);
+    }
   }
 }
 
@@ -1961,14 +2288,14 @@ class _PlaylistTileState extends ConsumerState<_PlaylistTile> {
               curve: Curves.easeOutCubic,
               height: 40,
               decoration: BoxDecoration(
-                color: tint.withValues(
-                  alpha:
-                      widget.selected
-                          ? 0.11
-                          : _hovered
-                          ? 0.038
-                          : 0.0,
-                ),
+                gradient:
+                    widget.selected
+                        ? heniBrandWash(widget.palette, opacity: 0.18)
+                        : null,
+                color:
+                    widget.selected
+                        ? null
+                        : tint.withValues(alpha: _hovered ? 0.038 : 0.0),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color:
@@ -2035,9 +2362,19 @@ class _PlaylistTileState extends ConsumerState<_PlaylistTile> {
                                 height: 25,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
-                                  color: tint.withValues(
-                                    alpha: active ? 0.18 : 0.07,
-                                  ),
+                                  gradient:
+                                      widget.selected
+                                          ? heniBrandGradient(
+                                            widget.palette,
+                                            opacity: 0.34,
+                                          )
+                                          : null,
+                                  color:
+                                      widget.selected
+                                          ? null
+                                          : tint.withValues(
+                                            alpha: active ? 0.18 : 0.07,
+                                          ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
@@ -2079,7 +2416,10 @@ class _PlaylistTileState extends ConsumerState<_PlaylistTile> {
                                         ref
                                             .read(playbackEngineProvider)
                                             .playing,
-                                    initialData: false,
+                                    initialData:
+                                        ref
+                                            .read(playbackEngineProvider)
+                                            .currentPlaying,
                                     builder: (context, snap) {
                                       return _NowPlayingWave(
                                         color: widget.palette.seed,
@@ -2444,6 +2784,8 @@ class _ContentArea extends ConsumerWidget {
     required this.onManagePlaylist,
     required this.onRemoveFromPlaylist,
     required this.onRemoveFromPlaybackQueue,
+    required this.onPlayNext,
+    required this.onEnqueue,
     required this.onSelectUiStyle,
   });
 
@@ -2467,6 +2809,8 @@ class _ContentArea extends ConsumerWidget {
   final ValueChanged<HeniPlaylist> onManagePlaylist;
   final void Function(String playlistId, MediaItem item) onRemoveFromPlaylist;
   final ValueChanged<int> onRemoveFromPlaybackQueue;
+  final void Function(MediaItem item) onPlayNext;
+  final void Function(MediaItem item) onEnqueue;
   final ValueChanged<HeniUiStyle> onSelectUiStyle;
 
   @override
@@ -2527,6 +2871,8 @@ class _ContentArea extends ConsumerWidget {
                 onAddToPlaylist: onAddToPlaylist,
                 onRemoveFromPlaylist: onRemoveFromPlaylist,
                 onRemoveFromPlaybackQueue: onRemoveFromPlaybackQueue,
+                onPlayNext: onPlayNext,
+                onEnqueue: onEnqueue,
                 onPickFolder: onPickFolder,
                 onPickMedia: onPickMedia,
                 onRefreshLibrary: onRefreshLibrary,
@@ -3329,7 +3675,7 @@ class _SceneryContent extends ConsumerWidget {
 
     return StreamBuilder<bool>(
       stream: engine.playing,
-      initialData: false,
+      initialData: engine.currentPlaying,
       builder: (context, snapshot) {
         final isPlaying = snapshot.data ?? false;
 
@@ -4245,6 +4591,8 @@ class _LibraryContent extends ConsumerStatefulWidget {
     required this.onAddToPlaylist,
     required this.onRemoveFromPlaylist,
     required this.onRemoveFromPlaybackQueue,
+    required this.onPlayNext,
+    required this.onEnqueue,
     required this.onPickFolder,
     required this.onPickMedia,
     required this.onRefreshLibrary,
@@ -4260,6 +4608,8 @@ class _LibraryContent extends ConsumerStatefulWidget {
   final void Function(String playlistId, MediaItem item) onAddToPlaylist;
   final void Function(String playlistId, MediaItem item) onRemoveFromPlaylist;
   final ValueChanged<int> onRemoveFromPlaybackQueue;
+  final void Function(MediaItem item) onPlayNext;
+  final void Function(MediaItem item) onEnqueue;
   final VoidCallback onPickFolder;
   final VoidCallback onPickMedia;
   final VoidCallback onRefreshLibrary;
@@ -4318,6 +4668,9 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 padding: EdgeInsets.zero,
+                style: IconButton.styleFrom(
+                  foregroundColor: _secondaryGlassText(emphasis: 1.08),
+                ),
               ),
               IconButton(
                 tooltip: '导入文件夹',
@@ -4326,6 +4679,9 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 padding: EdgeInsets.zero,
+                style: IconButton.styleFrom(
+                  foregroundColor: _secondaryGlassText(emphasis: 1.08),
+                ),
               ),
               IconButton.filled(
                 tooltip: '添加文件',
@@ -4335,6 +4691,7 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                   minimumSize: const Size(36, 36),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   padding: EdgeInsets.zero,
+                  foregroundColor: _accentControlForeground(context),
                 ),
               ),
             ]
@@ -4351,6 +4708,7 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                   minimumSize: const Size(38, 38),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   padding: EdgeInsets.zero,
+                  foregroundColor: _stateIconOnGlass(context, active: true),
                 ),
               ),
             ]
@@ -4362,6 +4720,9 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 padding: EdgeInsets.zero,
+                style: IconButton.styleFrom(
+                  foregroundColor: _secondaryGlassText(emphasis: 1.08),
+                ),
               ),
               IconButton.filled(
                 tooltip: '从曲库添加',
@@ -4371,6 +4732,7 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                   minimumSize: const Size(36, 36),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   padding: EdgeInsets.zero,
+                  foregroundColor: _accentControlForeground(context),
                 ),
               ),
             ];
@@ -4406,15 +4768,15 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
         SizedBox(height: widget.layout.contentGap),
         Expanded(
           child: _GlassPanel(
-            radius: 26,
-            fillColor: _shellGlassFill(widget.palette, emphasis: 0.74),
-            borderColor: _shellGlassBorder(widget.palette, emphasis: 0.7),
+            radius: 22,
+            fillColor: _shellGlassFill(widget.palette, emphasis: 0.66),
+            borderColor: _shellGlassBorder(widget.palette, emphasis: 0.58),
             auroraPalette: widget.palette,
             hoverAccentPalette: widget.palette,
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
+                  padding: const EdgeInsets.fromLTRB(12, 6, 10, 4),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final narrowToolbar = constraints.maxWidth < 720;
@@ -4550,9 +4912,9 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                   ),
                 ),
                 Container(
-                  height: 24,
-                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 2),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  height: 22,
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final columns = _LibraryTableColumns.forWidth(
@@ -4566,10 +4928,10 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                             child: Text(
                               '曲目',
                               style: TextStyle(
-                                fontSize: 10.2,
+                                fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                letterSpacing: 0.9,
-                                color: Colors.white.withValues(alpha: 0.28),
+                                letterSpacing: 0.7,
+                                color: Colors.white.withValues(alpha: 0.32),
                               ),
                             ),
                           ),
@@ -4580,10 +4942,10 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                               '时长',
                               textAlign: TextAlign.right,
                               style: TextStyle(
-                                fontSize: 10.2,
+                                fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                letterSpacing: 0.9,
-                                color: Colors.white.withValues(alpha: 0.24),
+                                letterSpacing: 0.7,
+                                color: Colors.white.withValues(alpha: 0.30),
                               ),
                             ),
                           ),
@@ -4633,6 +4995,7 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                                 browsingLibrary: browsingLibrary,
                                 browsingPlaybackQueue: browsingPlaybackQueue,
                                 playlists: widget.queue.playlists,
+                                currentPlaylistId: activePlaylist.id,
                                 selectionMode: _selectionMode,
                                 checked: _selectedPaths.contains(item.path),
                                 onPlay:
@@ -4655,6 +5018,14 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                                               activePlaylist.id,
                                               item,
                                             ),
+                                onPlayNext:
+                                    browsingPlaybackQueue
+                                        ? null
+                                        : () => widget.onPlayNext(item),
+                                onEnqueue:
+                                    browsingPlaybackQueue
+                                        ? null
+                                        : () => widget.onEnqueue(item),
                                 onToggleSelect: () => _toggleItem(item),
                               );
                             },
@@ -4752,12 +5123,15 @@ class _LibraryRow extends ConsumerStatefulWidget {
     required this.browsingLibrary,
     required this.browsingPlaybackQueue,
     required this.playlists,
+    required this.currentPlaylistId,
     required this.selectionMode,
     required this.checked,
     required this.onPlay,
     required this.onAddToPlaylist,
     required this.onRemoveFromPlaylist,
     required this.onToggleSelect,
+    this.onPlayNext,
+    this.onEnqueue,
   });
 
   final MediaItem item;
@@ -4766,12 +5140,17 @@ class _LibraryRow extends ConsumerStatefulWidget {
   final bool browsingLibrary;
   final bool browsingPlaybackQueue;
   final List<HeniPlaylist> playlists;
+
+  /// 当前正在浏览的歌单 id（曲库/队列时为对应特殊 id），用于在“加入歌单”里排除自身。
+  final String currentPlaylistId;
   final bool selectionMode;
   final bool checked;
   final VoidCallback onPlay;
   final ValueChanged<String> onAddToPlaylist;
   final VoidCallback onRemoveFromPlaylist;
   final VoidCallback onToggleSelect;
+  final VoidCallback? onPlayNext;
+  final VoidCallback? onEnqueue;
 
   @override
   ConsumerState<_LibraryRow> createState() => _LibraryRowState();
@@ -4824,8 +5203,8 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
-            margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 5),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.centerLeft,
@@ -4842,7 +5221,7 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                 ],
                 stops: const [0.0, 0.08, 1.0],
               ),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(17),
               border: Border.all(color: borderColor),
               boxShadow: [
                 if (hoverOrSelected)
@@ -4914,7 +5293,7 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(17),
                     hoverColor: Theme.of(
                       context,
                     ).colorScheme.primary.withValues(alpha: 0.018),
@@ -4933,7 +5312,7 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                         final compactLead = columns.leadWidth < 58;
 
                         return Padding(
-                          padding: const EdgeInsets.fromLTRB(4, 12, 4, 12),
+                          padding: const EdgeInsets.fromLTRB(4, 9, 4, 9),
                           child: Row(
                             children: [
                               SizedBox(
@@ -4975,7 +5354,12 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                                                                   playbackEngineProvider,
                                                                 )
                                                                 .playing,
-                                                        initialData: false,
+                                                        initialData:
+                                                            ref
+                                                                .read(
+                                                                  playbackEngineProvider,
+                                                                )
+                                                                .currentPlaying,
                                                         builder: (
                                                           context,
                                                           snap,
@@ -5024,8 +5408,8 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                                       ),
                                       AnimatedContainer(
                                         duration: _hoverDuration,
-                                        width: columns.compactAction ? 26 : 30,
-                                        height: columns.compactAction ? 30 : 32,
+                                        width: columns.compactAction ? 25 : 28,
+                                        height: columns.compactAction ? 28 : 30,
                                         alignment: Alignment.center,
                                         decoration: BoxDecoration(
                                           color:
@@ -5045,14 +5429,14 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                                                             : 0.07,
                                                   ),
                                           borderRadius: BorderRadius.circular(
-                                            12,
+                                            10,
                                           ),
                                         ),
                                         child: Icon(
                                           widget.item.kind == MediaKind.video
                                               ? Icons.movie_outlined
                                               : Icons.music_note_outlined,
-                                          size: 13.5,
+                                          size: 13,
                                           color:
                                               playing
                                                   ? heniAccentOnGlass(
@@ -5081,19 +5465,19 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                                       overflow: TextOverflow.ellipsis,
                                       style: theme.textTheme.titleMedium
                                           ?.copyWith(
-                                            fontSize: 14.4,
+                                            fontSize: 14,
                                             fontWeight: FontWeight.w700,
                                           ),
                                     ),
                                     if (columns.showPath) ...[
-                                      const SizedBox(height: 5),
+                                      const SizedBox(height: 3),
                                       Text(
                                         p.dirname(widget.item.path),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: theme.textTheme.bodySmall
                                             ?.copyWith(
-                                              fontSize: 10.9,
+                                              fontSize: 10.7,
                                               color:
                                                   checked
                                                       ? Colors.white.withValues(
@@ -5198,35 +5582,36 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                                               ),
                                             ),
                                           )
-                                          : widget.browsingLibrary
-                                          ? Align(
+                                          : Align(
                                             alignment: Alignment.centerLeft,
                                             child: AnimatedOpacity(
                                               duration: _hoverDuration,
                                               opacity:
-                                                  hoverOrSelected ? 1 : 0.82,
-                                              child: _AddToPlaylistMenu(
-                                                playlists: widget.playlists,
-                                                onSelected:
+                                                  hoverOrSelected ? 1 : 0.8,
+                                              child: _SongRowMenu(
+                                                item: widget.item,
+                                                targetPlaylists: [
+                                                  for (final pl
+                                                      in widget.playlists)
+                                                    if (pl.id !=
+                                                        widget.currentPlaylistId)
+                                                      pl,
+                                                ],
+                                                onAddToPlaylist:
                                                     widget.onAddToPlaylist,
-                                                compact: columns.compactAction,
-                                              ),
-                                            ),
-                                          )
-                                          : Align(
-                                            alignment: Alignment.centerLeft,
-                                            child: Tooltip(
-                                              message:
-                                                  widget.browsingPlaybackQueue
-                                                      ? '从当前播放列表移除'
-                                                      : '从当前歌单移除',
-                                              child: _InlineActionButton(
-                                                icon:
-                                                    Icons.remove_circle_outline,
+                                                onPlayNext: widget.onPlayNext,
+                                                onEnqueue: widget.onEnqueue,
+                                                onRemove:
+                                                    widget.browsingLibrary
+                                                        ? null
+                                                        : widget
+                                                            .onRemoveFromPlaylist,
+                                                removeLabel:
+                                                    widget.browsingPlaybackQueue
+                                                        ? '从播放列表移除'
+                                                        : '从该歌单移除',
                                                 active: hoverOrSelected,
-                                                danger: true,
-                                                onPressed:
-                                                    widget.onRemoveFromPlaylist,
+                                                compact: columns.compactAction,
                                               ),
                                             ),
                                           ),
@@ -5299,87 +5684,246 @@ String _formatDuration(Duration? duration) {
   return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
 
-class _AddToPlaylistMenu extends StatelessWidget {
-  const _AddToPlaylistMenu({
-    required this.playlists,
-    required this.onSelected,
+sealed class _SongMenuAction {
+  const _SongMenuAction();
+}
+
+class _PlaySongNext extends _SongMenuAction {
+  const _PlaySongNext();
+}
+
+class _EnqueueSong extends _SongMenuAction {
+  const _EnqueueSong();
+}
+
+class _AddSongToPlaylist extends _SongMenuAction {
+  const _AddSongToPlaylist(this.playlistId);
+  final String playlistId;
+}
+
+class _RemoveSongFromCurrent extends _SongMenuAction {
+  const _RemoveSongFromCurrent();
+}
+
+/// 歌曲行的「更多操作」菜单：下一首播放、加到当前播放列表、
+/// 快捷加入其它歌单，以及（在歌单/队列里）从当前位置移除。
+class _SongRowMenu extends StatelessWidget {
+  const _SongRowMenu({
+    required this.item,
+    required this.targetPlaylists,
+    required this.onAddToPlaylist,
+    required this.active,
+    this.onPlayNext,
+    this.onEnqueue,
+    this.onRemove,
+    this.removeLabel,
     this.compact = false,
   });
 
-  final List<HeniPlaylist> playlists;
-  final ValueChanged<String> onSelected;
+  final MediaItem item;
+  final List<HeniPlaylist> targetPlaylists;
+  final ValueChanged<String> onAddToPlaylist;
+  final bool active;
+  final VoidCallback? onPlayNext;
+  final VoidCallback? onEnqueue;
+  final VoidCallback? onRemove;
+  final String? removeLabel;
   final bool compact;
+
+  bool _contains(HeniPlaylist playlist) {
+    final key = item.path.toLowerCase();
+    return playlist.items.any((it) => it.path.toLowerCase() == key);
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (playlists.isEmpty) {
-      return Tooltip(
-        message: '先新建歌单',
-        child: OutlinedButton(onPressed: null, child: const Text('加入歌单')),
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final dangerColor = const Color(0xFFFF6B6B);
+
+    PopupMenuItem<_SongMenuAction> buildAction({
+      required _SongMenuAction value,
+      required IconData icon,
+      required String label,
+    }) {
+      return PopupMenuItem<_SongMenuAction>(
+        value: value,
+        height: 42,
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: heniAccentOnGlass(primary, alpha: 0.86),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
-    return PopupMenuButton<String>(
-      tooltip: '加入歌单',
-      onSelected: onSelected,
-      itemBuilder:
-          (context) => [
-            for (final playlist in playlists)
-              PopupMenuItem<String>(
-                value: playlist.id,
-                child: Text(playlist.name),
+    final hasQueueActions = onPlayNext != null || onEnqueue != null;
+
+    return PopupMenuButton<_SongMenuAction>(
+      tooltip: '更多操作',
+      position: PopupMenuPosition.under,
+      padding: EdgeInsets.zero,
+      splashRadius: 18,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: Color.alphaBlend(
+        Colors.white.withValues(alpha: 0.06),
+        const Color(0xFF1A1B1F),
+      ),
+      constraints: const BoxConstraints(minWidth: 208, maxWidth: 268),
+      onSelected: (action) {
+        switch (action) {
+          case _PlaySongNext():
+            onPlayNext?.call();
+          case _EnqueueSong():
+            onEnqueue?.call();
+          case _AddSongToPlaylist(:final playlistId):
+            onAddToPlaylist(playlistId);
+          case _RemoveSongFromCurrent():
+            onRemove?.call();
+        }
+      },
+      itemBuilder: (context) {
+        return <PopupMenuEntry<_SongMenuAction>>[
+          if (hasQueueActions) ...[
+            if (onPlayNext != null)
+              buildAction(
+                value: const _PlaySongNext(),
+                icon: Icons.playlist_play_rounded,
+                label: '下一首播放',
               ),
+            if (onEnqueue != null)
+              buildAction(
+                value: const _EnqueueSong(),
+                icon: Icons.queue_music_rounded,
+                label: '加到当前播放列表',
+              ),
+            if (targetPlaylists.isNotEmpty || onRemove != null)
+              const PopupMenuDivider(height: 8),
           ],
-      child:
-          compact
-              ? Container(
-                width: 36,
-                height: 30,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.26),
-                  ),
-                ),
-                child: Icon(
-                  Icons.add_rounded,
-                  size: 16,
-                  color: heniAccentOnGlass(
-                    Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              )
-              : Container(
-                height: 30,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.26),
-                  ),
-                ),
-                child: Text(
-                  '加入歌单',
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: heniAccentOnGlass(
-                      Theme.of(context).colorScheme.primary,
-                    ),
-                    fontWeight: FontWeight.w700,
-                  ),
+          if (targetPlaylists.isNotEmpty) ...[
+            PopupMenuItem<_SongMenuAction>(
+              enabled: false,
+              height: 30,
+              child: Text(
+                '加入歌单',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.42),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
                 ),
               ),
+            ),
+            for (final playlist in targetPlaylists)
+              () {
+                final already = _contains(playlist);
+                return PopupMenuItem<_SongMenuAction>(
+                  value: already ? null : _AddSongToPlaylist(playlist.id),
+                  enabled: !already,
+                  height: 42,
+                  child: Row(
+                    children: [
+                      Icon(
+                        already
+                            ? Icons.check_circle_rounded
+                            : Icons.add_circle_outline_rounded,
+                        size: 18,
+                        color:
+                            already
+                                ? heniAccentOnGlass(primary, alpha: 0.8)
+                                : Colors.white.withValues(alpha: 0.74),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          playlist.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color:
+                                already
+                                    ? Colors.white.withValues(alpha: 0.5)
+                                    : Colors.white.withValues(alpha: 0.92),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (already)
+                        Text(
+                          '已加入',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.4),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }(),
+            if (onRemove != null) const PopupMenuDivider(height: 8),
+          ],
+          if (onRemove != null)
+            PopupMenuItem<_SongMenuAction>(
+              value: const _RemoveSongFromCurrent(),
+              height: 42,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.remove_circle_outline,
+                    size: 18,
+                    color: dangerColor.withValues(alpha: 0.92),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    removeLabel ?? '移除',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: dangerColor.withValues(alpha: 0.92),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ];
+      },
+      child: AnimatedContainer(
+        duration: _hoverDuration,
+        width: compact ? 32 : 34,
+        height: 30,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color:
+              active
+                  ? Colors.white.withValues(alpha: 0.07)
+                  : Colors.white.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color:
+                active
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : Colors.white.withValues(alpha: 0.05),
+          ),
+        ),
+        child: Icon(
+          Icons.more_horiz_rounded,
+          size: 18,
+          color: Colors.white.withValues(alpha: active ? 0.82 : 0.55),
+        ),
+      ),
     );
   }
 }
@@ -5712,6 +6256,7 @@ class _BottomPlayerBar extends ConsumerWidget {
                       children: [
                         _TransportControls(
                           engine: engine,
+                          palette: palette,
                           onPreviousTrack: onPreviousTrack,
                           onNextTrack: onNextTrack,
                         ),
@@ -5782,7 +6327,7 @@ class _CompactBottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return StreamBuilder<bool>(
       stream: engine.playing,
-      initialData: false,
+      initialData: engine.currentPlaying,
       builder: (context, snap) {
         final isPlaying = snap.data ?? false;
         return LayoutBuilder(
@@ -5856,23 +6401,42 @@ class _CompactBottomBar extends StatelessWidget {
                     onPressed: onPreviousTrack,
                     icon: Icons.skip_previous_rounded,
                   ),
-                IconButton.filled(
-                  tooltip: isPlaying ? '暂停' : '播放',
-                  onPressed: () {
-                    if (isPlaying) {
-                      unawaited(engine.pause());
-                    } else {
-                      unawaited(engine.play());
-                    }
-                  },
-                  style: IconButton.styleFrom(
-                    fixedSize: Size.square(playSize),
-                    padding: EdgeInsets.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: heniBrandGradient(palette),
+                    boxShadow: [
+                      BoxShadow(
+                        color: palette.seed.withValues(
+                          alpha: isPlaying ? 0.22 : 0.10,
+                        ),
+                        blurRadius: 12,
+                        spreadRadius: isPlaying ? 1 : 0,
+                      ),
+                    ],
                   ),
-                  icon: Icon(
-                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    size: iconSize,
+                  child: IconButton.filled(
+                    tooltip: isPlaying ? '暂停' : '播放',
+                    onPressed: () {
+                      if (isPlaying) {
+                        unawaited(engine.pause());
+                      } else {
+                        unawaited(engine.play());
+                      }
+                    },
+                    style: IconButton.styleFrom(
+                      fixedSize: Size.square(playSize),
+                      padding: EdgeInsets.zero,
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: heniReadableForegroundOn(palette.seed),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: Icon(
+                      isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      size: iconSize,
+                    ),
                   ),
                 ),
                 if (!tiny)
@@ -5941,7 +6505,7 @@ class _NowPlayingSummary extends StatelessWidget {
               : 284,
       child: StreamBuilder<bool>(
         stream: engine.playing,
-        initialData: false,
+        initialData: engine.currentPlaying,
         builder: (context, snapshot) {
           final isPlaying = snapshot.data ?? false;
 
@@ -5983,12 +6547,14 @@ class _NowPlayingSummary extends StatelessWidget {
                       AnimatedDefaultTextStyle(
                         duration: _hoverDuration,
                         style:
-                            theme.textTheme.labelMedium?.copyWith(
+                            theme.textTheme.labelSmall?.copyWith(
+                              fontSize: 9.6,
                               color: heniAccentOnGlass(
                                 palette.accent,
-                                alpha: isPlaying ? 0.88 : 0.7,
+                                alpha: isPlaying ? 0.92 : 0.62,
                               ),
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 2.2,
                             ) ??
                             const TextStyle(),
                         child: Text(
@@ -5997,14 +6563,16 @@ class _NowPlayingSummary extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: _Gap.xs + 1),
                       Text(
                         currentMedia?.title ?? '未播放',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleMedium?.copyWith(
-                          fontSize: layout.quiet ? 14.2 : 14.8,
-                          fontWeight: FontWeight.w700,
+                          fontSize: layout.quiet ? 15 : 16.4,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          height: 1.1,
                         ),
                       ),
                       if (layout.showNowPlayingDetails) ...[
@@ -6054,8 +6622,9 @@ class _NowPlayingArtwork extends StatefulWidget {
 }
 
 class _NowPlayingArtworkState extends State<_NowPlayingArtwork>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _breath;
+  late AnimationController _wave;
 
   @override
   void initState() {
@@ -6064,7 +6633,14 @@ class _NowPlayingArtworkState extends State<_NowPlayingArtwork>
       vsync: this,
       duration: const Duration(milliseconds: 2400),
     );
-    if (widget.isPlaying) _breath.repeat(reverse: true);
+    _wave = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    );
+    if (widget.isPlaying) {
+      _breath.repeat(reverse: true);
+      _wave.repeat();
+    }
   }
 
   @override
@@ -6072,15 +6648,18 @@ class _NowPlayingArtworkState extends State<_NowPlayingArtwork>
     super.didUpdateWidget(old);
     if (widget.isPlaying && !_breath.isAnimating) {
       _breath.repeat(reverse: true);
+      _wave.repeat();
     } else if (!widget.isPlaying && _breath.isAnimating) {
       _breath.stop();
       _breath.value = 0;
+      _wave.stop();
     }
   }
 
   @override
   void dispose() {
     _breath.dispose();
+    _wave.dispose();
     super.dispose();
   }
 
@@ -6128,6 +6707,26 @@ class _NowPlayingArtworkState extends State<_NowPlayingArtwork>
               ),
             ),
           ),
+          if (widget.hasMedia)
+            RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: _wave,
+                builder: (context, _) {
+                  return SizedBox(
+                    width: ringSize,
+                    height: ringSize,
+                    child: CustomPaint(
+                      painter: _SpectrumRingPainter(
+                        progress: _wave.value,
+                        playing: widget.isPlaying,
+                        seedColor: p.seed,
+                        accentColor: p.accent,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           widget.isVideo
               ? Container(
                 width: widget.size,
@@ -6213,6 +6812,73 @@ class _ArtworkRingPainter extends CustomPainter {
     return old.seedColor != seedColor ||
         old.accentColor != accentColor ||
         old.active != active;
+  }
+}
+
+/// Heni 的视觉签名：环绕封面的一圈圆形频谱，
+/// 播放时随一条环游的行波起伏，暂停时收成平静的细齿。
+class _SpectrumRingPainter extends CustomPainter {
+  const _SpectrumRingPainter({
+    required this.progress,
+    required this.playing,
+    required this.seedColor,
+    required this.accentColor,
+  });
+
+  final double progress;
+  final bool playing;
+  final Color seedColor;
+  final Color accentColor;
+
+  static const _bars = 56;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    // 把频谱齿放进封面边缘与外圈之间的窄带里，避免越出布局尺寸。
+    final baseRadius = size.width / 2 - 6.0;
+    final t = progress * 2 * math.pi;
+
+    for (var i = 0; i < _bars; i++) {
+      final frac = i / _bars;
+      final angle = frac * 2 * math.pi - math.pi / 2;
+
+      // 两条相位不同的正弦叠加，制造环游的“行波”律动。
+      final wave =
+          0.5 +
+          0.5 *
+              (0.6 * math.sin(frac * 2 * math.pi * 3 - t) +
+                  0.4 * math.sin(frac * 2 * math.pi * 5 + t * 1.3));
+      final amp = playing ? wave.clamp(0.0, 1.0) : 0.12;
+      final barLen = playing ? (1.0 + amp * 4.4) : 1.4;
+
+      final inner = baseRadius;
+      final outer = baseRadius + barLen;
+      final cosA = math.cos(angle);
+      final sinA = math.sin(angle);
+
+      final p1 = Offset(center.dx + cosA * inner, center.dy + sinA * inner);
+      final p2 = Offset(center.dx + cosA * outer, center.dy + sinA * outer);
+
+      final color =
+          Color.lerp(seedColor, accentColor, (math.sin(angle) + 1) / 2)!;
+      final paint =
+          Paint()
+            ..strokeCap = StrokeCap.round
+            ..strokeWidth = 1.7
+            ..color = color.withValues(
+              alpha: playing ? (0.30 + amp * 0.55) : 0.18,
+            );
+      canvas.drawLine(p1, p2, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpectrumRingPainter old) {
+    return old.progress != progress ||
+        old.playing != playing ||
+        old.seedColor != seedColor ||
+        old.accentColor != accentColor;
   }
 }
 
@@ -6536,6 +7202,10 @@ class _CurrentQueueButton extends StatelessWidget {
           style: IconButton.styleFrom(
             fixedSize: const Size.square(_regularIconButtonSize),
             padding: EdgeInsets.zero,
+            foregroundColor:
+                hasCurrent
+                    ? _stateIconOnGlass(context, active: true)
+                    : _secondaryGlassText(),
           ),
           icon: Stack(
             clipBehavior: Clip.none,
@@ -6607,6 +7277,7 @@ class _ExportActions extends StatelessWidget {
               style: IconButton.styleFrom(
                 fixedSize: const Size.square(_regularIconButtonSize),
                 padding: EdgeInsets.zero,
+                foregroundColor: _primaryGlassText(),
               ),
               icon: const Icon(Icons.stop_circle_outlined, size: 20),
             ),
@@ -6636,6 +7307,8 @@ class _ExportActions extends StatelessWidget {
       style: IconButton.styleFrom(
         fixedSize: const Size.square(_regularIconButtonSize),
         padding: EdgeInsets.zero,
+        foregroundColor: _secondaryGlassText(emphasis: 1.05),
+        disabledForegroundColor: _tertiaryGlassText(),
       ),
       icon: Icon(statusIcon, size: 20),
     );
@@ -6696,6 +7369,9 @@ class _VolumeMenuButton extends StatelessWidget {
                   controller.open();
                 }
               },
+              style: IconButton.styleFrom(
+                foregroundColor: _secondaryGlassText(emphasis: 1.05),
+              ),
               icon: Icon(icon),
             );
           },
@@ -7340,7 +8016,10 @@ class _PlaybackQueueRowState extends ConsumerState<_PlaybackQueueRow> {
                                         ref
                                             .read(playbackEngineProvider)
                                             .playing,
-                                    initialData: false,
+                                    initialData:
+                                        ref
+                                            .read(playbackEngineProvider)
+                                            .currentPlaying,
                                     builder: (context, snap) {
                                       return _NowPlayingWave(
                                         color: palette.seed,
@@ -8267,11 +8946,13 @@ class _PulseRingState extends State<_PulseRing>
 class _TransportControls extends StatelessWidget {
   const _TransportControls({
     required this.engine,
+    required this.palette,
     required this.onPreviousTrack,
     required this.onNextTrack,
   });
 
   final PlaybackEngine engine;
+  final HeniPalette palette;
   final VoidCallback onPreviousTrack;
   final VoidCallback onNextTrack;
 
@@ -8279,7 +8960,7 @@ class _TransportControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return StreamBuilder<bool>(
       stream: engine.playing,
-      initialData: false,
+      initialData: engine.currentPlaying,
       builder: (context, snapshot) {
         final playing = snapshot.data ?? false;
 
@@ -8304,10 +8985,12 @@ class _TransportControls extends StatelessWidget {
                     curve: Curves.easeOutCubic,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
+                      gradient: heniBrandGradient(palette),
                       boxShadow: [
                         BoxShadow(
-                          color: Theme.of(context).colorScheme.primary
-                              .withValues(alpha: playing ? 0.20 : 0.10),
+                          color: palette.seed.withValues(
+                            alpha: playing ? 0.24 : 0.12,
+                          ),
                           blurRadius: playing ? 18 : 10,
                           spreadRadius: playing ? 2 : 0,
                         ),
@@ -8324,9 +9007,8 @@ class _TransportControls extends StatelessWidget {
                       },
                       style: IconButton.styleFrom(
                         fixedSize: const Size.square(44),
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor:
-                            Theme.of(context).colorScheme.onPrimary,
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: heniReadableForegroundOn(palette.seed),
                       ),
                       iconSize: 22,
                       icon: AnimatedSwitcher(
@@ -8415,6 +9097,10 @@ class _PlaybackModeIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final active = mode != HeniPlaybackMode.sequence;
+    final foreground =
+        active
+            ? _stateIconOnGlass(context, active: true)
+            : _secondaryGlassText();
 
     return Tooltip(
       message: '播放模式：${mode.label}',
@@ -8441,6 +9127,7 @@ class _PlaybackModeIconButton extends StatelessWidget {
             fixedSize: Size.square(size),
             padding: EdgeInsets.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            foregroundColor: foreground,
           ),
           icon: AnimatedSwitcher(
             duration: const Duration(milliseconds: 160),
@@ -8590,6 +9277,8 @@ class _PaletteSwatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selectedMarkColor = heniReadableForegroundOn(palette.seed);
+
     return AnimatedContainer(
       duration: _hoverDuration,
       curve: _hoverCurve,
@@ -8599,7 +9288,10 @@ class _PaletteSwatch extends StatelessWidget {
         color: palette.seed,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: selected ? Colors.white : Colors.white.withValues(alpha: 0.24),
+          color:
+              selected
+                  ? selectedMarkColor.withValues(alpha: 0.92)
+                  : Colors.white.withValues(alpha: 0.24),
           width: selected ? 2.2 : 1,
         ),
         boxShadow: [
@@ -8619,10 +9311,10 @@ class _PaletteSwatch extends StatelessWidget {
           height: selected ? 7 : 0,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.92),
+            color: selectedMarkColor.withValues(alpha: 0.92),
             boxShadow: [
               BoxShadow(
-                color: Colors.white.withValues(alpha: 0.26),
+                color: selectedMarkColor.withValues(alpha: 0.22),
                 blurRadius: 6,
               ),
             ],

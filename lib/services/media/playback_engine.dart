@@ -8,6 +8,10 @@ abstract interface class PlaybackEngine {
   Stream<double> get volume;
   double get currentVolume;
 
+  /// 当前是否正在播放的同步快照，用于界面重建时给 [playing] 流提供
+  /// 正确的 initialData，避免重建后误显示为“未播放”。
+  bool get currentPlaying;
+
   Future<void> openItem(MediaItem item, {bool play});
   Future<void> openPath(String path, {bool play});
   Future<void> play();

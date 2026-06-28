@@ -19,6 +19,7 @@ class HeniLibraryConfig {
   const HeniLibraryConfig({
     this.libraryDirectories = const [],
     this.libraryFiles = const [],
+    this.mediaDurations = const {},
     this.playlists = const [],
     this.activePlaylistId,
     this.sceneryImagePaths = const [],
@@ -35,6 +36,7 @@ class HeniLibraryConfig {
     return HeniLibraryConfig(
       libraryDirectories: _stringList(json['libraryDirectories']),
       libraryFiles: _stringList(json['libraryFiles']),
+      mediaDurations: _durationMap(json['mediaDurations']),
       playlists: _objectList(
         json['playlists'],
       ).map(HeniPlaylistConfig.fromJson).toList(growable: false),
@@ -52,6 +54,7 @@ class HeniLibraryConfig {
 
   final List<String> libraryDirectories;
   final List<String> libraryFiles;
+  final Map<String, int> mediaDurations;
   final List<HeniPlaylistConfig> playlists;
   final String? activePlaylistId;
   final List<String> sceneryImagePaths;
@@ -77,6 +80,7 @@ class HeniLibraryConfig {
   bool get isEmpty {
     return libraryDirectories.isEmpty &&
         libraryFiles.isEmpty &&
+        mediaDurations.isEmpty &&
         playlists.isEmpty &&
         activePlaylistId == null &&
         sceneryImagePaths.isEmpty &&
@@ -91,6 +95,7 @@ class HeniLibraryConfig {
       'schemaVersion': 1,
       'libraryDirectories': libraryDirectories,
       'libraryFiles': libraryFiles,
+      'mediaDurations': mediaDurations,
       'playlists': playlists.map((playlist) => playlist.toJson()).toList(),
       'activePlaylistId': activePlaylistId,
       'sceneryImagePaths': sceneryImagePaths,
@@ -209,6 +214,19 @@ List<Map<String, Object?>> _objectList(Object? value) {
   ];
 }
 
+Map<String, int> _durationMap(Object? value) {
+  if (value is! Map) {
+    return const {};
+  }
+
+  return {
+    for (final entry in value.entries)
+      if (entry.key case final String path)
+        if (_int(entry.value) case final int milliseconds when milliseconds > 0)
+          path: milliseconds,
+  };
+}
+
 Map<String, Object?> _objectMap(Map<dynamic, dynamic> value) {
   return {
     for (final entry in value.entries)
@@ -228,6 +246,14 @@ double? _double(Object? value) {
   return switch (value) {
     final int number => number.toDouble(),
     final double number => number,
+    _ => null,
+  };
+}
+
+int? _int(Object? value) {
+  return switch (value) {
+    final int number => number,
+    final double number => number.round(),
     _ => null,
   };
 }

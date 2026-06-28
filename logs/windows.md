@@ -414,3 +414,35 @@ Current test count: 29 passing tests.
   sits more comfortably on the tile’s vertical middle.
 - Added a little more horizontal breathing room between the songs-table media
   icon cluster and the track title block.
+
+## 2026-05-24 - Modal Action Re-entry Guard
+
+- Added an app-level modal action guard so repeated clicks on `添加歌曲` no
+  longer open multiple add-from-library dialogs.
+- The same guard now protects other Windows modal/file-picker actions, including
+  adding files, importing folders, changing scenery images, exporting audio,
+  playlist edit flows, and the playback queue dialog.
+- File pickers that were missing `lockParentWindow` now set it, reducing stray
+  native picker behavior around the Heni window.
+
+## 2026-05-25 - Duration Metadata And Songs Panel Refinement
+
+- Windows library metadata now persists detected media durations in the local
+  Heni config and restores them into visible library/playlist rows.
+- Library import, folder scan, restore, and refresh now trigger background
+  duration inspection for missing durations, so unplayed songs can still gain
+  stable duration values.
+- Duration updates discovered during playback or background probing are written
+  back to the local config.
+- The right-side songs panel was tightened with lighter glass, smaller toolbar
+  spacing, a more compact table header, and denser song rows.
+
+## 2026-05-25 - White Theme Contrast And Quiet UI Direction
+
+- The Windows white palette now uses a soft sage accent instead of pure white,
+  improving filled-button and state-icon visibility while keeping the clean
+  white-theme feel.
+- Palette swatches and high-frequency controls now use explicit readable
+  foreground colors instead of relying on default icon contrast.
+- Added automated contrast coverage to prevent the white palette from regressing
+  to unreadable pure-white control states.

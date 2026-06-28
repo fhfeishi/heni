@@ -62,6 +62,27 @@ void main() {
         );
       }
     });
+
+    test(
+      'white palette uses a visible accent instead of pure white controls',
+      () {
+        final palette = HeniPalette.snow;
+        final theme = HeniTheme.dark(palette);
+
+        expect(
+          _contrastRatio(theme.colorScheme.primary, palette.surface),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(
+          _contrastRatio(
+            theme.colorScheme.onPrimary,
+            theme.colorScheme.primary,
+          ),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(theme.colorScheme.primary, isNot(equals(Colors.white)));
+      },
+    );
   });
 }
 

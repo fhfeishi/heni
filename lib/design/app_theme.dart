@@ -118,7 +118,7 @@ class HeniPalette {
     seed: Color(0xFFF4F1EA),
     surface: Color(0xFF151515),
     surfaceAlt: Color(0xFF292823),
-    accent: Color(0xFFFFFFFF),
+    accent: Color(0xFFB7C79C),
     glow: Color(0xFFF4F1EA),
   );
 

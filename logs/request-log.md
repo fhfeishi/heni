@@ -1878,3 +1878,117 @@ request that changes Heni.
   vertical centerline.
 - Added a small spacer between the songs-table lead cluster and the title block,
   which makes the icon/title relationship feel less cramped.
+
+## 2026-05-24 - Modal Action Re-entry Guard
+
+### User Request
+
+- Clicking `添加歌曲` repeatedly currently executes the action repeatedly and
+  can open several windows, which is unreasonable.
+
+### Understanding
+
+- This is a modal re-entry problem: actions that open dialogs or native file
+  pickers should be mutually exclusive while one is already active.
+- The fix should cover `添加歌曲` directly, and also protect nearby modal actions
+  such as adding files, importing folders, changing scenery images, exporting
+  audio, and playlist edit dialogs.
+
+### Should Do
+
+- Add a lightweight app-level modal action lock.
+- Wrap dialog/file-picker entry points so repeated clicks are ignored until the
+  active modal action finishes.
+- Keep the behavior simple and invisible to the user: no extra prompt, no
+  stacked windows.
+
+### Done
+
+- Added an `ActiveModalAction` notifier that tracks whether a modal/file-picker
+  action is currently active.
+- Wrapped `添加歌曲`, `添加文件`, `导入目录`, `更换背景`, `导出音频`, playlist creation,
+  rename, description, deletion, management, and playback queue dialogs with the
+  same modal guard.
+- Added `lockParentWindow: true` to the file pickers that were missing it, so
+  native picker behavior is better tied to the Heni window.
+
+## 2026-05-25 - Duration Metadata And Songs Panel Refinement
+
+### User Request
+
+- Re-examine Heni's local music-player UI from the appearance/design angle and
+  suggest how further beautification should proceed.
+- Fix the bug where playlist/library song durations default to `--:--`, reset
+  after refresh, and only become visible after a song has been played.
+- Redesign the second right-side panel, making it more compact and more
+  beautiful.
+
+### Understanding
+
+- Duration should behave as stable media metadata, not as a temporary playback
+  side effect.
+- The right-side songs panel was visually pleasant but still a bit tall and
+  padded; it can become more mature by being denser, quieter, and better aligned.
+- From an appearance standpoint, the next UI improvements should focus less on
+  adding decoration and more on material hierarchy, list rhythm, and visual
+  consistency across states.
+
+### Should Do
+
+- Persist detected media durations in the local library config.
+- Restore duration metadata into library and playlist items during app startup
+  and library refresh.
+- Background-probe missing durations after adding files or scanning folders, so
+  unplayed songs can still receive stable duration metadata.
+- Tighten the right songs panel: lighter glass, smaller header/tool area,
+  denser rows, and more restrained icon/title/path hierarchy.
+
+### Done
+
+- Added `mediaDurations` to the persisted Heni library config.
+- Merged known durations back into scanned/restored media items so refresh and
+  restart no longer discard duration metadata.
+- Added a background duration inspection flow for missing durations after import,
+  folder scan, restore, and refresh.
+- Persist duration updates when playback or background inspection discovers
+  them.
+- Added a regression test proving persisted media durations restore into the
+  visible library.
+- Redesigned the right-side songs list panel with lighter glass, tighter toolbar
+  spacing, a more compact table header, and slimmer song rows.
+
+## 2026-05-25 - White Theme Contrast And Quiet UI Direction
+
+### User Request
+
+- In the white appearance mode, some button icons/patterns are nearly invisible.
+- Adjust the color scheme to keep it beautiful while improving visibility.
+- Continue the design direction of reducing decoration, strengthening content
+  order, using theme color only for current/playback/selected states, and
+  keeping Heni quiet, transparent, and durable.
+
+### Understanding
+
+- The white palette used a nearly pure-white accent, which made several filled
+  or selected controls vulnerable to weak icon contrast.
+- The fix should not make the white theme harsh; it should keep the clean white
+  identity while giving interactive controls a readable accent color.
+- Ordinary controls should stay calm and glass-like; theme color should be
+  reserved for true state and emphasis.
+
+### Should Do
+
+- Replace the white theme's pure-white accent with a softer but visible accent.
+- Make selected palette dots and high-frequency player controls choose explicit
+  readable foreground colors instead of relying on defaults.
+- Add a regression test for white-theme control contrast.
+
+### Done
+
+- Updated the white palette accent from pure white to a soft sage tone, keeping
+  the white theme clean while making filled controls and icons readable.
+- Added shared foreground helpers for accent controls and state icons on glass.
+- Applied explicit foreground colors to palette swatches, playback mode,
+  current queue, export, volume, and key songs-panel icon buttons.
+- Added a theme test that prevents the white palette from regressing to pure
+  white controls with weak icon contrast.

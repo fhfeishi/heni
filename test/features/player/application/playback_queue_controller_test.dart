@@ -304,6 +304,42 @@ void main() {
         expect(state.currentItem?.duration, const Duration(seconds: 222));
       },
     );
+
+    test(
+      'restores persisted media durations into the visible library',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'heni-duration-restore-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final mediaFile = File(
+          '${directory.path}${Platform.pathSeparator}a.mp3',
+        );
+        await mediaFile.writeAsBytes(const []);
+
+        final engine = _FakePlaybackEngine();
+        final store =
+            _MemoryLibraryStore()
+              ..latest = HeniLibraryConfig(
+                libraryFiles: [mediaFile.path],
+                mediaDurations: {
+                  mediaFile.path:
+                      const Duration(minutes: 4, seconds: 8).inMilliseconds,
+                },
+              );
+        final container = _container(engine, store: store);
+        addTearDown(container.dispose);
+
+        container.read(playbackQueueControllerProvider.notifier);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        final state = container.read(playbackQueueControllerProvider);
+        expect(
+          state.library.items.single.duration,
+          const Duration(minutes: 4, seconds: 8),
+        );
+      },
+    );
   });
 }
 
@@ -340,6 +376,9 @@ class _FakePlaybackEngine implements PlaybackEngine {
 
   @override
   double get currentVolume => _volume;
+
+  @override
+  bool get currentPlaying => false;
 
   @override
   Stream<Duration> get duration => Stream.value(Duration.zero);
