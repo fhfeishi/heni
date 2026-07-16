@@ -478,3 +478,16 @@ Current test count: 29 passing tests.
   successfully.
 - `flutter test` remains blocked before suite loading by local Flutter listener
   timeouts on `127.0.0.1`; no test assertion was reached.
+
+## 2026-07-16 - DPI-Aware Minimum Size And Progress Resize Fix
+
+- Added `WM_GETMINMAXINFO` handling so the full Windows player cannot shrink
+  below a DPI-scaled `900 × 620` logical client area.
+- The bottom progress display is now a focused component with a narrow fallback
+  that preserves the seek track and suppresses time labels when they cannot fit.
+- Hover and drag math no longer divides by a zero-width track, and tooltip
+  positioning remains valid below 48 logical pixels.
+- Added a repeatable PowerShell runtime check that requests `220 × 300` and
+  verifies Windows clamps Heni to its minimum size.
+- On the current 200% DPI monitor, the verified minimum outer window is
+  `913 × 656`, with no progress/time overlap or Flutter overflow banners.

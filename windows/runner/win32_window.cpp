@@ -21,6 +21,8 @@ namespace {
 #endif
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
+constexpr int kMinimumLogicalClientWidth = 900;
+constexpr int kMinimumLogicalClientHeight = 620;
 
 /// Registry key for app theme preference.
 ///
@@ -318,6 +320,35 @@ Win32Window::MessageHandler(HWND hwnd,
       SetWindowPos(hwnd, nullptr, newRectSize->left, newRectSize->top, newWidth,
                    newHeight, SWP_NOZORDER | SWP_NOACTIVATE);
 
+      return 0;
+    }
+    case WM_GETMINMAXINFO: {
+      auto min_max_info = reinterpret_cast<MINMAXINFO*>(lparam);
+      const UINT dpi = GetDpiForWindow(hwnd);
+      const double scale_factor = dpi / 96.0;
+      RECT minimum_client_rect = {
+          0,
+          0,
+          Scale(kMinimumLogicalClientWidth, scale_factor),
+          Scale(kMinimumLogicalClientHeight, scale_factor),
+      };
+      const DWORD style = static_cast<DWORD>(
+          GetWindowLongPtr(hwnd, GWL_STYLE));
+      const DWORD extended_style = static_cast<DWORD>(
+          GetWindowLongPtr(hwnd, GWL_EXSTYLE));
+
+      if (AdjustWindowRectExForDpi(&minimum_client_rect, style, FALSE,
+                                   extended_style, dpi)) {
+        min_max_info->ptMinTrackSize.x =
+            minimum_client_rect.right - minimum_client_rect.left;
+        min_max_info->ptMinTrackSize.y =
+            minimum_client_rect.bottom - minimum_client_rect.top;
+      } else {
+        min_max_info->ptMinTrackSize.x =
+            Scale(kMinimumLogicalClientWidth, scale_factor);
+        min_max_info->ptMinTrackSize.y =
+            Scale(kMinimumLogicalClientHeight, scale_factor);
+      }
       return 0;
     }
     case WM_SIZE: {

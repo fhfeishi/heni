@@ -2082,3 +2082,38 @@ request that changes Heni.
   executable successfully.
 - The full Flutter test suite could not load because every test runner listener
   connection to local `127.0.0.1` timed out before any test case executed.
+
+## 2026-07-16 - Progress Resize Stability
+
+### User Request
+
+- Fix the bottom song progress display bug that appears while resizing the
+  player horizontally.
+
+### Root Cause
+
+- The approved full-player minimum size had not been implemented in the Win32
+  runner, so Windows allowed the full interface to shrink to arbitrary widths.
+- At extreme widths the full shell produced multiple `RenderFlex overflow`
+  errors and the progress component replaced the seek track with a combined
+  time label.
+- The seek tooltip also assumed a track width of at least 48 logical pixels.
+
+### Done
+
+- Added DPI-aware `WM_GETMINMAXINFO` handling for a minimum full-player client
+  area of `900 × 620` logical pixels.
+- Extracted the progress presentation into a focused, testable widget.
+- Narrow progress layouts now always retain the interactive seek track and hide
+  time labels that cannot fit instead of replacing the track with text.
+- Hardened drag, hover, and tooltip calculations for zero-width and sub-48-pixel
+  tracks.
+- Added a narrow-width Flutter widget regression test and a Windows runtime
+  minimum-size verification script.
+- Verified the native test fails at `220 × 300` before the fix and reports a
+  clamped `913 × 656` window after the fix on the current 200% DPI display.
+- Screenshot QA at the minimum size shows separated time labels and seek track
+  with no overflow banners.
+- `flutter analyze` and the Windows Debug build pass. Flutter widget test
+  execution remains blocked before assertions by the existing local
+  `127.0.0.1` listener timeout.
