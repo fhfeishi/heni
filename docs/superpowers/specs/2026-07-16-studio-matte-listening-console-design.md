@@ -265,4 +265,3 @@ and existing playback state into these components.
 - Queue locate opens centered on the current item.
 - Lyrics never load or appear.
 - User-owned running Release processes are not terminated during verification.
-
