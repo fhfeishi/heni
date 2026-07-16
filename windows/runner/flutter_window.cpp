@@ -1,5 +1,6 @@
 #include "flutter_window.h"
 
+#include <flutter/standard_method_codec.h>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -25,6 +26,7 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  RegisterWindowChannel();
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -40,6 +42,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  window_channel_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -51,6 +54,10 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_SIZE) {
+    NotifyMaximizedChanged(hwnd);
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =
@@ -68,4 +75,67 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+}
+
+void FlutterWindow::RegisterWindowChannel() {
+  window_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "heni/window",
+          &flutter::StandardMethodCodec::GetInstance());
+  window_channel_->SetMethodCallHandler(
+      [this](
+          const flutter::MethodCall<flutter::EncodableValue>& call,
+          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+              result) {
+        const auto& method = call.method_name();
+        const HWND window = GetHandle();
+        if (window == nullptr) {
+          result->Error("window-unavailable", "The Heni window is unavailable.");
+          return;
+        }
+
+        if (method == "minimize") {
+          ShowWindow(window, SW_MINIMIZE);
+          result->Success();
+          return;
+        }
+        if (method == "toggleMaximize") {
+          ShowWindow(window, IsZoomed(window) ? SW_RESTORE : SW_MAXIMIZE);
+          result->Success();
+          return;
+        }
+        if (method == "close") {
+          PostMessage(window, WM_CLOSE, 0, 0);
+          result->Success();
+          return;
+        }
+        if (method == "beginDrag") {
+          ReleaseCapture();
+          SendMessage(window, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+          result->Success();
+          return;
+        }
+        if (method == "isMaximized") {
+          result->Success(
+              flutter::EncodableValue(IsZoomed(window) != FALSE));
+          return;
+        }
+
+        result->NotImplemented();
+      });
+}
+
+void FlutterWindow::NotifyMaximizedChanged(HWND window) {
+  if (!window_channel_ || window == nullptr || IsIconic(window)) {
+    return;
+  }
+
+  const bool maximized = IsZoomed(window) != FALSE;
+  if (maximized == last_maximized_) {
+    return;
+  }
+  last_maximized_ = maximized;
+  window_channel_->InvokeMethod(
+      "maximizedChanged",
+      std::make_unique<flutter::EncodableValue>(maximized));
 }

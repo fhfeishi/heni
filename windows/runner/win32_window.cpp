@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <windowsx.h>
 
 #include "resource.h"
 
@@ -23,6 +24,8 @@ namespace {
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 constexpr int kMinimumLogicalClientWidth = 900;
 constexpr int kMinimumLogicalClientHeight = 620;
+constexpr int kResizeBorderLogical = 8;
+constexpr DWORD kHeniWindowStyle = WS_OVERLAPPEDWINDOW & ~WS_CAPTION;
 
 /// Registry key for app theme preference.
 ///
@@ -260,7 +263,7 @@ bool Win32Window::Create(const std::wstring& title,
   }
 
   HWND window = CreateWindow(
-      window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
+      window_class, title.c_str(), kHeniWindowStyle,
       left, top, width, height,
       nullptr, nullptr, GetModuleHandle(nullptr), this);
 
@@ -350,6 +353,54 @@ Win32Window::MessageHandler(HWND hwnd,
             Scale(kMinimumLogicalClientHeight, scale_factor);
       }
       return 0;
+    }
+    case WM_NCHITTEST: {
+      if (IsZoomed(hwnd)) {
+        return HTCLIENT;
+      }
+
+      RECT window_rect;
+      if (!GetWindowRect(hwnd, &window_rect)) {
+        return HTCLIENT;
+      }
+
+      const UINT dpi = GetDpiForWindow(hwnd);
+      const int border =
+          Scale(kResizeBorderLogical, static_cast<double>(dpi) / 96.0);
+      const int x = GET_X_LPARAM(lparam);
+      const int y = GET_Y_LPARAM(lparam);
+      const bool left = x >= window_rect.left && x < window_rect.left + border;
+      const bool right =
+          x < window_rect.right && x >= window_rect.right - border;
+      const bool top = y >= window_rect.top && y < window_rect.top + border;
+      const bool bottom =
+          y < window_rect.bottom && y >= window_rect.bottom - border;
+
+      if (top && left) {
+        return HTTOPLEFT;
+      }
+      if (top && right) {
+        return HTTOPRIGHT;
+      }
+      if (bottom && left) {
+        return HTBOTTOMLEFT;
+      }
+      if (bottom && right) {
+        return HTBOTTOMRIGHT;
+      }
+      if (left) {
+        return HTLEFT;
+      }
+      if (right) {
+        return HTRIGHT;
+      }
+      if (top) {
+        return HTTOP;
+      }
+      if (bottom) {
+        return HTBOTTOM;
+      }
+      return HTCLIENT;
     }
     case WM_SIZE: {
       SaveWindowState(hwnd);

@@ -26,6 +26,7 @@ import 'adaptive_sidebar.dart';
 import 'playback_queue_location.dart';
 import 'player_progress.dart';
 import 'player_responsive_layout.dart';
+import 'player_window_chrome.dart';
 
 const _hoverDuration = Duration(milliseconds: 220);
 const _hoverCurve = Curves.easeOutCubic;
@@ -1731,7 +1732,9 @@ class _TopNavigation extends ConsumerWidget {
       emphasis: 0.5,
       child: Row(
         children: [
-          _TopBrand(palette: palette, layout: layout),
+          HeniWindowDragRegion(
+            child: _TopBrand(palette: palette, layout: layout),
+          ),
           Expanded(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: layout.narrow ? 8 : 18),
@@ -1741,6 +1744,14 @@ class _TopNavigation extends ConsumerWidget {
           _CompactPaletteButton(active: palette),
           SizedBox(width: layout.quiet ? 6 : 8),
           _SettingsMenu(queue: queue),
+          SizedBox(width: layout.quiet ? 6 : 8),
+          Container(
+            width: 1,
+            height: 24,
+            color: palette.seed.withValues(alpha: 0.14),
+          ),
+          SizedBox(width: layout.quiet ? 4 : 6),
+          HeniWindowControls(palette: palette),
         ],
       ),
     );
