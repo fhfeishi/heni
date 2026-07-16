@@ -446,3 +446,35 @@ Current test count: 29 passing tests.
   foreground colors instead of relying on default icon contrast.
 - Added automated contrast coverage to prevent the white palette from regressing
   to unreadable pure-white control states.
+
+## 2026-07-16 - Playback Quality And Desktop Shell Overhaul
+
+- Audited the Windows playback path and confirmed that local media is opened
+  directly by `media_kit`; FFmpeg remains limited to inspection/export work.
+- Made the neutral player configuration explicit and kept pitch manipulation
+  and startup mute disabled.
+- Removed playback-position-driven full-window background rebuilds and reduced
+  full-screen blur, glow, hover movement, and decorative animation load.
+- Added visible codec, bitrate, sample-rate, lossless, and low-bitrate source
+  hints so web-downloaded MP4/AAC quality is easier to identify.
+- Rebuilt the Windows shell with a flatter header, responsive icon rail, quieter
+  playlist workspace, denser song rows, and a fixed bottom playback dock.
+- Performed DPI-aware screenshot QA at full desktop and compact window sizes;
+  the sweep caught and corrected an 8-pixel bottom-player overflow.
+
+## 2026-07-16 - Playback Queue Locator And Utility Cleanup
+
+- The Windows playback queue now centers the current track automatically when
+  opened and exposes a dedicated `定位当前歌曲` button beside search.
+- The locator handles long lazy lists with an estimated first scroll followed
+  by exact row centering once the current row has been built.
+- An active queue search is cleared only when it prevents the current track from
+  appearing.
+- Removed the bottom-player FLAC/audio export action and its full application and
+  FFmpeg export path; FLAC and Opus files remain supported for normal playback.
+- Confirmed the redesigned bottom utility group now contains queue, playback
+  mode, and volume only.
+- `flutter analyze` completed with no issues and the Windows Debug target built
+  successfully.
+- `flutter test` remains blocked before suite loading by local Flutter listener
+  timeouts on `127.0.0.1`; no test assertion was reached.

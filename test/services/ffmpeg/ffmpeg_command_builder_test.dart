@@ -20,30 +20,5 @@ void main() {
       expect(args, containsAllInOrder(['-c', 'copy']));
       expect(args.last, r'D:\media\clip.mp4');
     });
-
-    test('builds an Opus audio extraction command', () {
-      final args = FfmpegCommandBuilder.extractAudio(
-        const FfmpegAudioExtractRequest(
-          inputPath: 'input.mkv',
-          outputPath: 'voice.opus',
-          codec: AudioOutputCodec.opus,
-        ),
-      );
-
-      expect(args, [
-        '-hide_banner',
-        '-n',
-        '-i',
-        'input.mkv',
-        '-map',
-        '0:a:0',
-        '-vn',
-        '-c:a',
-        'libopus',
-        '-b:a',
-        '128k',
-        'voice.opus',
-      ]);
-    });
   });
 }

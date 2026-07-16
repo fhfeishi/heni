@@ -5,8 +5,17 @@ import 'package:media_kit/media_kit.dart';
 import '../../domain/media/media_item.dart';
 import 'playback_engine.dart';
 
+const heniPlayerConfiguration = PlayerConfiguration(
+  title: 'Heni',
+  osc: false,
+  pitch: false,
+  muted: false,
+  vo: 'null',
+);
+
 class MediaKitPlaybackEngine implements PlaybackEngine {
-  MediaKitPlaybackEngine({Player? player}) : _player = player ?? Player() {
+  MediaKitPlaybackEngine({Player? player})
+    : _player = player ?? Player(configuration: heniPlayerConfiguration) {
     _currentVolume = _player.state.volume.clamp(0, 100).toDouble();
     _volumeSubscription = _player.stream.volume.listen((volume) {
       _currentVolume = volume.clamp(0, 100).toDouble();

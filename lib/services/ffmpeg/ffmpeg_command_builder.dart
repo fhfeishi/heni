@@ -16,9 +16,9 @@ class FfmpegTrimRequest {
     this.accurateSeek = false,
     this.overwrite = false,
   }) : assert(
-          start != null || end != null,
-          'A trim request needs at least a start or end.',
-        );
+         start != null || end != null,
+         'A trim request needs at least a start or end.',
+       );
 
   final String inputPath;
   final String outputPath;
@@ -32,26 +32,6 @@ class FfmpegTrimRequest {
   /// still constrained by packet and keyframe boundaries.
   final bool accurateSeek;
   final bool overwrite;
-}
-
-class FfmpegAudioExtractRequest {
-  const FfmpegAudioExtractRequest({
-    required this.inputPath,
-    required this.outputPath,
-    this.codec = AudioOutputCodec.flac,
-    this.overwrite = false,
-  });
-
-  final String inputPath;
-  final String outputPath;
-  final AudioOutputCodec codec;
-  final bool overwrite;
-}
-
-enum AudioOutputCodec {
-  flac,
-  opus,
-  wav,
 }
 
 class FfmpegCommandBuilder {
@@ -103,35 +83,20 @@ class FfmpegCommandBuilder {
     return args;
   }
 
-  static List<String> extractAudio(FfmpegAudioExtractRequest request) {
-    return [
-      '-hide_banner',
-      if (request.overwrite) '-y' else '-n',
-      '-i',
-      request.inputPath,
-      '-map',
-      '0:a:0',
-      '-vn',
-      ...switch (request.codec) {
-        AudioOutputCodec.flac => ['-c:a', 'flac'],
-        AudioOutputCodec.opus => ['-c:a', 'libopus', '-b:a', '128k'],
-        AudioOutputCodec.wav => ['-c:a', 'pcm_s16le'],
-      },
-      request.outputPath,
-    ];
-  }
-
   static String _formatTimestamp(Duration duration) {
     final totalMicroseconds = duration.inMicroseconds;
     final sign = totalMicroseconds < 0 ? '-' : '';
     final absolute = totalMicroseconds.abs();
     final hours = absolute ~/ Duration.microsecondsPerHour;
     final minutes =
-        (absolute % Duration.microsecondsPerHour) ~/ Duration.microsecondsPerMinute;
+        (absolute % Duration.microsecondsPerHour) ~/
+        Duration.microsecondsPerMinute;
     final seconds =
-        (absolute % Duration.microsecondsPerMinute) ~/ Duration.microsecondsPerSecond;
+        (absolute % Duration.microsecondsPerMinute) ~/
+        Duration.microsecondsPerSecond;
     final milliseconds =
-        (absolute % Duration.microsecondsPerSecond) ~/ Duration.microsecondsPerMillisecond;
+        (absolute % Duration.microsecondsPerSecond) ~/
+        Duration.microsecondsPerMillisecond;
 
     String twoDigits(int value) => value.toString().padLeft(2, '0');
     String threeDigits(int value) => value.toString().padLeft(3, '0');

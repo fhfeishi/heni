@@ -19,9 +19,9 @@ import '../../../domain/playback/playback_mode.dart';
 import '../../../services/media/playback_engine.dart';
 import '../../../services/media/playback_providers.dart';
 import '../../scenery/presentation/scenery_stage.dart';
-import '../application/audio_export_controller.dart';
 import '../application/playback_queue_controller.dart';
 import '../application/player_state.dart';
+import 'playback_queue_location.dart';
 
 const _hoverDuration = Duration(milliseconds: 220);
 const _hoverCurve = Curves.easeOutCubic;
@@ -115,13 +115,16 @@ class _LibraryTableColumns {
 
 Color _shellGlassFill(HeniPalette palette, {double emphasis = 1}) {
   return Color.alphaBlend(
-    palette.surfaceAlt.withValues(alpha: 0.44 + 0.035 * emphasis),
-    palette.surface,
+    Colors.white.withValues(alpha: 0.022 + 0.012 * emphasis),
+    Color.lerp(palette.surface, const Color(0xFF090B0F), 0.34)!,
   );
 }
 
 Color _shellGlassBorder(HeniPalette palette, {double emphasis = 1}) {
-  return palette.seed.withValues(alpha: 0.075 + 0.014 * emphasis);
+  return Color.alphaBlend(
+    palette.seed.withValues(alpha: 0.035 + 0.008 * emphasis),
+    Colors.white.withValues(alpha: 0.045),
+  );
 }
 
 Color _primaryGlassText({double emphasis = 1}) {
@@ -169,9 +172,11 @@ LinearGradient heniBrandGradient(
     end: end,
     colors: [
       palette.seed.withValues(alpha: opacity),
-      Color.lerp(palette.seed, palette.accent, 0.85)!.withValues(
-        alpha: opacity,
-      ),
+      Color.lerp(
+        palette.seed,
+        palette.accent,
+        0.85,
+      )!.withValues(alpha: opacity),
     ],
   );
 }
@@ -323,10 +328,7 @@ class _ToastBubble extends StatelessWidget {
                 ),
               ],
             ),
-            border: Border.all(
-              color: accent.withValues(alpha: 0.30),
-              width: 1,
-            ),
+            border: Border.all(color: accent.withValues(alpha: 0.30), width: 1),
             boxShadow: [
               BoxShadow(
                 color: palette.seed.withValues(alpha: 0.28),
@@ -439,40 +441,54 @@ enum _SongsSortMode {
 }
 
 class _ShellLayout {
-  const _ShellLayout({required this.compact, required this.quiet});
+  const _ShellLayout({
+    required this.compact,
+    required this.quiet,
+    required this.narrow,
+  });
 
   factory _ShellLayout.fromConstraints(BoxConstraints constraints) {
     final width = constraints.maxWidth;
     final height = constraints.maxHeight;
-    final compact = width < 1480 || height < 920;
-    final quiet = width < 1260 || height < 820;
-    return _ShellLayout(compact: compact, quiet: quiet);
+    final compact = width < 1360 || height < 860;
+    final quiet = width < 1120 || height < 740;
+    final narrow = width < 900 || height < 620;
+    return _ShellLayout(compact: compact, quiet: quiet, narrow: narrow);
   }
 
   final bool compact;
   final bool quiet;
+  final bool narrow;
 
   double get topHeight =>
-      quiet
-          ? 54
-          : compact
+      narrow
           ? 58
-          : 60;
+          : quiet
+          ? 62
+          : 66;
   double get bottomHeight =>
-      quiet
-          ? 92
+      narrow
+          ? 68
+          : quiet
+          ? 76
           : compact
-          ? 98
-          : 104;
+          ? 84
+          : 88;
   double get sidebarWidth =>
       quiet
-          ? 182
+          ? 58
           : compact
-          ? 194
-          : 206;
-  double get sidebarPadding => quiet ? 10 : 12;
-  double get topHorizontalMargin => quiet ? 12 : 14;
-  double get contentGap => quiet ? 10 : 14;
+          ? 214
+          : 232;
+  double get sidebarPadding => narrow ? 8 : 12;
+  double get topHorizontalMargin => narrow ? 8 : 12;
+  double get contentGap => narrow ? 8 : 12;
+  double get bottomDockExtent =>
+      narrow
+          ? 84
+          : quiet
+          ? 90
+          : bottomHeight + 12;
   bool get showSidebarStatus => !quiet;
   bool get useDenseHeader => compact;
   bool get showSceneryOrb => !quiet;
@@ -533,60 +549,62 @@ class _GlassPanelState extends State<_GlassPanel> {
 
     final shadows = <BoxShadow>[
       BoxShadow(
-        color: Colors.black.withValues(alpha: 0.16),
-        blurRadius: 24,
-        offset: const Offset(0, 12),
+        color: Colors.black.withValues(alpha: 0.12),
+        blurRadius: 18,
+        offset: const Offset(0, 8),
       ),
       if (_hover && accent != null)
         BoxShadow(
-          color: accent.seed.withValues(alpha: 0.10),
-          blurRadius: 24,
-          spreadRadius: -8,
-          offset: const Offset(0, 10),
+          color: accent.seed.withValues(alpha: 0.055),
+          blurRadius: 18,
+          spreadRadius: -10,
+          offset: const Offset(0, 8),
         ),
     ];
 
-    Widget core = AnimatedScale(
-      duration: _hoverDuration,
-      curve: _hoverCurve,
-      scale: _hover && accent != null ? 1.002 : 1.0,
-      child: AnimatedSlide(
-        duration: _hoverDuration,
-        curve: _hoverCurve,
-        offset:
-            _hover && accent != null ? const Offset(0, -0.002) : Offset.zero,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(widget.radius),
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 26, sigmaY: 26),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              decoration: BoxDecoration(
-                color: resolvedFill,
-                borderRadius: BorderRadius.circular(widget.radius),
-                border: Border.all(color: borderCol),
-                boxShadow: shadows,
-              ),
-              child: Stack(
-                children: [
-                  if (widget.auroraPalette != null)
-                    Positioned(
-                      left: 14,
-                      right: 14,
-                      top: 0,
-                      height: 1,
-                      child: IgnorePointer(
-                        child: _AuroraBar(palette: widget.auroraPalette!),
+    final core = ClipRRect(
+      borderRadius: BorderRadius.circular(widget.radius),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color: resolvedFill,
+            borderRadius: BorderRadius.circular(widget.radius),
+            border: Border.all(color: borderCol),
+            boxShadow: shadows,
+          ),
+          child: Stack(
+            children: [
+              if (widget.auroraPalette != null)
+                Positioned(
+                  left: 18,
+                  right: 18,
+                  top: 0,
+                  height: 1,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            widget.auroraPalette!.seed.withValues(alpha: 0.24),
+                            widget.auroraPalette!.accent.withValues(
+                              alpha: 0.20,
+                            ),
+                            Colors.transparent,
+                          ],
+                        ),
                       ),
                     ),
-                  Padding(
-                    padding: widget.padding ?? EdgeInsets.zero,
-                    child: widget.child,
                   ),
-                ],
+                ),
+              Padding(
+                padding: widget.padding ?? EdgeInsets.zero,
+                child: widget.child,
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -718,29 +736,17 @@ class _ShellBand extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: margin,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0.992, end: 1),
-        duration: const Duration(milliseconds: 760),
-        curve: Curves.easeOutCubic,
-        builder: (context, value, _) {
-          return Transform.translate(
-            offset: Offset(0, (1 - value) * 14 * emphasis),
-            child: AnimatedContainer(
-              duration: _contentSwitchDuration,
-              curve: _hoverCurve,
-              height: height,
-              child: _GlassPanel(
-                radius: 26,
-                fillColor: _shellGlassFill(palette, emphasis: emphasis),
-                borderColor: _shellGlassBorder(palette, emphasis: emphasis),
-                auroraPalette: palette,
-                hoverAccentPalette: palette,
-                padding: padding,
-                child: child,
-              ),
-            ),
-          );
-        },
+      child: AnimatedContainer(
+        duration: _contentSwitchDuration,
+        curve: _hoverCurve,
+        height: height,
+        child: _GlassPanel(
+          radius: 18,
+          fillColor: _shellGlassFill(palette, emphasis: emphasis),
+          borderColor: _shellGlassBorder(palette, emphasis: emphasis),
+          padding: padding,
+          child: child,
+        ),
       ),
     );
   }
@@ -890,69 +896,35 @@ class _AmbientBackdrop extends ConsumerStatefulWidget {
   ConsumerState<_AmbientBackdrop> createState() => _AmbientBackdropState();
 }
 
-class _AmbientBackdropState extends ConsumerState<_AmbientBackdrop>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
+class _AmbientBackdropState extends ConsumerState<_AmbientBackdrop> {
   bool _playing = false;
   StreamSubscription<bool>? _sub;
-  StreamSubscription<Duration>? _posSub;
-  Duration _lastPos = Duration.zero;
-  double _pulse = 0;
-  DateTime _lastTick = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 24),
-    )..repeat();
-
     final engine = ref.read(playbackEngineProvider);
     _playing = engine.currentPlaying;
-    _ctrl.duration = Duration(seconds: _playing ? 14 : 24);
     _sub = engine.playing.listen((v) {
       if (!mounted) return;
-      setState(() {
-        _playing = v;
-        _ctrl.duration = Duration(seconds: v ? 14 : 24);
-        _ctrl.repeat();
-      });
-    });
-    _posSub = engine.position.listen((p) {
-      if (!mounted) return;
-      final now = DateTime.now();
-      final dt = now.difference(_lastTick).inMilliseconds;
-      _lastTick = now;
-      if (_playing && dt > 0 && dt < 800) {
-        final delta = (p - _lastPos).inMilliseconds.abs();
-        if (delta > 0 && delta < 800) {
-          setState(() {
-            _pulse = (_pulse * 0.78 + (delta / 250).clamp(0, 1)) * 0.95;
-            if (_pulse > 1) _pulse = 1;
-          });
-        }
-      }
-      _lastPos = p;
+      setState(() => _playing = v);
     });
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
     unawaited(_sub?.cancel());
-    unawaited(_posSub?.cancel());
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = widget.palette;
-    final intensity = _playing ? (0.7 + _pulse * 0.3) : 0.55;
+    final intensity = _playing ? 1.0 : 0.68;
 
     return IgnorePointer(
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 520),
+        duration: const Duration(milliseconds: 700),
         curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
           color: palette.surface,
@@ -961,76 +933,37 @@ class _AmbientBackdropState extends ConsumerState<_AmbientBackdrop>
             end: Alignment.bottomRight,
             colors: [
               Color.alphaBlend(
-                palette.seed.withValues(alpha: 0.10 * intensity),
+                palette.seed.withValues(alpha: 0.075 * intensity),
                 palette.surface,
               ),
               palette.surface,
               Color.alphaBlend(
-                palette.accent.withValues(alpha: 0.06 * intensity),
+                palette.accent.withValues(alpha: 0.045 * intensity),
                 palette.surface,
               ),
             ],
-            stops: const [0.0, 0.55, 1.0],
+            stops: const [0.0, 0.62, 1.0],
           ),
         ),
-        child: AnimatedBuilder(
-          animation: _ctrl,
-          builder: (context, _) {
-            final t = _ctrl.value * 2 * math.pi;
-            final amp = _playing ? 1.0 : 0.6;
-            final dx1 = math.sin(t) * 60 * amp;
-            final dy1 = math.cos(t * 0.7) * 40 * amp;
-            final dx2 = math.sin(t * 0.6 + 1.3) * 80 * amp;
-            final dy2 = math.cos(t * 0.9 + 0.4) * 50 * amp;
-            final dx3 = math.sin(t * 1.2 + 2.1) * 70 * amp;
-            final dy3 = math.cos(t * 1.0 + 0.8) * 45 * amp;
-            final scale1 = 1.0 + math.sin(t * 0.5) * 0.08 + _pulse * 0.05;
-            final scale2 = 1.0 + math.cos(t * 0.4) * 0.06 + _pulse * 0.04;
-            final scale3 = 1.0 + math.sin(t * 0.8) * 0.10;
-
-            return Stack(
-              children: [
-                Positioned(
-                  top: -140 + dy1,
-                  left: -110 + dx1,
-                  child: Transform.scale(
-                    scale: scale1,
-                    child: _GlowOrb(
-                      size: 420,
-                      color: palette.seed.withValues(alpha: 0.18 * intensity),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  bottom: -200 + dy2,
-                  right: -120 + dx2,
-                  child: Transform.scale(
-                    scale: scale2,
-                    child: _GlowOrb(
-                      size: 460,
-                      color: palette.accent.withValues(alpha: 0.10 * intensity),
-                    ),
-                  ),
-                ),
-                if (_playing)
-                  Positioned(
-                    top: 240 + dy3,
-                    right: 120 + dx3,
-                    child: Transform.scale(
-                      scale: scale3,
-                      child: _GlowOrb(
-                        size: 280,
-                        color: Color.lerp(
-                          palette.seed,
-                          palette.accent,
-                          0.5,
-                        )!.withValues(alpha: 0.08 + _pulse * 0.06),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
+        child: Stack(
+          children: [
+            Positioned(
+              top: -170,
+              left: -120,
+              child: _GlowOrb(
+                size: 430,
+                color: palette.seed.withValues(alpha: 0.12 * intensity),
+              ),
+            ),
+            Positioned(
+              bottom: -220,
+              right: -130,
+              child: _GlowOrb(
+                size: 500,
+                color: palette.accent.withValues(alpha: 0.07 * intensity),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1046,36 +979,23 @@ class _CornerGlow extends ConsumerStatefulWidget {
   ConsumerState<_CornerGlow> createState() => _CornerGlowState();
 }
 
-class _CornerGlowState extends ConsumerState<_CornerGlow>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
+class _CornerGlowState extends ConsumerState<_CornerGlow> {
   bool _playing = false;
   StreamSubscription<bool>? _sub;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 3200),
-    )..repeat(reverse: true);
-
     final engine = ref.read(playbackEngineProvider);
     _playing = engine.currentPlaying;
-    _ctrl.duration = Duration(milliseconds: _playing ? 1800 : 3200);
     _sub = engine.playing.listen((v) {
       if (!mounted) return;
-      setState(() {
-        _playing = v;
-        _ctrl.duration = Duration(milliseconds: v ? 1800 : 3200);
-        _ctrl.repeat(reverse: true);
-      });
+      setState(() => _playing = v);
     });
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
     unawaited(_sub?.cancel());
     super.dispose();
   }
@@ -1083,73 +1003,30 @@ class _CornerGlowState extends ConsumerState<_CornerGlow>
   @override
   Widget build(BuildContext context) {
     final palette = widget.palette;
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, _) {
-        final breathe = _ctrl.value;
-        final amp = _playing ? 1.0 : 0.4;
-        final scale = 1.0 + 0.05 * breathe * amp;
-        final alphaBoost = _playing ? 0.4 * breathe : 0.15 * breathe;
-
-        return Stack(
-          children: [
-            Positioned(
-              left: -120,
-              top: -120,
-              child: Transform.scale(
-                scale: scale,
-                child: _CornerOrb(
-                  size: 320,
-                  color: palette.seed.withValues(
-                    alpha: 0.18 + alphaBoost * 0.08,
-                  ),
-                ),
-              ),
+    final playBoost = _playing ? 1.0 : 0.66;
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 600),
+      opacity: playBoost,
+      child: Stack(
+        children: [
+          Positioned(
+            left: -150,
+            top: -150,
+            child: _CornerOrb(
+              size: 340,
+              color: palette.seed.withValues(alpha: 0.10),
             ),
-            Positioned(
-              right: -130,
-              top: -100,
-              child: Transform.scale(
-                scale: 1.0 + 0.04 * (1 - breathe) * amp,
-                child: _CornerOrb(
-                  size: 260,
-                  color: palette.accent.withValues(
-                    alpha: 0.10 + alphaBoost * 0.06,
-                  ),
-                ),
-              ),
+          ),
+          Positioned(
+            right: -150,
+            bottom: -150,
+            child: _CornerOrb(
+              size: 320,
+              color: palette.accent.withValues(alpha: 0.055),
             ),
-            Positioned(
-              left: -100,
-              bottom: -120,
-              child: Transform.scale(
-                scale: 1.0 + 0.045 * breathe * amp,
-                child: _CornerOrb(
-                  size: 300,
-                  color: Color.lerp(
-                    palette.seed,
-                    palette.accent,
-                    0.6,
-                  )!.withValues(alpha: 0.12 + alphaBoost * 0.08),
-                ),
-              ),
-            ),
-            Positioned(
-              right: -90,
-              bottom: -100,
-              child: Transform.scale(
-                scale: 1.0 + 0.035 * (1 - breathe) * amp,
-                child: _CornerOrb(
-                  size: 220,
-                  color: palette.accent.withValues(
-                    alpha: 0.08 + alphaBoost * 0.05,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1218,7 +1095,6 @@ class PlayerScreen extends ConsumerWidget {
     final currentMedia = queue.currentItem ?? ref.watch(currentMediaProvider);
     final mediaProbe = ref.watch(currentMediaProbeProvider);
     final lyrics = ref.watch(currentLyricsProvider);
-    final audioExport = ref.watch(audioExportControllerProvider);
     final engine = ref.watch(playbackEngineProvider);
     final videoController = ref.watch(videoControllerProvider);
     final focusMode = ref.watch(focusModeProvider);
@@ -1230,79 +1106,163 @@ class PlayerScreen extends ConsumerWidget {
           Positioned.fill(
             child: IgnorePointer(child: _CornerGlow(palette: palette)),
           ),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 520),
-            curve: Curves.easeOutCubic,
-            decoration: BoxDecoration(
-              color: palette.surface,
-              border: Border(
-                top: BorderSide(
-                  color:
-                      Color.lerp(palette.seed, palette.accent, 0.18) ??
-                      palette.seed,
-                  width: 4,
-                ),
+          Positioned.fill(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 520),
+              curve: Curves.easeOutCubic,
+              decoration: BoxDecoration(
+                color: palette.surface.withValues(alpha: 0.74),
               ),
-            ),
-            child: SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final layout = _ShellLayout.fromConstraints(constraints);
+              child: SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final layout = _ShellLayout.fromConstraints(constraints);
 
-                  return Column(
-                    children: [
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 360),
-                        curve: Curves.easeOutCubic,
-                        child:
-                            focusMode
-                                ? _FocusRecallStrip(
-                                  palette: palette,
-                                  onRestore:
-                                      () =>
-                                          ref
-                                              .read(focusModeProvider.notifier)
-                                              .toggle(),
-                                )
-                                : _TopNavigation(
-                                  palette: palette,
-                                  queue: queue,
-                                  layout: layout,
-                                ),
-                      ),
-                      Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            AnimatedSize(
-                              duration: const Duration(milliseconds: 360),
-                              curve: Curves.easeOutCubic,
-                              child:
-                                  focusMode
-                                      ? _FocusSideRecall(
+                    return Stack(
+                      children: [
+                        Positioned.fill(
+                          bottom: layout.bottomDockExtent,
+                          child: Column(
+                            children: [
+                              AnimatedSize(
+                                duration: const Duration(milliseconds: 360),
+                                curve: Curves.easeOutCubic,
+                                child:
+                                    focusMode
+                                        ? _FocusRecallStrip(
+                                          palette: palette,
+                                          onRestore:
+                                              () =>
+                                                  ref
+                                                      .read(
+                                                        focusModeProvider
+                                                            .notifier,
+                                                      )
+                                                      .toggle(),
+                                        )
+                                        : _TopNavigation(
+                                          palette: palette,
+                                          queue: queue,
+                                          layout: layout,
+                                        ),
+                              ),
+                              Expanded(
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    AnimatedSize(
+                                      duration: const Duration(
+                                        milliseconds: 360,
+                                      ),
+                                      curve: Curves.easeOutCubic,
+                                      child:
+                                          focusMode
+                                              ? _FocusSideRecall(
+                                                palette: palette,
+                                                onRestore:
+                                                    () =>
+                                                        ref
+                                                            .read(
+                                                              focusModeProvider
+                                                                  .notifier,
+                                                            )
+                                                            .toggle(),
+                                              )
+                                              : _Sidebar(
+                                                palette: palette,
+                                                queue: queue,
+                                                layout: layout,
+                                                onCreatePlaylist:
+                                                    () => _createPlaylist(
+                                                      context,
+                                                      ref,
+                                                    ),
+                                                onSelectPlaylist: (playlistId) {
+                                                  ref
+                                                      .read(
+                                                        playbackQueueControllerProvider
+                                                            .notifier,
+                                                      )
+                                                      .selectPlaylist(
+                                                        playlistId,
+                                                      );
+                                                },
+                                                onAddFromLibrary: (playlistId) {
+                                                  _addFromLibrary(
+                                                    context,
+                                                    ref,
+                                                    playlistId,
+                                                  );
+                                                },
+                                                onRenamePlaylist: (playlist) {
+                                                  _renamePlaylist(
+                                                    context,
+                                                    ref,
+                                                    playlist,
+                                                  );
+                                                },
+                                                onEditDescription: (playlist) {
+                                                  _editPlaylistDescription(
+                                                    context,
+                                                    ref,
+                                                    playlist,
+                                                  );
+                                                },
+                                                onDeletePlaylist: (playlist) {
+                                                  _confirmDeletePlaylist(
+                                                    context,
+                                                    ref,
+                                                    playlist,
+                                                  );
+                                                },
+                                              ),
+                                    ),
+                                    Expanded(
+                                      child: _ContentArea(
                                         palette: palette,
-                                        onRestore:
-                                            () =>
-                                                ref
-                                                    .read(
-                                                      focusModeProvider
-                                                          .notifier,
-                                                    )
-                                                    .toggle(),
-                                      )
-                                      : _Sidebar(
-                                        palette: palette,
+                                        uiStyle: uiStyle,
+                                        sceneryImages: sceneryImages,
                                         queue: queue,
+                                        currentMedia: currentMedia,
+                                        mediaProbe: mediaProbe,
+                                        lyrics: lyrics,
+                                        engine: engine,
+                                        videoController: videoController,
                                         layout: layout,
-                                        onCreatePlaylist:
-                                            () => _createPlaylist(context, ref),
-                                        onSelectPlaylist: (playlistId) {
+                                        onPickScenery: () => _pickScenery(ref),
+                                        onPickMedia: () => _pickMedia(ref),
+                                        onPickFolder: () => _pickFolder(ref),
+                                        onRefreshLibrary: () {
+                                          unawaited(
+                                            ref
+                                                .read(
+                                                  playbackQueueControllerProvider
+                                                      .notifier,
+                                                )
+                                                .refreshLibrary(),
+                                          );
+                                        },
+                                        onPlayIndex: (index) {
+                                          unawaited(
+                                            ref
+                                                .read(
+                                                  playbackQueueControllerProvider
+                                                      .notifier,
+                                                )
+                                                .playIndex(index),
+                                          );
+                                        },
+                                        onAddToPlaylist: (playlistId, item) {
                                           ref
                                               .read(
                                                 playbackQueueControllerProvider
                                                     .notifier,
                                               )
-                                              .selectPlaylist(playlistId);
+                                              .addItemToPlaylist(
+                                                playlistId,
+                                                item,
+                                              );
                                         },
                                         onAddFromLibrary: (playlistId) {
                                           _addFromLibrary(
@@ -1311,186 +1271,135 @@ class PlayerScreen extends ConsumerWidget {
                                             playlistId,
                                           );
                                         },
-                                        onRenamePlaylist: (playlist) {
-                                          _renamePlaylist(
+                                        onManagePlaylist: (playlist) {
+                                          _managePlaylistItems(
                                             context,
                                             ref,
                                             playlist,
                                           );
                                         },
-                                        onEditDescription: (playlist) {
-                                          _editPlaylistDescription(
-                                            context,
-                                            ref,
-                                            playlist,
+                                        onRemoveFromPlaylist: (
+                                          playlistId,
+                                          item,
+                                        ) {
+                                          ref
+                                              .read(
+                                                playbackQueueControllerProvider
+                                                    .notifier,
+                                              )
+                                              .removeItemsFromPlaylist(
+                                                playlistId,
+                                                [item],
+                                              );
+                                        },
+                                        onRemoveFromPlaybackQueue: (index) {
+                                          unawaited(
+                                            ref
+                                                .read(
+                                                  playbackQueueControllerProvider
+                                                      .notifier,
+                                                )
+                                                .removePlaybackQueueItemAt(
+                                                  index,
+                                                ),
                                           );
                                         },
-                                        onDeletePlaylist: (playlist) {
-                                          _confirmDeletePlaylist(
-                                            context,
-                                            ref,
-                                            playlist,
+                                        onPlayNext: (item) {
+                                          ref
+                                              .read(
+                                                playbackQueueControllerProvider
+                                                    .notifier,
+                                              )
+                                              .playItemNext(item);
+                                        },
+                                        onEnqueue: (item) {
+                                          ref
+                                              .read(
+                                                playbackQueueControllerProvider
+                                                    .notifier,
+                                              )
+                                              .enqueueItem(item);
+                                        },
+                                        onSelectUiStyle: (style) {
+                                          ref
+                                              .read(
+                                                activeUiStyleProvider.notifier,
+                                              )
+                                              .select(style);
+                                          unawaited(
+                                            ref
+                                                .read(
+                                                  playbackQueueControllerProvider
+                                                      .notifier,
+                                                )
+                                                .persistShellPreferences(
+                                                  uiStyle: style,
+                                                ),
                                           );
                                         },
                                       ),
-                            ),
-                            Expanded(
-                              child: _ContentArea(
-                                palette: palette,
-                                uiStyle: uiStyle,
-                                sceneryImages: sceneryImages,
-                                queue: queue,
-                                currentMedia: currentMedia,
-                                mediaProbe: mediaProbe,
-                                lyrics: lyrics,
-                                engine: engine,
-                                videoController: videoController,
-                                layout: layout,
-                                onPickScenery: () => _pickScenery(ref),
-                                onPickMedia: () => _pickMedia(ref),
-                                onPickFolder: () => _pickFolder(ref),
-                                onRefreshLibrary: () {
-                                  unawaited(
-                                    ref
-                                        .read(
-                                          playbackQueueControllerProvider
-                                              .notifier,
-                                        )
-                                        .refreshLibrary(),
-                                  );
-                                },
-                                onPlayIndex: (index) {
-                                  unawaited(
-                                    ref
-                                        .read(
-                                          playbackQueueControllerProvider
-                                              .notifier,
-                                        )
-                                        .playIndex(index),
-                                  );
-                                },
-                                onAddToPlaylist: (playlistId, item) {
-                                  ref
-                                      .read(
-                                        playbackQueueControllerProvider
-                                            .notifier,
-                                      )
-                                      .addItemToPlaylist(playlistId, item);
-                                },
-                                onAddFromLibrary: (playlistId) {
-                                  _addFromLibrary(context, ref, playlistId);
-                                },
-                                onManagePlaylist: (playlist) {
-                                  _managePlaylistItems(context, ref, playlist);
-                                },
-                                onRemoveFromPlaylist: (playlistId, item) {
-                                  ref
-                                      .read(
-                                        playbackQueueControllerProvider
-                                            .notifier,
-                                      )
-                                      .removeItemsFromPlaylist(playlistId, [
-                                        item,
-                                      ]);
-                                },
-                                onRemoveFromPlaybackQueue: (index) {
-                                  unawaited(
-                                    ref
-                                        .read(
-                                          playbackQueueControllerProvider
-                                              .notifier,
-                                        )
-                                        .removePlaybackQueueItemAt(index),
-                                  );
-                                },
-                                onPlayNext: (item) {
-                                  ref
-                                      .read(
-                                        playbackQueueControllerProvider
-                                            .notifier,
-                                      )
-                                      .playItemNext(item);
-                                },
-                                onEnqueue: (item) {
-                                  ref
-                                      .read(
-                                        playbackQueueControllerProvider
-                                            .notifier,
-                                      )
-                                      .enqueueItem(item);
-                                },
-                                onSelectUiStyle: (style) {
-                                  ref
-                                      .read(activeUiStyleProvider.notifier)
-                                      .select(style);
-                                  unawaited(
-                                    ref
-                                        .read(
-                                          playbackQueueControllerProvider
-                                              .notifier,
-                                        )
-                                        .persistShellPreferences(
-                                          uiStyle: style,
-                                        ),
-                                  );
-                                },
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      _BottomPlayerBar(
-                        palette: palette,
-                        currentMedia: currentMedia,
-                        mediaProbe: mediaProbe,
-                        audioExport: audioExport,
-                        queue: queue,
-                        engine: engine,
-                        layout: layout,
-                        onPreviousTrack: () {
-                          unawaited(
-                            ref
-                                .read(playbackQueueControllerProvider.notifier)
-                                .playPrevious(),
-                          );
-                        },
-                        onNextTrack: () {
-                          unawaited(
-                            ref
-                                .read(playbackQueueControllerProvider.notifier)
-                                .playNext(),
-                          );
-                        },
-                        onCyclePlaybackMode: () {
-                          ref
-                              .read(playbackQueueControllerProvider.notifier)
-                              .cyclePlaybackMode();
-                        },
-                        onShowPlaybackQueue: () {
-                          _showPlaybackQueue(context, ref);
-                        },
-                        onExtractAudio:
-                            currentMedia == null
-                                ? null
-                                : () => _extractAudio(ref, currentMedia),
-                        onCancelAudioExport: () {
-                          unawaited(
-                            ref
-                                .read(audioExportControllerProvider.notifier)
-                                .cancel(),
-                          );
-                        },
-                        onPersistVolume: (volume) {
-                          unawaited(
-                            ref
-                                .read(playbackQueueControllerProvider.notifier)
-                                .persistVolume(volume),
-                          );
-                        },
-                      ),
-                    ],
-                  );
-                },
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          height: layout.bottomDockExtent,
+                          child: _BottomPlayerBar(
+                            palette: palette,
+                            currentMedia: currentMedia,
+                            mediaProbe: mediaProbe,
+                            queue: queue,
+                            engine: engine,
+                            layout: layout,
+                            onPreviousTrack: () {
+                              unawaited(
+                                ref
+                                    .read(
+                                      playbackQueueControllerProvider.notifier,
+                                    )
+                                    .playPrevious(),
+                              );
+                            },
+                            onNextTrack: () {
+                              unawaited(
+                                ref
+                                    .read(
+                                      playbackQueueControllerProvider.notifier,
+                                    )
+                                    .playNext(),
+                              );
+                            },
+                            onCyclePlaybackMode: () {
+                              ref
+                                  .read(
+                                    playbackQueueControllerProvider.notifier,
+                                  )
+                                  .cyclePlaybackMode();
+                            },
+                            onShowPlaybackQueue: () {
+                              _showPlaybackQueue(context, ref);
+                            },
+                            onPersistVolume: (volume) {
+                              unawaited(
+                                ref
+                                    .read(
+                                      playbackQueueControllerProvider.notifier,
+                                    )
+                                    .persistVolume(volume),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -1569,28 +1478,6 @@ class PlayerScreen extends ConsumerWidget {
         ref
             .read(playbackQueueControllerProvider.notifier)
             .persistShellPreferences(sceneryImagePaths: paths),
-      );
-    });
-  }
-
-  Future<void> _extractAudio(WidgetRef ref, MediaItem item) async {
-    await _runModalAction(ref, 'extract-audio', () async {
-      final outputPath = await FilePicker.saveFile(
-        dialogTitle: '导出音频',
-        fileName: '${item.title}.flac',
-        initialDirectory: p.dirname(item.path),
-        type: FileType.custom,
-        allowedExtensions: const ['flac'],
-        lockParentWindow: true,
-      );
-      if (outputPath == null) {
-        return;
-      }
-
-      unawaited(
-        ref
-            .read(audioExportControllerProvider.notifier)
-            .extractAudio(inputPath: item.path, outputPath: outputPath),
       );
     });
   }
@@ -1784,22 +1671,22 @@ class _TopNavigation extends ConsumerWidget {
       palette: palette,
       margin: EdgeInsets.fromLTRB(
         layout.topHorizontalMargin,
-        8,
+        layout.narrow ? 6 : 10,
         layout.topHorizontalMargin,
-        4,
+        6,
       ),
       padding: EdgeInsets.symmetric(
-        horizontal: layout.quiet ? 10 : 12,
-        vertical: layout.quiet ? 6 : 7,
+        horizontal: layout.narrow ? 10 : 14,
+        vertical: 8,
       ),
-      height: layout.topHeight - 4,
-      emphasis: 0.84,
+      height: layout.topHeight,
+      emphasis: 0.5,
       child: Row(
         children: [
           _TopBrand(palette: palette, layout: layout),
           Expanded(
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: layout.quiet ? 10 : 16),
+              padding: EdgeInsets.symmetric(horizontal: layout.narrow ? 8 : 18),
               child: _TopSearchField(layout: layout),
             ),
           ),
@@ -1859,20 +1746,20 @@ class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
     });
 
     final palette = ref.watch(activePaletteProvider);
-    final hintText = widget.layout.quiet ? '搜索歌曲或路径' : '搜索当前列表里的歌曲、路径';
+    final hintText = widget.layout.quiet ? '搜索歌曲或路径' : '搜索歌曲、歌单或本地路径';
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOutCubic,
-      height: widget.layout.quiet ? 32 : 36,
+      height: widget.layout.narrow ? 34 : 38,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: _focused ? 0.045 : 0.022),
-        borderRadius: BorderRadius.circular(999),
+        color: Colors.white.withValues(alpha: _focused ? 0.058 : 0.034),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color:
               _focused
-                  ? palette.seed.withValues(alpha: 0.26)
-                  : Colors.white.withValues(alpha: 0.045),
+                  ? palette.accent.withValues(alpha: 0.30)
+                  : Colors.white.withValues(alpha: 0.055),
           width: _focused ? 1.0 : 1,
         ),
         boxShadow:
@@ -1922,10 +1809,7 @@ class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
                     icon: const Icon(Icons.close_rounded, size: 18),
                   ),
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 7,
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14),
         ),
       ),
     );
@@ -1943,7 +1827,7 @@ class _TopBrand extends StatelessWidget {
     final theme = Theme.of(context);
 
     return SizedBox(
-      width: layout.quiet ? 98 : 110,
+      width: layout.quiet ? 38 : 112,
       child: Row(
         children: [
           TweenAnimationBuilder<double>(
@@ -1955,8 +1839,8 @@ class _TopBrand extends StatelessWidget {
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
-              width: 26,
-              height: 26,
+              width: layout.narrow ? 30 : 32,
+              height: layout.narrow ? 30 : 32,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -1966,10 +1850,7 @@ class _TopBrand extends StatelessWidget {
                     palette.seed,
                   ],
                 ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  width: 1,
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                 boxShadow: [
                   BoxShadow(
                     color: palette.seed.withValues(alpha: 0.22),
@@ -1982,24 +1863,26 @@ class _TopBrand extends StatelessWidget {
                 'H',
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w900,
-                  fontSize: 13.5,
+                  fontSize: 14,
                   color: heniReadableForegroundOn(palette.seed),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Heni',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                fontSize: 15,
-                letterSpacing: 0.18,
-                color: _primaryGlassText(emphasis: 0.94),
+          if (!layout.quiet) ...[
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'HENI',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  letterSpacing: 2.0,
+                  color: _primaryGlassText(emphasis: 0.94),
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -2031,6 +1914,16 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (layout.quiet) {
+      return _CompactSidebar(
+        palette: palette,
+        queue: queue,
+        layout: layout,
+        onCreatePlaylist: onCreatePlaylist,
+        onSelectPlaylist: onSelectPlaylist,
+      );
+    }
+
     final theme = Theme.of(context);
     final playbackQueuePlaylist = HeniPlaylist(
       id: heniPlaybackQueueId,
@@ -2053,11 +1946,9 @@ class _Sidebar extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           _GlassPanel(
-            radius: 28,
-            fillColor: _shellGlassFill(palette, emphasis: 0.8),
-            borderColor: _shellGlassBorder(palette, emphasis: 0.74),
-            auroraPalette: palette,
-            hoverAccentPalette: palette,
+            radius: 18,
+            fillColor: _shellGlassFill(palette, emphasis: 0.48),
+            borderColor: _shellGlassBorder(palette, emphasis: 0.46),
             padding: EdgeInsets.fromLTRB(
               layout.quiet ? 10 : 12,
               layout.quiet ? 12 : 14,
@@ -2193,6 +2084,182 @@ class _Sidebar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CompactSidebar extends StatelessWidget {
+  const _CompactSidebar({
+    required this.palette,
+    required this.queue,
+    required this.layout,
+    required this.onCreatePlaylist,
+    required this.onSelectPlaylist,
+  });
+
+  final HeniPalette palette;
+  final PlaybackQueueState queue;
+  final _ShellLayout layout;
+  final VoidCallback onCreatePlaylist;
+  final ValueChanged<String> onSelectPlaylist;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget destination({
+      required String tooltip,
+      required IconData icon,
+      required String id,
+      required int count,
+    }) {
+      final selected = queue.activePlaylistId == id;
+      return Tooltip(
+        message: '$tooltip · $count 首',
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(13),
+              onTap: () => onSelectPlaylist(id),
+              child: AnimatedContainer(
+                duration: _hoverDuration,
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color:
+                      selected
+                          ? palette.accent.withValues(alpha: 0.14)
+                          : Colors.transparent,
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(
+                    color:
+                        selected
+                            ? palette.accent.withValues(alpha: 0.20)
+                            : Colors.transparent,
+                  ),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      icon,
+                      size: 20,
+                      color:
+                          selected
+                              ? heniAccentOnGlass(palette.accent)
+                              : _secondaryGlassText(),
+                    ),
+                    if (selected)
+                      Positioned(
+                        left: 0,
+                        top: 12,
+                        bottom: 12,
+                        child: Container(
+                          width: 2,
+                          decoration: BoxDecoration(
+                            color: palette.accent,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        layout.sidebarPadding,
+        0,
+        6,
+        layout.sidebarPadding,
+      ),
+      child: _GlassPanel(
+        radius: 18,
+        fillColor: _shellGlassFill(palette, emphasis: 0.45),
+        borderColor: _shellGlassBorder(palette, emphasis: 0.42),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 10),
+        child: SizedBox(
+          width: layout.sidebarWidth,
+          child: Column(
+            children: [
+              destination(
+                tooltip: '本地曲库',
+                icon: Icons.library_music_outlined,
+                id: heniLibraryPlaylistId,
+                count: queue.library.items.length,
+              ),
+              destination(
+                tooltip: '当前播放',
+                icon: Icons.queue_music_rounded,
+                id: heniPlaybackQueueId,
+                count: queue.playbackQueue.items.length,
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 10),
+                child: Divider(height: 1),
+              ),
+              if (queue.playlists.isNotEmpty)
+                PopupMenuButton<String>(
+                  tooltip: '我的歌单',
+                  onSelected: onSelectPlaylist,
+                  itemBuilder:
+                      (context) => [
+                        for (final playlist in queue.playlists)
+                          PopupMenuItem<String>(
+                            value: playlist.id,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  playlist.id == queue.activePlaylistId
+                                      ? Icons.radio_button_checked_rounded
+                                      : Icons.music_note_rounded,
+                                  size: 17,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    playlist.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text('${playlist.items.length}'),
+                              ],
+                            ),
+                          ),
+                      ],
+                  child: SizedBox(
+                    width: 42,
+                    height: 42,
+                    child: Icon(
+                      Icons.playlist_play_rounded,
+                      color: _secondaryGlassText(),
+                    ),
+                  ),
+                ),
+              const Spacer(),
+              IconButton(
+                tooltip: '新建歌单',
+                onPressed: onCreatePlaylist,
+                icon: const Icon(Icons.add_rounded, size: 20),
+                style: IconButton.styleFrom(
+                  fixedSize: const Size.square(42),
+                  foregroundColor: heniAccentOnGlass(palette.accent),
+                  backgroundColor: palette.accent.withValues(alpha: 0.10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -3275,6 +3342,55 @@ String _formatTotalDuration(Duration total) {
   return '${total.inSeconds} 秒';
 }
 
+String _playbackQualityLine(MediaItem? media, MediaProbe? probe) {
+  if (media == null) {
+    return '选择一首本地音频或视频，开始播放';
+  }
+
+  final audio = probe?.primaryAudioStream;
+  if (audio == null) {
+    return media.kind == MediaKind.video ? '本地视频' : '本地音频';
+  }
+
+  final codec = audio.codecName?.toUpperCase();
+  final bitRate = audio.bitRate;
+  final sampleRate = audio.sampleRate;
+  final pieces = <String>[
+    if (codec != null) codec,
+    if (bitRate != null && bitRate > 0) '${(bitRate / 1000).round()} kbps',
+    if (sampleRate != null && sampleRate > 0)
+      sampleRate % 1000 == 0
+          ? '${sampleRate ~/ 1000} kHz'
+          : '${(sampleRate / 1000).toStringAsFixed(1)} kHz',
+    if (_audioQualityTag(audio) case final String tag) tag,
+  ];
+
+  return pieces.isEmpty
+      ? (media.kind == MediaKind.video ? '本地视频' : '本地音频')
+      : pieces.join(' · ');
+}
+
+String? _audioQualityTag(MediaStreamProbe? audio) {
+  final codec = audio?.codecName?.toLowerCase();
+  if (codec == null) {
+    return null;
+  }
+  if (codec == 'flac' ||
+      codec == 'alac' ||
+      codec == 'wavpack' ||
+      codec.startsWith('pcm_')) {
+    return '无损';
+  }
+  final bitRate = audio?.bitRate;
+  if ((codec == 'aac' || codec == 'mp3') &&
+      bitRate != null &&
+      bitRate > 0 &&
+      bitRate <= 135000) {
+    return '低码率源';
+  }
+  return null;
+}
+
 class _LibraryHeroBanner extends StatelessWidget {
   const _LibraryHeroBanner({
     required this.palette,
@@ -3350,184 +3466,158 @@ class _LibraryHeroBanner extends StatelessWidget {
       color: Colors.white.withValues(alpha: 0.48),
     );
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                palette.seed.withValues(alpha: 0.15),
-                Color.alphaBlend(
-                  palette.accent.withValues(alpha: 0.07),
-                  Colors.black.withValues(alpha: 0.32),
-                ),
-                Colors.black.withValues(alpha: 0.42),
-              ],
-              stops: const [0.0, 0.55, 1.0],
-            ),
-            border: Border.all(
-              color: palette.seed.withValues(alpha: 0.12),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: palette.seed.withValues(alpha: 0.07),
-                blurRadius: 16,
-              ),
-            ],
-          ),
-          child: Stack(
+    Widget titleBlock() {
+      final subtitleStyle = theme.textTheme.bodySmall?.copyWith(
+        fontSize: 11.5,
+        fontWeight: FontWeight.w500,
+        height: 1.2,
+        color: Colors.white.withValues(alpha: 0.46),
+        letterSpacing: 0.12,
+      );
+      final subtitle = Text(
+        subtitleLine,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: subtitleStyle,
+      );
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Positioned(
-                left: 18,
-                right: 18,
-                top: 0,
-                height: 1,
-                child: IgnorePointer(child: _AuroraBar(palette: palette)),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 18, 16, 18),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            palette.seed,
-                            Color.lerp(palette.seed, palette.accent, 0.55)!,
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: palette.seed.withValues(alpha: 0.18),
-                            blurRadius: 12,
-                            spreadRadius: 0,
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        heroIcon,
-                        size: 22,
-                        color: heniReadableForegroundOn(palette.seed),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                headingLabel.toUpperCase(),
-                                style: scopeStyle,
-                              ),
-                              if (isScanning) ...[
-                                const SizedBox(width: 8),
-                                Icon(
-                                  Icons.sync_rounded,
-                                  size: 13,
-                                  color: Colors.white.withValues(alpha: 0.55),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '整理中',
-                                  style: scopeStyle?.copyWith(
-                                    letterSpacing: 0.4,
-                                    color: Colors.white.withValues(alpha: 0.62),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            activePlaylist.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.25,
-                              height: 1.08,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: 0.24),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Builder(
-                            builder: (context) {
-                              final subtitleStyle = theme.textTheme.bodySmall
-                                  ?.copyWith(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.2,
-                                    color: Colors.white.withValues(alpha: 0.44),
-                                    letterSpacing: 0.12,
-                                  );
-                              final text = Text(
-                                subtitleLine,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: subtitleStyle,
-                              );
-                              final tip = subtitleTooltip;
-                              if (tip == null || tip.isEmpty) {
-                                return text;
-                              }
-                              return Tooltip(
-                                message: tip,
-                                waitDuration: const Duration(milliseconds: 320),
-                                child: MouseRegion(
-                                  cursor: SystemMouseCursors.help,
-                                  child: text,
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      alignment: WrapAlignment.end,
-                      children: [
-                        ...actions,
-                        _UiStyleSwitch(
-                          palette: palette,
-                          active: uiStyle,
-                          onSelect: onSelectUiStyle,
-                        ),
-                      ],
-                    ),
-                  ],
+              Text(headingLabel.toUpperCase(), style: scopeStyle),
+              if (isScanning) ...[
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.sync_rounded,
+                  size: 13,
+                  color: palette.accent.withValues(alpha: 0.78),
                 ),
-              ),
+                const SizedBox(width: 4),
+                Text(
+                  '整理中',
+                  style: scopeStyle?.copyWith(
+                    color: palette.accent.withValues(alpha: 0.78),
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ],
             ],
           ),
+          const SizedBox(height: 5),
+          Text(
+            activePlaylist.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.45,
+              height: 1.08,
+            ),
+          ),
+          const SizedBox(height: 5),
+          if (subtitleTooltip case final String tip when tip.isNotEmpty)
+            Tooltip(
+              message: tip,
+              waitDuration: const Duration(milliseconds: 320),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.help,
+                child: subtitle,
+              ),
+            )
+          else
+            subtitle,
+        ],
+      );
+    }
+
+    Widget artwork() {
+      return Container(
+        width: 52,
+        height: 52,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: palette.accent.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: palette.accent.withValues(alpha: 0.16)),
         ),
-      ),
+        child: Icon(
+          heroIcon,
+          size: 23,
+          color: heniAccentOnGlass(palette.accent),
+        ),
+      );
+    }
+
+    final controls = Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      alignment: WrapAlignment.end,
+      children: [
+        ...actions,
+        _UiStyleSwitch(
+          palette: palette,
+          active: uiStyle,
+          onSelect: onSelectUiStyle,
+        ),
+      ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stacked = constraints.maxWidth < 760;
+        return Container(
+          padding: EdgeInsets.fromLTRB(
+            stacked ? 16 : 18,
+            14,
+            stacked ? 14 : 16,
+            14,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                palette.accent.withValues(alpha: 0.075),
+                Colors.white.withValues(alpha: 0.025),
+                Colors.transparent,
+              ],
+            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          ),
+          child:
+              stacked
+                  ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          artwork(),
+                          const SizedBox(width: 14),
+                          Expanded(child: titleBlock()),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Align(alignment: Alignment.centerRight, child: controls),
+                    ],
+                  )
+                  : Row(
+                    children: [
+                      artwork(),
+                      const SizedBox(width: 16),
+                      Expanded(child: titleBlock()),
+                      const SizedBox(width: 16),
+                      controls,
+                    ],
+                  ),
+        );
+      },
     );
   }
 }
@@ -4768,10 +4858,9 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
         SizedBox(height: widget.layout.contentGap),
         Expanded(
           child: _GlassPanel(
-            radius: 22,
-            fillColor: _shellGlassFill(widget.palette, emphasis: 0.66),
-            borderColor: _shellGlassBorder(widget.palette, emphasis: 0.58),
-            auroraPalette: widget.palette,
+            radius: 18,
+            fillColor: _shellGlassFill(widget.palette, emphasis: 0.46),
+            borderColor: _shellGlassBorder(widget.palette, emphasis: 0.44),
             hoverAccentPalette: widget.palette,
             child: Column(
               children: [
@@ -5168,20 +5257,20 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
     final evenRow = widget.index.isEven;
     final rowColor =
         playing
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.10)
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.085)
             : checked
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.06)
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.05)
             : _hovered
-            ? Colors.white.withValues(alpha: 0.04)
-            : Colors.white.withValues(alpha: evenRow ? 0.025 : 0.014);
+            ? Colors.white.withValues(alpha: 0.034)
+            : Colors.white.withValues(alpha: evenRow ? 0.010 : 0.003);
     final borderColor =
         playing
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.22)
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.17)
             : checked
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.14)
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.11)
             : _hovered
-            ? Colors.white.withValues(alpha: 0.08)
-            : Colors.white.withValues(alpha: 0.032);
+            ? Colors.white.withValues(alpha: 0.055)
+            : Colors.transparent;
     final leadingColor =
         playing
             ? heniAccentOnGlass(Theme.of(context).colorScheme.primary)
@@ -5195,49 +5284,20 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
       child: AnimatedScale(
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOutCubic,
-        scale: playing ? 1.0 : (_hovered ? 1.004 : 1.0),
+        scale: 1,
         child: AnimatedSlide(
           duration: _hoverDuration,
           curve: _hoverCurve,
-          offset: _hovered && !playing ? const Offset(0.006, 0) : Offset.zero,
+          offset: Offset.zero,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
-            margin: const EdgeInsets.fromLTRB(12, 0, 12, 5),
+            margin: const EdgeInsets.fromLTRB(8, 0, 8, 2),
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  if (playing || checked)
-                    Theme.of(context).colorScheme.primary.withValues(
-                      alpha: playing ? 0.08 : 0.04,
-                    )
-                  else
-                    Colors.white.withValues(alpha: evenRow ? 0.012 : 0.002),
-                  rowColor,
-                  rowColor,
-                ],
-                stops: const [0.0, 0.08, 1.0],
-              ),
-              borderRadius: BorderRadius.circular(17),
+              color: rowColor,
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: borderColor),
-              boxShadow: [
-                if (hoverOrSelected)
-                  BoxShadow(
-                    color: Colors.black.withValues(
-                      alpha:
-                          playing
-                              ? 0.14
-                              : checked
-                              ? 0.10
-                              : 0.07,
-                    ),
-                    blurRadius: playing ? 12 : 8,
-                    offset: const Offset(0, 4),
-                  ),
-              ],
             ),
             child: Stack(
               children: [
@@ -5249,11 +5309,11 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                     duration: _hoverDuration,
                     width:
                         playing
-                            ? 4
-                            : checked
                             ? 3
-                            : _hovered
+                            : checked
                             ? 2
+                            : _hovered
+                            ? 1
                             : 0,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(999),
@@ -5274,26 +5334,10 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                     ),
                   ),
                 ),
-                Positioned(
-                  left: 18,
-                  right: 18,
-                  top: 0,
-                  child: AnimatedOpacity(
-                    duration: _hoverDuration,
-                    opacity: hoverOrSelected ? 0.08 : 0.04,
-                    child: Container(
-                      height: 1,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(999),
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(17),
+                    borderRadius: BorderRadius.circular(12),
                     hoverColor: Theme.of(
                       context,
                     ).colorScheme.primary.withValues(alpha: 0.018),
@@ -5312,7 +5356,7 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                         final compactLead = columns.leadWidth < 58;
 
                         return Padding(
-                          padding: const EdgeInsets.fromLTRB(4, 9, 4, 9),
+                          padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
                           child: Row(
                             children: [
                               SizedBox(
@@ -5594,7 +5638,8 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                                                   for (final pl
                                                       in widget.playlists)
                                                     if (pl.id !=
-                                                        widget.currentPlaylistId)
+                                                        widget
+                                                            .currentPlaylistId)
                                                       pl,
                                                 ],
                                                 onAddToPlaylist:
@@ -6176,7 +6221,6 @@ class _BottomPlayerBar extends ConsumerWidget {
     required this.palette,
     required this.currentMedia,
     required this.mediaProbe,
-    required this.audioExport,
     required this.queue,
     required this.engine,
     required this.layout,
@@ -6184,15 +6228,12 @@ class _BottomPlayerBar extends ConsumerWidget {
     required this.onNextTrack,
     required this.onCyclePlaybackMode,
     required this.onShowPlaybackQueue,
-    required this.onExtractAudio,
-    required this.onCancelAudioExport,
     required this.onPersistVolume,
   });
 
   final HeniPalette palette;
   final MediaItem? currentMedia;
   final AsyncValue<MediaProbe?> mediaProbe;
-  final AudioExportState audioExport;
   final PlaybackQueueState queue;
   final PlaybackEngine engine;
   final _ShellLayout layout;
@@ -6200,8 +6241,6 @@ class _BottomPlayerBar extends ConsumerWidget {
   final VoidCallback onNextTrack;
   final VoidCallback onCyclePlaybackMode;
   final VoidCallback onShowPlaybackQueue;
-  final VoidCallback? onExtractAudio;
-  final VoidCallback onCancelAudioExport;
   final ValueChanged<double> onPersistVolume;
 
   @override
@@ -6216,16 +6255,21 @@ class _BottomPlayerBar extends ConsumerWidget {
         layout.topHorizontalMargin,
         0,
         layout.topHorizontalMargin,
-        compactBottom ? 6 : layout.sidebarPadding,
+        layout.narrow ? 6 : 10,
       ),
       padding: EdgeInsets.fromLTRB(
-        layout.quiet ? 14 : 18,
-        compactBottom ? 6 : (layout.quiet ? 8 : 10),
-        layout.quiet ? 14 : 18,
-        compactBottom ? 6 : (layout.quiet ? 8 : 10),
+        layout.narrow ? 10 : 16,
+        compactBottom ? 7 : 5,
+        layout.narrow ? 10 : 16,
+        compactBottom ? 7 : 5,
       ),
-      height: compactBottom ? (layout.quiet ? 64 : 72) : layout.bottomHeight,
-      emphasis: 0.9,
+      height:
+          compactBottom
+              ? layout.narrow
+                  ? 66
+                  : 72
+              : layout.bottomHeight,
+      emphasis: 0.55,
       child:
           compactBottom
               ? _CompactBottomBar(
@@ -6280,18 +6324,9 @@ class _BottomPlayerBar extends ConsumerWidget {
                     palette: palette,
                     mode: queue.playbackMode,
                     engine: engine,
-                    state: audioExport,
                     queue: queue,
-                    layout: layout,
-                    sourceDuration: mediaProbe.when(
-                      data: (probe) => probe?.duration,
-                      error: (error, stackTrace) => null,
-                      loading: () => null,
-                    ),
                     onShowPlaybackQueue: onShowPlaybackQueue,
                     onCyclePlaybackMode: onCyclePlaybackMode,
-                    onExtract: onExtractAudio,
-                    onCancel: onCancelAudioExport,
                     onPersistVolume: onPersistVolume,
                   ),
                 ],
@@ -6499,17 +6534,24 @@ class _NowPlayingSummary extends StatelessWidget {
     return SizedBox(
       width:
           layout.quiet
-              ? 224
+              ? 210
               : layout.compact
-              ? 248
-              : 284,
+              ? 232
+              : 252,
       child: StreamBuilder<bool>(
         stream: engine.playing,
         initialData: engine.currentPlaying,
         builder: (context, snapshot) {
           final isPlaying = snapshot.data ?? false;
+          final qualityLine = mediaProbe.when(
+            data: (probe) => _playbackQualityLine(currentMedia, probe),
+            loading: () => currentMedia == null ? '等待播放' : '正在读取音频参数',
+            error:
+                (error, stackTrace) =>
+                    currentMedia?.kind == MediaKind.video ? '本地视频' : '本地音频',
+          );
 
-          final discSize = layout.quiet ? 54.0 : 62.0;
+          final discSize = layout.quiet ? 46.0 : 52.0;
           final isVideo = currentMedia?.kind == MediaKind.video;
 
           return Row(
@@ -6578,11 +6620,7 @@ class _NowPlayingSummary extends StatelessWidget {
                       if (layout.showNowPlayingDetails) ...[
                         const SizedBox(height: 4),
                         Text(
-                          currentMedia == null
-                              ? '选择一首本地音频或视频，开始播放'
-                              : currentMedia!.kind == MediaKind.video
-                              ? '本地视频'
-                              : '本地音频',
+                          qualityLine,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
@@ -7110,28 +7148,18 @@ class _UtilityControls extends StatelessWidget {
     required this.palette,
     required this.mode,
     required this.engine,
-    required this.state,
     required this.queue,
-    required this.layout,
-    required this.sourceDuration,
     required this.onShowPlaybackQueue,
     required this.onCyclePlaybackMode,
-    required this.onExtract,
-    required this.onCancel,
     required this.onPersistVolume,
   });
 
   final HeniPalette palette;
   final HeniPlaybackMode mode;
   final PlaybackEngine engine;
-  final AudioExportState state;
   final PlaybackQueueState queue;
-  final _ShellLayout layout;
-  final Duration? sourceDuration;
   final VoidCallback onShowPlaybackQueue;
   final VoidCallback onCyclePlaybackMode;
-  final VoidCallback? onExtract;
-  final VoidCallback onCancel;
   final ValueChanged<double> onPersistVolume;
 
   @override
@@ -7151,13 +7179,6 @@ class _UtilityControls extends StatelessWidget {
           engine: engine,
           palette: palette,
           onVolumeChanged: onPersistVolume,
-        ),
-        const SizedBox(width: 4),
-        _ExportActions(
-          state: state,
-          sourceDuration: sourceDuration,
-          onExtract: onExtract,
-          onCancel: onCancel,
         ),
       ],
     );
@@ -7238,79 +7259,6 @@ class _CurrentQueueButton extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ExportActions extends StatelessWidget {
-  const _ExportActions({
-    required this.state,
-    required this.sourceDuration,
-    required this.onExtract,
-    required this.onCancel,
-  });
-
-  final AudioExportState state;
-  final Duration? sourceDuration;
-  final VoidCallback? onExtract;
-  final VoidCallback onCancel;
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = state.fraction(sourceDuration);
-
-    if (state.isRunning) {
-      return SizedBox(
-        width: 92,
-        child: Row(
-          children: [
-            Expanded(
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 5,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            IconButton(
-              tooltip: '取消导出',
-              onPressed: onCancel,
-              style: IconButton.styleFrom(
-                fixedSize: const Size.square(_regularIconButtonSize),
-                padding: EdgeInsets.zero,
-                foregroundColor: _primaryGlassText(),
-              ),
-              icon: const Icon(Icons.stop_circle_outlined, size: 20),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final statusIcon = switch (state.status) {
-      AudioExportStatus.completed => Icons.check_circle_outline,
-      AudioExportStatus.failed => Icons.error_outline,
-      AudioExportStatus.cancelled => Icons.cancel_outlined,
-      AudioExportStatus.idle => Icons.audio_file_outlined,
-      AudioExportStatus.running => Icons.audio_file_outlined,
-    };
-    final tooltip = switch (state.status) {
-      AudioExportStatus.completed => '音频已导出',
-      AudioExportStatus.failed => state.errorMessage ?? '导出失败',
-      AudioExportStatus.cancelled => '已取消导出',
-      AudioExportStatus.idle => '导出 FLAC',
-      AudioExportStatus.running => '导出中',
-    };
-
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: state.status == AudioExportStatus.idle ? onExtract : null,
-      style: IconButton.styleFrom(
-        fixedSize: const Size.square(_regularIconButtonSize),
-        padding: EdgeInsets.zero,
-        foregroundColor: _secondaryGlassText(emphasis: 1.05),
-        disabledForegroundColor: _tertiaryGlassText(),
-      ),
-      icon: Icon(statusIcon, size: 20),
     );
   }
 }
@@ -7794,12 +7742,91 @@ class _PlaybackQueueDialog extends ConsumerStatefulWidget {
 
 class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
   final _searchController = TextEditingController();
+  final _listController = ScrollController();
+  final _currentRowKey = GlobalKey();
   var _query = '';
+  var _scheduledInitialLocate = false;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _listController.dispose();
     super.dispose();
+  }
+
+  Future<void> _locateCurrentTrack(
+    PlaybackQueueState queue, {
+    bool clearBlockingQuery = true,
+  }) async {
+    if (queue.currentIndex < 0 ||
+        queue.currentIndex >= queue.playbackQueue.items.length) {
+      return;
+    }
+
+    final nextQuery = queryForLocatingCurrentTrack(
+      items: queue.playbackQueue.items,
+      currentIndex: queue.currentIndex,
+      query: _query,
+    );
+    if (clearBlockingQuery && nextQuery != _query) {
+      setState(() {
+        _query = nextQuery;
+        _searchController.value = TextEditingValue(
+          text: nextQuery,
+          selection: TextSelection.collapsed(offset: nextQuery.length),
+        );
+      });
+    }
+
+    final visibleItems =
+        queue.playbackQueue.items
+            .where((item) => _matchesQueueQuery(item, nextQuery))
+            .toList();
+    final currentPath = queue.playbackQueue.items[queue.currentIndex].path;
+    final visibleIndex = visibleItems.indexWhere(
+      (item) => item.path == currentPath,
+    );
+    if (visibleIndex < 0) {
+      return;
+    }
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) {
+      return;
+    }
+
+    if (_currentRowKey.currentContext == null && _listController.hasClients) {
+      final lastIndex = math.max(1, visibleItems.length - 1);
+      final fraction = visibleIndex / lastIndex;
+      final estimatedOffset =
+          _listController.position.maxScrollExtent * fraction;
+      await _listController.animateTo(
+        estimatedOffset,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) {
+        return;
+      }
+    }
+
+    final rowContext = _currentRowKey.currentContext;
+    if (rowContext != null && rowContext.mounted) {
+      await Scrollable.ensureVisible(
+        rowContext,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  bool _matchesQueueQuery(MediaItem item, String query) {
+    final normalized = query.trim().toLowerCase();
+    return normalized.isEmpty ||
+        item.title.toLowerCase().contains(normalized) ||
+        item.path.toLowerCase().contains(normalized);
   }
 
   @override
@@ -7808,15 +7835,17 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
     final theme = Theme.of(context);
     final allItems = queue.playbackQueue.items;
     final items =
-        allItems.where((item) {
-          if (_query.isEmpty) {
-            return true;
-          }
-          final normalized = _query.toLowerCase();
-          return item.title.toLowerCase().contains(normalized) ||
-              item.path.toLowerCase().contains(normalized);
-        }).toList();
+        allItems.where((item) => _matchesQueueQuery(item, _query)).toList();
     final current = queue.currentItem;
+
+    if (!_scheduledInitialLocate && current != null && _query.isEmpty) {
+      _scheduledInitialLocate = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(_locateCurrentTrack(queue, clearBlockingQuery: false));
+        }
+      });
+    }
 
     return _HeniDialog(
       title: const Text('当前播放列表'),
@@ -7855,13 +7884,28 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
               ],
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _searchController,
-              onChanged: (value) => setState(() => _query = value.trim()),
-              decoration: const InputDecoration(
-                hintText: '搜索当前播放列表',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() => _query = value.trim()),
+                    decoration: const InputDecoration(
+                      hintText: '搜索当前播放列表',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  tooltip: '定位当前歌曲',
+                  onPressed:
+                      current == null
+                          ? null
+                          : () => unawaited(_locateCurrentTrack(queue)),
+                  icon: const Icon(Icons.my_location_rounded, size: 20),
+                ),
+              ],
             ),
             const SizedBox(height: 14),
             ConstrainedBox(
@@ -7880,6 +7924,7 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
                         ),
                       )
                       : ListView.separated(
+                        controller: _listController,
                         shrinkWrap: true,
                         itemCount: items.length,
                         separatorBuilder:
@@ -7889,29 +7934,37 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
                           final actualIndex = allItems.indexOf(item);
                           final isCurrent = actualIndex == queue.currentIndex;
 
-                          return _PlaybackQueueRow(
-                            item: item,
-                            index: index,
-                            isCurrent: isCurrent,
-                            onPlay: () {
-                              Navigator.of(context).pop();
-                              unawaited(
-                                ref
-                                    .read(
-                                      playbackQueueControllerProvider.notifier,
-                                    )
-                                    .playQueueIndex(actualIndex),
-                              );
-                            },
-                            onRemove: () {
-                              unawaited(
-                                ref
-                                    .read(
-                                      playbackQueueControllerProvider.notifier,
-                                    )
-                                    .removePlaybackQueueItemAt(actualIndex),
-                              );
-                            },
+                          return KeyedSubtree(
+                            key:
+                                isCurrent
+                                    ? _currentRowKey
+                                    : ValueKey(item.path),
+                            child: _PlaybackQueueRow(
+                              item: item,
+                              index: index,
+                              isCurrent: isCurrent,
+                              onPlay: () {
+                                Navigator.of(context).pop();
+                                unawaited(
+                                  ref
+                                      .read(
+                                        playbackQueueControllerProvider
+                                            .notifier,
+                                      )
+                                      .playQueueIndex(actualIndex),
+                                );
+                              },
+                              onRemove: () {
+                                unawaited(
+                                  ref
+                                      .read(
+                                        playbackQueueControllerProvider
+                                            .notifier,
+                                      )
+                                      .removePlaybackQueueItemAt(actualIndex),
+                                );
+                              },
+                            ),
                           );
                         },
                       ),
@@ -8396,10 +8449,15 @@ class _MediaProbeDetails extends StatelessWidget {
           if (primaryVideo?.codecName case final String codec) '视频 $codec',
           if (primaryVideo?.displaySize case final String size) size,
           if (primaryAudio?.codecName case final String codec) '音频 $codec',
+          if (primaryAudio?.bitRate case final int bitRate when bitRate > 0)
+            '${(bitRate / 1000).round()} kbps',
           if (primaryAudio?.sampleRate case final int sampleRate)
-            '${sampleRate ~/ 1000} kHz',
+            sampleRate % 1000 == 0
+                ? '${sampleRate ~/ 1000} kHz'
+                : '${(sampleRate / 1000).toStringAsFixed(1)} kHz',
           if (primaryAudio?.channels case final int channels)
             channels == 1 ? '单声道' : '$channels 声道',
+          if (_audioQualityTag(primaryAudio) case final String tag) tag,
           if (data.duration case final Duration duration)
             _formatDurationLong(duration),
         ];
@@ -9342,13 +9400,13 @@ class _UiStyleSwitch extends StatelessWidget {
     final activeIndex = styles.indexOf(active);
 
     return Container(
-      width: 130,
-      height: 36,
+      width: 132,
+      height: 38,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+        color: Colors.black.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -9367,15 +9425,15 @@ class _UiStyleSwitch extends StatelessWidget {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        palette.seed.withValues(alpha: 0.92),
-                        Color.lerp(palette.seed, palette.accent, 0.55)!,
+                        palette.accent.withValues(alpha: 0.92),
+                        Color.lerp(palette.accent, palette.seed, 0.36)!,
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
-                        color: palette.seed.withValues(alpha: 0.42),
-                        blurRadius: 10,
+                        color: palette.accent.withValues(alpha: 0.20),
+                        blurRadius: 8,
                       ),
                     ],
                   ),
@@ -9400,7 +9458,9 @@ class _UiStyleSwitch extends StatelessWidget {
                                 size: 13,
                                 color:
                                     style == active
-                                        ? heniReadableForegroundOn(palette.seed)
+                                        ? heniReadableForegroundOn(
+                                          palette.accent,
+                                        )
                                         : Colors.white.withValues(alpha: 0.62),
                               ),
                               const SizedBox(width: 4),
@@ -9414,7 +9474,7 @@ class _UiStyleSwitch extends StatelessWidget {
                                     color:
                                         style == active
                                             ? heniReadableForegroundOn(
-                                              palette.seed,
+                                              palette.accent,
                                             )
                                             : Colors.white.withValues(
                                               alpha: 0.62,

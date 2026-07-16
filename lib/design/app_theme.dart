@@ -358,13 +358,13 @@ class HeniTheme {
           backgroundColor: palette.accent,
           foregroundColor: scheme.onPrimary,
           minimumSize: const Size(44, 38),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
           textStyle: textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w700,
             letterSpacing: 0.08,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
       ),
@@ -379,7 +379,7 @@ class HeniTheme {
             letterSpacing: 0.08,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
       ),
@@ -394,15 +394,15 @@ class HeniTheme {
           vertical: 13,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: palette.seed.withValues(alpha: 0.42)),
         ),
       ),
@@ -415,7 +415,7 @@ class HeniTheme {
             BorderSide(color: Colors.white.withValues(alpha: 0.1)),
           ),
           shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
@@ -426,7 +426,7 @@ class HeniTheme {
         ),
       ),
       dialogTheme: DialogThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: Color.alphaBlend(
           palette.surfaceAlt.withValues(alpha: 0.92),
           palette.surface,
@@ -446,7 +446,7 @@ class HeniTheme {
           palette.surfaceAlt.withValues(alpha: 0.94),
           palette.surface,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         menuPadding: const EdgeInsets.symmetric(vertical: 8),
         textStyle: textTheme.bodyMedium,
       ),

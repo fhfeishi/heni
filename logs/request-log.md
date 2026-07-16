@@ -1992,3 +1992,93 @@ request that changes Heni.
   current queue, export, volume, and key songs-panel icon buttons.
 - Added a theme test that prevents the white palette from regressing to pure
   white controls with weak icon contrast.
+
+## 2026-07-16 - Playback Quality Audit And Editorial UI Redesign
+
+### User Request
+
+- Check whether playback contains incorrect compression or playback logic that
+  lowers sound quality.
+- Consider that part of the library comes from web-downloaded MP4 files.
+- Substantially redesign the player UI because the existing interface still
+  feels visually unsatisfying.
+
+### Understanding
+
+- Local playback should open the source file directly without an implicit
+  FFmpeg conversion, equalizer, loudness normalizer, pitch filter, or volume
+  boost.
+- Perceived harshness can still come from low-bitrate AAC/MP3 sources and from
+  rendering pressure caused by a continuously rebuilding, heavily blurred
+  desktop shell.
+- The UI needs fewer nested glass cards, pills, animated glows, and decorative
+  motion; content hierarchy and reliable responsive layout should carry the
+  visual identity.
+
+### Should Do
+
+- Make the neutral `media_kit` playback configuration explicit.
+- Remove playback-position-driven full-window decoration updates and reduce
+  full-screen blur/animation load.
+- Surface codec, bitrate, sample rate, and basic source-quality hints in the
+  now-playing area.
+- Rebuild the desktop shell with a flatter editorial header, responsive icon
+  rail, quieter library workspace, and a fixed bottom player dock.
+- Verify wide and compact Windows layouts for clipping and overflow.
+
+### Done
+
+- Confirmed that playback opens the original local media path directly and does
+  not pass through the FFmpeg export pipeline or any runtime audio filter.
+- Added an explicit neutral player configuration with pitch control disabled,
+  startup mute disabled, and no native on-screen controls.
+- Removed the playback-position subscription from the full-window ambient
+  backdrop and replaced continuously animated background decoration with a
+  restrained static treatment.
+- Added codec, bitrate, sample-rate, lossless, and low-bitrate source indicators
+  to the playback metadata.
+- Reworked the navigation, sidebar, playlist header, songs table, global
+  materials, controls, and responsive breakpoints into a calmer editorial
+  desktop layout.
+- Anchored the player controls in a dedicated bottom dock so content cannot push
+  them out of view.
+- Corrected an 8-pixel overflow in the full desktop bottom-player layout found
+  during DPI-aware Windows screenshot QA.
+
+## 2026-07-16 - Queue Current-Track Locator And Export Removal
+
+### User Request
+
+- Verify why the previously discussed update did not appear in the player.
+- Add a direct way to locate the currently playing track in the playback queue.
+- Remove the FLAC/audio export feature because transcoding lossy sources to FLAC
+  does not improve sound quality.
+- Continue the usability work in the direction established by the earlier
+  player redesign.
+
+### Understanding
+
+- The earlier queue/export discussion had only been recorded in design
+  documents; it had not yet been applied to the running application.
+- Locating the current item must work even when it is outside the lazily built
+  portion of a long queue.
+- A search query that hides the current item should be cleared when the user
+  explicitly asks to locate that item.
+- Removing audio export should remove its UI, controller, FFmpeg editor path,
+  and obsolete tests without removing FLAC or Opus playback support.
+
+### Done
+
+- Added automatic current-track centering when the playback queue opens.
+- Added an always-visible `定位当前歌曲` action beside queue search.
+- Added two-stage queue scrolling so current tracks outside the currently built
+  list rows can still be brought into view.
+- Clear only a search query that blocks the current item; matching queries are
+  preserved.
+- Removed the player audio-export UI and the associated controller, FFmpeg
+  editor, command-building API, provider, and export-only tests.
+- Kept FLAC and Opus in the supported local playback extensions.
+- Verified the source with `flutter analyze` and rebuilt the Windows Debug
+  executable successfully.
+- The full Flutter test suite could not load because every test runner listener
+  connection to local `127.0.0.1` timed out before any test case executed.
