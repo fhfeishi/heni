@@ -21,8 +21,11 @@ import '../../../services/media/playback_providers.dart';
 import '../../scenery/presentation/scenery_stage.dart';
 import '../application/playback_queue_controller.dart';
 import '../application/player_state.dart';
+import '../application/sidebar_mode.dart';
+import 'adaptive_sidebar.dart';
 import 'playback_queue_location.dart';
 import 'player_progress.dart';
+import 'player_responsive_layout.dart';
 
 const _hoverDuration = Duration(milliseconds: 220);
 const _hoverCurve = Curves.easeOutCubic;
@@ -475,12 +478,13 @@ class _ShellLayout {
           : compact
           ? 84
           : 88;
-  double get sidebarWidth =>
-      quiet
-          ? 58
-          : compact
-          ? 214
-          : 232;
+  double sidebarWidth(HeniSidebarMode mode) {
+    return switch (mode) {
+      HeniSidebarMode.expanded => 224,
+      HeniSidebarMode.compact => 72,
+    };
+  }
+
   double get sidebarPadding => narrow ? 8 : 12;
   double get topHorizontalMargin => narrow ? 8 : 12;
   double get contentGap => narrow ? 8 : 12;
@@ -1099,6 +1103,7 @@ class PlayerScreen extends ConsumerWidget {
     final engine = ref.watch(playbackEngineProvider);
     final videoController = ref.watch(videoControllerProvider);
     final focusMode = ref.watch(focusModeProvider);
+    final sidebarPreference = ref.watch(sidebarModeProvider);
 
     return Scaffold(
       body: Stack(
@@ -1154,7 +1159,7 @@ class PlayerScreen extends ConsumerWidget {
                                   children: [
                                     AnimatedSize(
                                       duration: const Duration(
-                                        milliseconds: 360,
+                                        milliseconds: 200,
                                       ),
                                       curve: Curves.easeOutCubic,
                                       child:
@@ -1170,51 +1175,93 @@ class PlayerScreen extends ConsumerWidget {
                                                             )
                                                             .toggle(),
                                               )
-                                              : _Sidebar(
-                                                palette: palette,
-                                                queue: queue,
-                                                layout: layout,
-                                                onCreatePlaylist:
-                                                    () => _createPlaylist(
-                                                      context,
-                                                      ref,
-                                                    ),
-                                                onSelectPlaylist: (playlistId) {
-                                                  ref
-                                                      .read(
-                                                        playbackQueueControllerProvider
-                                                            .notifier,
-                                                      )
-                                                      .selectPlaylist(
+                                              : HeniAdaptiveSidebar(
+                                                availableWidth:
+                                                    constraints.maxWidth,
+                                                preference: sidebarPreference,
+                                                builder: (
+                                                  context,
+                                                  effectiveMode,
+                                                  widthForcedCompact,
+                                                ) {
+                                                  return _Sidebar(
+                                                    palette: palette,
+                                                    queue: queue,
+                                                    layout: layout,
+                                                    mode: effectiveMode,
+                                                    widthForcedCompact:
+                                                        widthForcedCompact,
+                                                    onModeChanged: (mode) {
+                                                      ref
+                                                          .read(
+                                                            sidebarModeProvider
+                                                                .notifier,
+                                                          )
+                                                          .select(mode);
+                                                      unawaited(
+                                                        ref
+                                                            .read(
+                                                              playbackQueueControllerProvider
+                                                                  .notifier,
+                                                            )
+                                                            .persistShellPreferences(
+                                                              sidebarMode: mode,
+                                                            ),
+                                                      );
+                                                    },
+                                                    onCreatePlaylist:
+                                                        () => _createPlaylist(
+                                                          context,
+                                                          ref,
+                                                        ),
+                                                    onSelectPlaylist: (
+                                                      playlistId,
+                                                    ) {
+                                                      ref
+                                                          .read(
+                                                            playbackQueueControllerProvider
+                                                                .notifier,
+                                                          )
+                                                          .selectPlaylist(
+                                                            playlistId,
+                                                          );
+                                                    },
+                                                    onAddFromLibrary: (
+                                                      playlistId,
+                                                    ) {
+                                                      _addFromLibrary(
+                                                        context,
+                                                        ref,
                                                         playlistId,
                                                       );
-                                                },
-                                                onAddFromLibrary: (playlistId) {
-                                                  _addFromLibrary(
-                                                    context,
-                                                    ref,
-                                                    playlistId,
-                                                  );
-                                                },
-                                                onRenamePlaylist: (playlist) {
-                                                  _renamePlaylist(
-                                                    context,
-                                                    ref,
-                                                    playlist,
-                                                  );
-                                                },
-                                                onEditDescription: (playlist) {
-                                                  _editPlaylistDescription(
-                                                    context,
-                                                    ref,
-                                                    playlist,
-                                                  );
-                                                },
-                                                onDeletePlaylist: (playlist) {
-                                                  _confirmDeletePlaylist(
-                                                    context,
-                                                    ref,
-                                                    playlist,
+                                                    },
+                                                    onRenamePlaylist: (
+                                                      playlist,
+                                                    ) {
+                                                      _renamePlaylist(
+                                                        context,
+                                                        ref,
+                                                        playlist,
+                                                      );
+                                                    },
+                                                    onEditDescription: (
+                                                      playlist,
+                                                    ) {
+                                                      _editPlaylistDescription(
+                                                        context,
+                                                        ref,
+                                                        playlist,
+                                                      );
+                                                    },
+                                                    onDeletePlaylist: (
+                                                      playlist,
+                                                    ) {
+                                                      _confirmDeletePlaylist(
+                                                        context,
+                                                        ref,
+                                                        playlist,
+                                                      );
+                                                    },
                                                   );
                                                 },
                                               ),
@@ -1895,6 +1942,9 @@ class _Sidebar extends StatelessWidget {
     required this.palette,
     required this.queue,
     required this.layout,
+    required this.mode,
+    required this.widthForcedCompact,
+    required this.onModeChanged,
     required this.onCreatePlaylist,
     required this.onSelectPlaylist,
     required this.onAddFromLibrary,
@@ -1906,6 +1956,9 @@ class _Sidebar extends StatelessWidget {
   final HeniPalette palette;
   final PlaybackQueueState queue;
   final _ShellLayout layout;
+  final HeniSidebarMode mode;
+  final bool widthForcedCompact;
+  final ValueChanged<HeniSidebarMode> onModeChanged;
   final VoidCallback onCreatePlaylist;
   final ValueChanged<String> onSelectPlaylist;
   final ValueChanged<String> onAddFromLibrary;
@@ -1915,11 +1968,13 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (layout.quiet) {
+    if (mode == HeniSidebarMode.compact) {
       return _CompactSidebar(
         palette: palette,
         queue: queue,
         layout: layout,
+        widthForcedCompact: widthForcedCompact,
+        onModeChanged: onModeChanged,
         onCreatePlaylist: onCreatePlaylist,
         onSelectPlaylist: onSelectPlaylist,
       );
@@ -1959,11 +2014,27 @@ class _Sidebar extends StatelessWidget {
             child: AnimatedContainer(
               duration: _contentSwitchDuration,
               curve: _hoverCurve,
-              width: layout.sidebarWidth,
+              width: layout.sidebarWidth(mode),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _SidebarSectionHeader(title: '浏览'),
+                  _SidebarSectionHeader(
+                    title: '浏览',
+                    action: IconButton(
+                      tooltip: '收起侧边栏',
+                      onPressed: () => onModeChanged(HeniSidebarMode.compact),
+                      icon: const Icon(
+                        Icons.keyboard_double_arrow_left_rounded,
+                        size: 18,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 28,
+                        minHeight: 28,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   _PlaylistTile(
                     palette: palette,
@@ -2005,6 +2076,9 @@ class _Sidebar extends StatelessWidget {
                               message: '从曲库挑歌加入歌单，慢慢搭起自己的收藏。',
                             )
                             : ListView(
+                              key: const PageStorageKey(
+                                'expanded-sidebar-playlists',
+                              ),
                               children: [
                                 for (final playlist in queue.playlists)
                                   _PlaylistTile(
@@ -2095,6 +2169,8 @@ class _CompactSidebar extends StatelessWidget {
     required this.palette,
     required this.queue,
     required this.layout,
+    required this.widthForcedCompact,
+    required this.onModeChanged,
     required this.onCreatePlaylist,
     required this.onSelectPlaylist,
   });
@@ -2102,6 +2178,8 @@ class _CompactSidebar extends StatelessWidget {
   final HeniPalette palette;
   final PlaybackQueueState queue;
   final _ShellLayout layout;
+  final bool widthForcedCompact;
+  final ValueChanged<HeniSidebarMode> onModeChanged;
   final VoidCallback onCreatePlaylist;
   final ValueChanged<String> onSelectPlaylist;
 
@@ -2186,9 +2264,36 @@ class _CompactSidebar extends StatelessWidget {
         borderColor: _shellGlassBorder(palette, emphasis: 0.42),
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 10),
         child: SizedBox(
-          width: layout.sidebarWidth,
+          width: layout.sidebarWidth(HeniSidebarMode.compact),
           child: Column(
             children: [
+              IconButton(
+                tooltip: widthForcedCompact ? '窗口宽度不足，拉宽后可展开' : '展开侧边栏',
+                onPressed:
+                    widthForcedCompact
+                        ? null
+                        : () => onModeChanged(HeniSidebarMode.expanded),
+                icon: const Icon(
+                  Icons.keyboard_double_arrow_right_rounded,
+                  size: 20,
+                ),
+                style: IconButton.styleFrom(
+                  fixedSize: const Size.square(42),
+                  foregroundColor: _secondaryGlassText(emphasis: 1.04),
+                  disabledForegroundColor: _tertiaryGlassText(),
+                  backgroundColor: Colors.white.withValues(alpha: 0.025),
+                  disabledBackgroundColor: Colors.white.withValues(
+                    alpha: 0.012,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 10),
+                child: Divider(height: 1),
+              ),
               destination(
                 tooltip: '本地曲库',
                 icon: Icons.library_music_outlined,
@@ -6248,7 +6353,11 @@ class _BottomPlayerBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final focusMode = ref.watch(focusModeProvider);
     final windowWidth = MediaQuery.sizeOf(context).width;
-    final compactBottom = focusMode || windowWidth < 1180;
+    final compactBottom = shouldUseCompactBottomBar(
+      windowWidth: windowWidth,
+      focusMode: focusMode,
+      verticallyDense: layout.quiet,
+    );
 
     return _ShellBand(
       palette: palette,

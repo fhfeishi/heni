@@ -2117,3 +2117,50 @@ request that changes Heni.
 - `flutter analyze` and the Windows Debug build pass. Flutter widget test
   execution remains blocked before assertions by the existing local
   `127.0.0.1` listener timeout.
+
+## 2026-07-16 - Adaptive Expanded And Compact Sidebar
+
+### User Request
+
+- Prevent the full UI from shrinking into an unusable layout.
+- Replace the always-small default sidebar with two intentional modes.
+- Keep a labeled expanded sidebar for comfortable widths.
+- Automatically use the compact rail when the window is narrow and restore the
+  appropriate wide-window mode afterwards.
+- Base the interaction on mature desktop music-player patterns.
+
+### Root Cause
+
+- Sidebar presentation was tied to the shared `quiet` layout flag:
+  `width < 1120 || height < 740`.
+- The default `1280 × 720` window therefore used the compact sidebar only
+  because its height was 20 logical pixels below the unrelated density
+  threshold.
+- The previous compact content width was about 58 logical pixels and there was
+  no manual preference, persistence, or resize hysteresis.
+
+### Done
+
+- Added explicit `expanded` and `compact` sidebar preferences, defaulting to
+  expanded.
+- Expanded mode is 224 logical pixels and retains destination labels, playlist
+  names, icons, and counts.
+- Compact mode is 72 logical pixels with icon destinations, tooltips, and a
+  dedicated expand control.
+- Added a collapse control beside the expanded `浏览` heading.
+- Added width hysteresis: enter forced compact at 1040, release at 1140, and use
+  1080 for the initial layout decision.
+- Automatic narrow-window compaction never overwrites the stored manual
+  preference.
+- A forced compact expand control remains visible but disabled with the tooltip
+  `窗口宽度不足，拉宽后可展开`.
+- Persisted the manual preference as `sidebarMode` in the Heni library config.
+- Verified manual compact/expanded changes write the config and that restart
+  restores the expanded preference.
+- Corrected a related default-size bottom overflow by using the compact bottom
+  bar when vertical density is constrained.
+- Screenshot QA confirms labeled expanded mode at 1280 × 720, forced compact at
+  width 1000, compact retention in the hysteresis band, and expanded restoration
+  at width 1180.
+- Static analysis and the Windows Debug build pass. Flutter test execution
+  remains blocked before assertions by the existing local listener timeout.

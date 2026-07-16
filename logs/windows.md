@@ -491,3 +491,21 @@ Current test count: 29 passing tests.
   verifies Windows clamps Heni to its minimum size.
 - On the current 200% DPI monitor, the verified minimum outer window is
   `913 × 656`, with no progress/time overlap or Flutter overflow banners.
+
+## 2026-07-16 - Mature Adaptive Sidebar Interaction
+
+- The default Windows player now opens with a labeled 224-pixel expanded
+  sidebar instead of incorrectly selecting the icon rail from window height.
+- Added a 72-pixel compact rail with an explicit expand control, icon
+  destinations, stable hit targets, and explanatory tooltips.
+- Manual expanded/compact preference persists as `sidebarMode`; automatic
+  narrow-window compaction remains transient.
+- Width hysteresis enters compact at 1040 and releases at 1140, preventing
+  repeated sidebar flicker during slow resize.
+- When expansion is blocked by width, the expand control remains visible and
+  explains that the window must be widened.
+- The default 1280 × 720 layout now uses a compact bottom bar because of its
+  vertical density, eliminating the 10-pixel overflow observed during the first
+  expanded-sidebar QA capture.
+- DPI-aware screenshots verified expanded, narrow compact, hysteresis compact,
+  restored expanded, and manual compact states.

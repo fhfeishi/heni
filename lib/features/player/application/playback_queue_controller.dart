@@ -16,6 +16,7 @@ import '../../../services/media/local_media_scanner.dart';
 import '../../../services/media/playback_providers.dart';
 import '../../../services/storage/heni_library_store.dart';
 import 'player_state.dart';
+import 'sidebar_mode.dart';
 
 const heniLibraryPlaylistId = 'heni-library';
 const heniPlaybackQueueId = 'heni-playback-queue';
@@ -40,6 +41,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   bool _launchMediaHandled = false;
   String? _persistedPaletteName;
   String? _persistedUiStyleName;
+  String? _persistedSidebarModeName;
   List<String> _persistedSceneryImagePaths = const [];
   double? _persistedVolumeLevel;
 
@@ -459,10 +461,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     }
 
     if (additions.isEmpty) {
-      state = state.copyWith(
-        statusMessage: '所选歌曲已在当前播放列表中',
-        lastError: null,
-      );
+      state = state.copyWith(statusMessage: '所选歌曲已在当前播放列表中', lastError: null);
       return;
     }
 
@@ -517,10 +516,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     }
 
     if (additions.isEmpty) {
-      state = state.copyWith(
-        statusMessage: '所选歌曲已在当前播放列表中',
-        lastError: null,
-      );
+      state = state.copyWith(statusMessage: '所选歌曲已在当前播放列表中', lastError: null);
       return;
     }
 
@@ -649,6 +645,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   Future<void> persistShellPreferences({
     HeniPalette? palette,
     HeniUiStyle? uiStyle,
+    HeniSidebarMode? sidebarMode,
     List<String>? sceneryImagePaths,
   }) async {
     if (palette != null) {
@@ -657,12 +654,16 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     if (uiStyle != null) {
       _persistedUiStyleName = uiStyle.name;
     }
+    if (sidebarMode != null) {
+      _persistedSidebarModeName = sidebarMode.name;
+    }
     if (sceneryImagePaths != null) {
       _persistedSceneryImagePaths = List.unmodifiable(sceneryImagePaths);
     }
     await _persistState(
       paletteName: _persistedPaletteName,
       uiStyleName: _persistedUiStyleName,
+      sidebarModeName: _persistedSidebarModeName,
       sceneryImagePaths: _persistedSceneryImagePaths,
     );
   }
@@ -696,6 +697,10 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
         _persistedUiStyleName = uiStyleName;
         ref.read(activeUiStyleProvider.notifier).restoreByName(uiStyleName);
       }
+      _persistedSidebarModeName = config.sidebarModeName;
+      ref
+          .read(sidebarModeProvider.notifier)
+          .restoreByName(config.sidebarModeName);
       _persistedVolumeLevel = config.volumeLevel?.clamp(0, 100).toDouble();
       _persistedSceneryImagePaths = List.unmodifiable(config.sceneryImagePaths);
       if (config.sceneryImagePaths.isNotEmpty) {
@@ -1090,6 +1095,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   Future<void> _persistState({
     String? paletteName,
     String? uiStyleName,
+    String? sidebarModeName,
     List<String>? sceneryImagePaths,
     double? volumeLevel,
   }) async {
@@ -1113,6 +1119,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
       autoplayOnLoad: state.autoplayOnLoad,
       activePaletteName: paletteName ?? _persistedPaletteName,
       activeUiStyle: uiStyleName ?? _persistedUiStyleName,
+      sidebarModeName: sidebarModeName ?? _persistedSidebarModeName,
       sceneryImagePaths: sceneryImagePaths ?? _persistedSceneryImagePaths,
       volumeLevel: volumeLevel ?? _persistedVolumeLevel,
     );

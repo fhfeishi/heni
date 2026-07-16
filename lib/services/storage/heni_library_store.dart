@@ -25,6 +25,7 @@ class HeniLibraryConfig {
     this.sceneryImagePaths = const [],
     this.activePaletteName,
     this.activeUiStyle,
+    this.sidebarModeName,
     this.playbackModeName,
     this.volumeLevel,
     this.recursiveScan = true,
@@ -44,6 +45,7 @@ class HeniLibraryConfig {
       sceneryImagePaths: _stringList(json['sceneryImagePaths']),
       activePaletteName: _string(json['activePaletteName']),
       activeUiStyle: _string(json['activeUiStyle']),
+      sidebarModeName: _string(json['sidebarMode']),
       playbackModeName: _string(json['playbackModeName']),
       volumeLevel: _double(json['volumeLevel']),
       recursiveScan: _bool(json['recursiveScan']) ?? true,
@@ -60,6 +62,7 @@ class HeniLibraryConfig {
   final List<String> sceneryImagePaths;
   final String? activePaletteName;
   final String? activeUiStyle;
+  final String? sidebarModeName;
   final String? playbackModeName;
   final double? volumeLevel;
   final bool recursiveScan;
@@ -86,6 +89,7 @@ class HeniLibraryConfig {
         sceneryImagePaths.isEmpty &&
         activePaletteName == null &&
         activeUiStyle == null &&
+        sidebarModeName == null &&
         playbackModeName == null &&
         volumeLevel == null;
   }
@@ -101,6 +105,7 @@ class HeniLibraryConfig {
       'sceneryImagePaths': sceneryImagePaths,
       'activePaletteName': activePaletteName,
       'activeUiStyle': activeUiStyle,
+      'sidebarMode': sidebarModeName,
       'playbackModeName': playbackModeName,
       'volumeLevel': volumeLevel,
       'recursiveScan': recursiveScan,

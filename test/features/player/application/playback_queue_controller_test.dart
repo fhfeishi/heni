@@ -8,6 +8,7 @@ import 'package:heni/domain/media/media_kind.dart';
 import 'package:heni/domain/media/media_probe.dart';
 import 'package:heni/domain/playback/playback_mode.dart';
 import 'package:heni/features/player/application/playback_queue_controller.dart';
+import 'package:heni/features/player/application/sidebar_mode.dart';
 import 'package:heni/services/ffmpeg/media_inspector.dart';
 import 'package:heni/services/ffmpeg/media_inspector_provider.dart';
 import 'package:heni/services/media/playback_engine.dart';
@@ -167,6 +168,31 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
       expect(restoredEngine.currentVolume, 37);
+    });
+
+    test('persists and restores the sidebar preference', () async {
+      final store = _MemoryLibraryStore();
+      final firstContainer = _container(_FakePlaybackEngine(), store: store);
+      addTearDown(firstContainer.dispose);
+
+      final firstController = firstContainer.read(
+        playbackQueueControllerProvider.notifier,
+      );
+      await firstController.persistShellPreferences(
+        sidebarMode: HeniSidebarMode.compact,
+      );
+
+      expect(store.latest?.sidebarModeName, HeniSidebarMode.compact.name);
+
+      final restoredContainer = _container(_FakePlaybackEngine(), store: store);
+      addTearDown(restoredContainer.dispose);
+      restoredContainer.read(playbackQueueControllerProvider.notifier);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(
+        restoredContainer.read(sidebarModeProvider),
+        HeniSidebarMode.compact,
+      );
     });
 
     test(
