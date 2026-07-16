@@ -124,7 +124,10 @@ mode change.
 The current-playlist dialog receives a persistent `ScrollController` and a
 current-row anchor strategy.
 
-- A `定位当前歌曲` action scrolls the current queue index to the visual center.
+- Opening the queue initially centers the current track when no queue search is
+  active.
+- An always-visible `定位当前歌曲` button in the queue toolbar re-centers the
+  current queue index at any time.
 - If the current item is filtered out, locating clears the queue search first.
 - If there is no current queue item, the action is disabled.
 - The current row uses a clear theme-accent marker without changing its height.
@@ -228,7 +231,7 @@ No empty lyrics toggle or placeholder remains.
 
 ### Audio Export
 
-Remove from the player feature:
+Remove the audio-export feature from the player completely:
 
 - FLAC/Opus extraction entry points;
 - export dialogs;
@@ -237,7 +240,7 @@ Remove from the player feature:
 
 FFmpeg media inspection remains. Audio-extraction requests, codecs, controller
 paths, dialogs, and tests with no remaining consumer should be deleted rather
-than hidden.
+than hidden. No replacement "lossless conversion" action is introduced.
 
 ## Practical Additions
 
@@ -384,10 +387,13 @@ The release is successful when Heni feels like one coherent Windows music
 player rather than a full interface compressed into arbitrary window sizes:
 
 - the current song is always easy to find;
+- opening the queue or pressing its locate button immediately reveals the
+  current song;
 - the queue is directly manageable;
 - full and mini modes are intentionally designed;
 - progress and volume remain clear at every supported size;
 - scenery supports the whole interface without dominating it;
 - the player performs no misleading audio conversion or unnecessary playback
   processing;
-- lyrics and low-value export controls no longer consume attention or resources.
+- lyrics and audio-export controls or background tasks no longer consume
+  attention or resources.
