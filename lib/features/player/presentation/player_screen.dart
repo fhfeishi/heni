@@ -18,11 +18,11 @@ import '../../../domain/playback/heni_playlist.dart';
 import '../../../domain/playback/playback_mode.dart';
 import '../../../services/media/playback_engine.dart';
 import '../../../services/media/playback_providers.dart';
-import '../../scenery/presentation/scenery_stage.dart';
 import '../application/playback_queue_controller.dart';
 import '../application/player_state.dart';
 import '../application/sidebar_mode.dart';
 import 'adaptive_sidebar.dart';
+import 'global_scenery_backdrop.dart';
 import 'playback_queue_location.dart';
 import 'player_progress.dart';
 import 'player_responsive_layout.dart';
@@ -1109,16 +1109,24 @@ class PlayerScreen extends ConsumerWidget {
     return Scaffold(
       body: Stack(
         children: [
-          Positioned.fill(child: _AmbientBackdrop(palette: palette)),
           Positioned.fill(
-            child: IgnorePointer(child: _CornerGlow(palette: palette)),
+            child: GlobalSceneryBackdrop(
+              imagePaths: sceneryImages,
+              palette: palette,
+              mode:
+                  uiStyle == HeniUiStyle.scenery
+                      ? HeniBackdropMode.playback
+                      : HeniBackdropMode.library,
+            ),
           ),
           Positioned.fill(
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 520),
               curve: Curves.easeOutCubic,
               decoration: BoxDecoration(
-                color: palette.surface.withValues(alpha: 0.74),
+                color: palette.surface.withValues(
+                  alpha: uiStyle == HeniUiStyle.scenery ? 0.16 : 0.30,
+                ),
               ),
               child: SafeArea(
                 child: LayoutBuilder(
@@ -1271,7 +1279,6 @@ class PlayerScreen extends ConsumerWidget {
                                       child: _ContentArea(
                                         palette: palette,
                                         uiStyle: uiStyle,
-                                        sceneryImages: sceneryImages,
                                         queue: queue,
                                         currentMedia: currentMedia,
                                         mediaProbe: mediaProbe,
@@ -2950,7 +2957,6 @@ class _ContentArea extends ConsumerWidget {
   const _ContentArea({
     required this.palette,
     required this.uiStyle,
-    required this.sceneryImages,
     required this.queue,
     required this.currentMedia,
     required this.mediaProbe,
@@ -2975,7 +2981,6 @@ class _ContentArea extends ConsumerWidget {
 
   final HeniPalette palette;
   final HeniUiStyle uiStyle;
-  final List<String> sceneryImages;
   final PlaybackQueueState queue;
   final MediaItem? currentMedia;
   final AsyncValue<MediaProbe?> mediaProbe;
@@ -3066,7 +3071,6 @@ class _ContentArea extends ConsumerWidget {
               ),
               _ => _SceneryContent(
                 palette: palette,
-                imagePaths: sceneryImages,
                 currentMedia: currentMedia,
                 mediaProbe: mediaProbe,
                 lyrics: lyrics,
@@ -3853,7 +3857,6 @@ class _HeadingChip extends StatelessWidget {
 class _SceneryContent extends ConsumerWidget {
   const _SceneryContent({
     required this.palette,
-    required this.imagePaths,
     required this.currentMedia,
     required this.mediaProbe,
     required this.lyrics,
@@ -3863,7 +3866,6 @@ class _SceneryContent extends ConsumerWidget {
   });
 
   final HeniPalette palette;
-  final List<String> imagePaths;
   final MediaItem? currentMedia;
   final AsyncValue<MediaProbe?> mediaProbe;
   final AsyncValue<LyricsDocument> lyrics;
@@ -3891,10 +3893,19 @@ class _SceneryContent extends ConsumerWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              SceneryStage(
-                imagePaths: imagePaths,
-                palette: palette,
-                isPlaying: isPlaying,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 420),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      palette.surface.withValues(alpha: 0.18),
+                      palette.seed.withValues(alpha: 0.06),
+                      palette.surfaceAlt.withValues(alpha: 0.24),
+                    ],
+                  ),
+                ),
               ),
               if (!focusMode)
                 Positioned.fill(
