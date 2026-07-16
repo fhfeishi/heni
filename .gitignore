@@ -34,3 +34,4 @@ windows/flutter/ephemeral/
 *.temp
 
 .superpowers/
+.worktrees/
