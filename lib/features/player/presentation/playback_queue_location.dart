@@ -1,5 +1,12 @@
 import '../../../domain/media/media_item.dart';
 
+double playbackQueueDialogContentHeight(double availableHeight) {
+  if (!availableHeight.isFinite) {
+    return 550;
+  }
+  return availableHeight.clamp(0, 550);
+}
+
 String queryForLocatingCurrentTrack({
   required List<MediaItem> items,
   required int currentIndex,

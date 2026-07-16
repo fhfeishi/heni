@@ -54,6 +54,10 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_APP + 1) {
+    return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+  }
+
   if (message == WM_SIZE) {
     NotifyMaximizedChanged(hwnd);
   }

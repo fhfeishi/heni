@@ -16,6 +16,7 @@ import '../../../domain/media/media_path.dart';
 import '../../../domain/media/media_probe.dart';
 import '../../../domain/playback/heni_playlist.dart';
 import '../../../domain/playback/playback_mode.dart';
+import '../../../services/files/local_file_actions.dart';
 import '../../../services/media/playback_engine.dart';
 import '../../../services/media/playback_providers.dart';
 import '../application/playback_queue_controller.dart';
@@ -23,6 +24,7 @@ import '../application/player_state.dart';
 import '../application/sidebar_mode.dart';
 import 'adaptive_sidebar.dart';
 import 'global_scenery_backdrop.dart';
+import 'listening_console.dart';
 import 'playback_queue_location.dart';
 import 'player_progress.dart';
 import 'player_responsive_layout.dart';
@@ -37,6 +39,7 @@ const _compactIconSize = 18.0;
 const _libraryLeadColumnWidth = 64.0;
 const _libraryDurationColumnWidth = 64.0;
 const _libraryActionColumnWidth = 92.0;
+final _localFileActions = LocalFileActions();
 
 class _LibraryTableColumns {
   const _LibraryTableColumns({
@@ -120,15 +123,18 @@ class _LibraryTableColumns {
 
 Color _shellGlassFill(HeniPalette palette, {double emphasis = 1}) {
   return Color.alphaBlend(
-    Colors.white.withValues(alpha: 0.022 + 0.012 * emphasis),
-    Color.lerp(palette.surface, const Color(0xFF090B0F), 0.34)!,
+    palette.seed.withValues(alpha: 0.08 + 0.025 * emphasis),
+    Color.alphaBlend(
+      palette.surfaceAlt.withValues(alpha: 0.62 + 0.08 * emphasis),
+      palette.surface,
+    ),
   );
 }
 
 Color _shellGlassBorder(HeniPalette palette, {double emphasis = 1}) {
   return Color.alphaBlend(
-    palette.seed.withValues(alpha: 0.035 + 0.008 * emphasis),
-    Colors.white.withValues(alpha: 0.045),
+    palette.seed.withValues(alpha: 0.12 + 0.025 * emphasis),
+    Colors.white.withValues(alpha: 0.055),
   );
 }
 
@@ -1100,7 +1106,6 @@ class PlayerScreen extends ConsumerWidget {
     final queue = ref.watch(playbackQueueControllerProvider);
     final currentMedia = queue.currentItem ?? ref.watch(currentMediaProvider);
     final mediaProbe = ref.watch(currentMediaProbeProvider);
-    final lyrics = ref.watch(currentLyricsProvider);
     final engine = ref.watch(playbackEngineProvider);
     final videoController = ref.watch(videoControllerProvider);
     final focusMode = ref.watch(focusModeProvider);
@@ -1282,13 +1287,26 @@ class PlayerScreen extends ConsumerWidget {
                                         queue: queue,
                                         currentMedia: currentMedia,
                                         mediaProbe: mediaProbe,
-                                        lyrics: lyrics,
                                         engine: engine,
                                         videoController: videoController,
                                         layout: layout,
                                         onPickScenery: () => _pickScenery(ref),
                                         onPickMedia: () => _pickMedia(ref),
                                         onPickFolder: () => _pickFolder(ref),
+                                        onShowPlaybackQueue:
+                                            () => _showPlaybackQueue(
+                                              context,
+                                              ref,
+                                            ),
+                                        onOpenFileLocation:
+                                            currentMedia == null
+                                                ? () {}
+                                                : () => unawaited(
+                                                  _openFileLocation(
+                                                    ref,
+                                                    currentMedia,
+                                                  ),
+                                                ),
                                         onRefreshLibrary: () {
                                           unawaited(
                                             ref
@@ -1689,6 +1707,17 @@ class PlayerScreen extends ConsumerWidget {
         builder: (context) => const _PlaybackQueueDialog(),
       );
     });
+  }
+
+  Future<void> _openFileLocation(WidgetRef ref, MediaItem media) async {
+    final result = await _localFileActions.revealInFileManager(media.path);
+    final message = switch (result) {
+      LocalFileActionResult.success => '已打开文件位置',
+      LocalFileActionResult.missing => '文件不存在，未修改曲库',
+      LocalFileActionResult.unsupported => '当前平台不支持打开文件位置',
+      LocalFileActionResult.failed => '无法打开文件位置',
+    };
+    ref.read(playbackQueueControllerProvider.notifier).reportStatus(message);
   }
 
   Future<void> _runModalAction(
@@ -2960,13 +2989,14 @@ class _ContentArea extends ConsumerWidget {
     required this.queue,
     required this.currentMedia,
     required this.mediaProbe,
-    required this.lyrics,
     required this.engine,
     required this.videoController,
     required this.layout,
     required this.onPickScenery,
     required this.onPickMedia,
     required this.onPickFolder,
+    required this.onShowPlaybackQueue,
+    required this.onOpenFileLocation,
     required this.onRefreshLibrary,
     required this.onPlayIndex,
     required this.onAddToPlaylist,
@@ -2984,13 +3014,14 @@ class _ContentArea extends ConsumerWidget {
   final PlaybackQueueState queue;
   final MediaItem? currentMedia;
   final AsyncValue<MediaProbe?> mediaProbe;
-  final AsyncValue<LyricsDocument> lyrics;
   final PlaybackEngine engine;
   final VideoController videoController;
   final _ShellLayout layout;
   final VoidCallback onPickScenery;
   final VoidCallback onPickMedia;
   final VoidCallback onPickFolder;
+  final VoidCallback onShowPlaybackQueue;
+  final VoidCallback onOpenFileLocation;
   final VoidCallback onRefreshLibrary;
   final ValueChanged<int> onPlayIndex;
   final void Function(String playlistId, MediaItem item) onAddToPlaylist;
@@ -3071,12 +3102,16 @@ class _ContentArea extends ConsumerWidget {
               ),
               _ => _SceneryContent(
                 palette: palette,
+                queue: queue,
                 currentMedia: currentMedia,
                 mediaProbe: mediaProbe,
-                lyrics: lyrics,
                 engine: engine,
                 videoController: videoController,
                 layout: layout,
+                onShowPlaybackQueue: onShowPlaybackQueue,
+                onOpenFileLocation: onOpenFileLocation,
+                onPickMedia: onPickMedia,
+                onPickFolder: onPickFolder,
               ),
             },
           ),
@@ -3857,29 +3892,33 @@ class _HeadingChip extends StatelessWidget {
 class _SceneryContent extends ConsumerWidget {
   const _SceneryContent({
     required this.palette,
+    required this.queue,
     required this.currentMedia,
     required this.mediaProbe,
-    required this.lyrics,
     required this.engine,
     required this.videoController,
     required this.layout,
+    required this.onShowPlaybackQueue,
+    required this.onOpenFileLocation,
+    required this.onPickMedia,
+    required this.onPickFolder,
   });
 
   final HeniPalette palette;
+  final PlaybackQueueState queue;
   final MediaItem? currentMedia;
   final AsyncValue<MediaProbe?> mediaProbe;
-  final AsyncValue<LyricsDocument> lyrics;
   final PlaybackEngine engine;
   final VideoController videoController;
   final _ShellLayout layout;
+  final VoidCallback onShowPlaybackQueue;
+  final VoidCallback onOpenFileLocation;
+  final VoidCallback onPickMedia;
+  final VoidCallback onPickFolder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isVideo = currentMedia?.kind == MediaKind.video;
-    final hasLyrics = lyrics.maybeWhen(
-      data: (document) => document.lines.isNotEmpty,
-      orElse: () => false,
-    );
     final focusMode = ref.watch(focusModeProvider);
 
     return StreamBuilder<bool>(
@@ -3964,29 +4003,42 @@ class _SceneryContent extends ConsumerWidget {
                   ),
                 )
               else if (!focusMode)
-                _AudioHero(
-                  palette: palette,
-                  currentMedia: currentMedia,
-                  mediaProbe: mediaProbe,
-                  layout: layout,
-                  isPlaying: isPlaying,
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    layout.narrow ? 10 : 16,
+                    layout.narrow ? 10 : 16,
+                    layout.narrow ? 10 : 16,
+                    layout.narrow ? 10 : 16,
+                  ),
+                  child: HeniListeningConsole(
+                    palette: palette,
+                    currentMedia: currentMedia,
+                    nextMedia:
+                        queue.currentIndex >= 0 &&
+                                queue.currentIndex + 1 <
+                                    queue.playbackQueue.items.length
+                            ? queue.playbackQueue.items[queue.currentIndex + 1]
+                            : null,
+                    mediaProbe: mediaProbe,
+                    isPlaying: isPlaying,
+                    libraryItemCount: queue.library.items.length,
+                    libraryDirectoryCount: queue.libraryDirectories.length,
+                    statusMessage: queue.statusMessage,
+                    onLocateCurrent: onShowPlaybackQueue,
+                    onOpenFileLocation: onOpenFileLocation,
+                    onPickMedia: onPickMedia,
+                    onPickFolder: onPickFolder,
+                  ),
                 ),
               if (!focusMode && currentMedia != null && isVideo)
                 Positioned(
                   left: 24,
-                  bottom: hasLyrics ? 28 : 24,
+                  bottom: 24,
                   child: _SceneryInfoBlock(
                     palette: palette,
                     currentMedia: currentMedia,
                     mediaProbe: mediaProbe,
-                    compact: hasLyrics,
                   ),
-                ),
-              if (!focusMode && currentMedia != null && hasLyrics)
-                Positioned(
-                  right: 24,
-                  bottom: isVideo ? 28 : 24,
-                  child: _LyricsPanel(lyrics: lyrics, engine: engine),
                 ),
               Positioned(
                 top: 18,
@@ -4038,7 +4090,7 @@ class _FocusRecallStripState extends State<_FocusRecallStrip>
   @override
   Widget build(BuildContext context) {
     final p = widget.palette;
-    return MouseRegion(
+    final recall = MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
@@ -4087,6 +4139,23 @@ class _FocusRecallStripState extends State<_FocusRecallStrip>
             ),
           ),
         ),
+      ),
+    );
+
+    return SizedBox(
+      height: 40,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Positioned.fill(
+            child: HeniWindowDragRegion(child: SizedBox.expand()),
+          ),
+          Positioned(left: 0, right: 134, child: recall),
+          Positioned(
+            right: 6,
+            child: HeniWindowControls(palette: widget.palette),
+          ),
+        ],
       ),
     );
   }
@@ -4202,158 +4271,6 @@ class _FocusToggleButtonState extends State<_FocusToggleButton> {
   }
 }
 
-class _LyricsPanel extends StatelessWidget {
-  const _LyricsPanel({required this.lyrics, required this.engine});
-
-  final AsyncValue<LyricsDocument> lyrics;
-  final PlaybackEngine engine;
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 380),
-      child: _GlassPanel(
-        radius: 22,
-        fillColor: Colors.black.withValues(alpha: 0.24),
-        borderColor: Colors.white.withValues(alpha: 0.08),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        child: Padding(
-          padding: EdgeInsets.zero,
-          child: lyrics.when(
-            data: (document) {
-              final lines = document.lines;
-              if (lines.isEmpty) {
-                return const SizedBox.shrink();
-              }
-              return StreamBuilder<Duration>(
-                stream: engine.position,
-                initialData: Duration.zero,
-                builder: (context, snapshot) {
-                  final position = snapshot.data ?? Duration.zero;
-                  final currentIndex = _currentLyricIndex(lines, position);
-                  final visible = _visibleLyrics(lines, currentIndex);
-
-                  final headerText = [
-                    if (document.header.title case final String title) title,
-                    if (document.header.artist case final String artist) artist,
-                  ];
-
-                  return SizedBox(
-                    width: 380,
-                    height: 166,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          headerText.isEmpty ? '歌词' : headerText.join(' · '),
-                          textAlign: TextAlign.right,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.labelMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 220),
-                            switchInCurve: Curves.easeOutCubic,
-                            switchOutCurve: Curves.easeInOutCubic,
-                            child: Column(
-                              key: ValueKey('$currentIndex-${visible.length}'),
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                for (final entry in visible)
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 180),
-                                    margin: const EdgeInsets.only(top: 4),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          entry.key == currentIndex
-                                              ? Colors.white.withValues(
-                                                alpha: 0.06,
-                                              )
-                                              : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      entry.value.text,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.right,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodyMedium?.copyWith(
-                                        fontSize:
-                                            entry.key == currentIndex ? 17 : 14,
-                                        color:
-                                            entry.key == currentIndex
-                                                ? Theme.of(
-                                                  context,
-                                                ).colorScheme.primary
-                                                : Colors.white.withValues(
-                                                  alpha:
-                                                      entry.key < currentIndex
-                                                          ? 0.46
-                                                          : 0.6,
-                                                ),
-                                        fontWeight:
-                                            entry.key == currentIndex
-                                                ? FontWeight.w800
-                                                : FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
-            loading: () => const SizedBox.shrink(),
-            error: (error, stackTrace) => const SizedBox.shrink(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  int _currentLyricIndex(List<LyricLine> lines, Duration position) {
-    if (lines.every((line) => line.time == null)) {
-      return 0;
-    }
-
-    var index = 0;
-    for (var i = 0; i < lines.length; i += 1) {
-      final time = lines[i].time;
-      if (time != null && time <= position) {
-        index = i;
-      }
-    }
-    return index;
-  }
-
-  List<MapEntry<int, LyricLine>> _visibleLyrics(
-    List<LyricLine> lines,
-    int currentIndex,
-  ) {
-    final start = (currentIndex - 2).clamp(0, lines.length - 1);
-    final end = (currentIndex + 3).clamp(0, lines.length);
-    return [for (var i = start; i < end; i += 1) MapEntry(i, lines[i])];
-  }
-}
-
 class _VideoStage extends StatelessWidget {
   const _VideoStage({required this.videoController, required this.isPlaying});
 
@@ -4395,337 +4312,25 @@ class _VideoStage extends StatelessWidget {
   }
 }
 
-class _AudioHero extends StatelessWidget {
-  const _AudioHero({
-    required this.palette,
-    required this.currentMedia,
-    required this.mediaProbe,
-    required this.layout,
-    required this.isPlaying,
-  });
-
-  final HeniPalette palette;
-  final MediaItem? currentMedia;
-  final AsyncValue<MediaProbe?> mediaProbe;
-  final _ShellLayout layout;
-  final bool isPlaying;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final narrow = constraints.maxWidth < 1100;
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            narrow ? 26 : 36,
-            26,
-            narrow ? 26 : 36,
-            34,
-          ),
-          child: Align(
-            alignment: narrow ? Alignment.bottomLeft : Alignment.centerLeft,
-            child: _ListeningLoungeCard(
-              palette: palette,
-              currentMedia: currentMedia,
-              mediaProbe: mediaProbe,
-              compact: narrow,
-              isPlaying: isPlaying,
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ListeningLoungeCard extends StatelessWidget {
-  const _ListeningLoungeCard({
-    required this.palette,
-    required this.currentMedia,
-    required this.mediaProbe,
-    required this.compact,
-    required this.isPlaying,
-  });
-
-  final HeniPalette palette;
-  final MediaItem? currentMedia;
-  final AsyncValue<MediaProbe?> mediaProbe;
-  final bool compact;
-  final bool isPlaying;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasMedia = currentMedia != null;
-
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: compact ? 520 : 760),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(compact ? 30 : 34),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-          child: Container(
-            padding: EdgeInsets.fromLTRB(
-              compact ? 18 : 24,
-              compact ? 18 : 22,
-              compact ? 18 : 24,
-              compact ? 18 : 22,
-            ),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.black.withValues(alpha: 0.14),
-                  Color.alphaBlend(
-                    palette.seed.withValues(alpha: 0.09),
-                    Colors.black.withValues(alpha: 0.18),
-                  ),
-                  Colors.black.withValues(alpha: 0.24),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(compact ? 30 : 34),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.14),
-                  blurRadius: 28,
-                  offset: const Offset(0, 16),
-                ),
-              ],
-            ),
-            child:
-                compact
-                    ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _ListeningScopeLabel(
-                          palette: palette,
-                          hasMedia: hasMedia,
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            _NowPlayingArtwork(
-                              size: 88,
-                              isVideo: currentMedia?.kind == MediaKind.video,
-                              isPlaying: isPlaying,
-                              hasMedia: hasMedia,
-                              palette: palette,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _ListeningTextColumn(
-                                palette: palette,
-                                currentMedia: currentMedia,
-                                mediaProbe: mediaProbe,
-                                compact: true,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    )
-                    : Row(
-                      children: [
-                        SizedBox(
-                          width: 170,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _ListeningScopeLabel(
-                                palette: palette,
-                                hasMedia: hasMedia,
-                              ),
-                              const SizedBox(height: 18),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: _NowPlayingArtwork(
-                                  size: 126,
-                                  isVideo:
-                                      currentMedia?.kind == MediaKind.video,
-                                  isPlaying: isPlaying,
-                                  hasMedia: hasMedia,
-                                  palette: palette,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 26),
-                        Expanded(
-                          child: _ListeningTextColumn(
-                            palette: palette,
-                            currentMedia: currentMedia,
-                            mediaProbe: mediaProbe,
-                            compact: false,
-                          ),
-                        ),
-                      ],
-                    ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ListeningScopeLabel extends StatelessWidget {
-  const _ListeningScopeLabel({required this.palette, required this.hasMedia});
-
-  final HeniPalette palette;
-  final bool hasMedia;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 7,
-          height: 7,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: palette.accent.withValues(alpha: hasMedia ? 0.86 : 0.42),
-            boxShadow: [
-              BoxShadow(
-                color: palette.accent.withValues(alpha: hasMedia ? 0.26 : 0.12),
-                blurRadius: 10,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          hasMedia ? 'LISTENING ROOM' : 'QUIET ROOM',
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: Colors.white.withValues(alpha: 0.54),
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.1,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ListeningTextColumn extends StatelessWidget {
-  const _ListeningTextColumn({
-    required this.palette,
-    required this.currentMedia,
-    required this.mediaProbe,
-    required this.compact,
-  });
-
-  final HeniPalette palette;
-  final MediaItem? currentMedia;
-  final AsyncValue<MediaProbe?> mediaProbe;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (currentMedia != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-            decoration: BoxDecoration(
-              color: palette.seed.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: palette.seed.withValues(alpha: 0.16)),
-            ),
-            child: Text(
-              '正在播放',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: heniAccentOnGlass(palette.accent, alpha: 0.96),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        if (currentMedia != null) const SizedBox(height: 14),
-        Text(
-          currentMedia?.title ?? '还没有播放内容',
-          maxLines: compact ? 2 : 3,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontSize: compact ? 28 : 40,
-            fontWeight: FontWeight.w700,
-            height: 1.08,
-            letterSpacing: -0.45,
-            shadows: [
-              Shadow(
-                color: Colors.black.withValues(alpha: 0.34),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          currentMedia == null
-              ? '选择一首本地音频或视频，开始安静地播放。'
-              : currentMedia!.kind == MediaKind.video
-              ? '本地视频 · 低扰沉浸播放'
-              : '本地音频 · 安静聆听模式',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: Colors.white.withValues(alpha: 0.56),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 14),
-        Container(
-          width: compact ? 120 : 160,
-          height: 1,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                palette.accent.withValues(alpha: 0.28),
-                Colors.white.withValues(alpha: 0.06),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        _MediaProbeDetails(probe: mediaProbe),
-      ],
-    );
-  }
-}
-
 class _SceneryInfoBlock extends StatelessWidget {
   const _SceneryInfoBlock({
     required this.palette,
     required this.currentMedia,
     required this.mediaProbe,
-    this.compact = false,
   });
 
   final HeniPalette palette;
   final MediaItem? currentMedia;
   final AsyncValue<MediaProbe?> mediaProbe;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: compact ? 420 : 560),
+      constraints: const BoxConstraints(maxWidth: 560),
       child: Container(
-        padding: EdgeInsets.fromLTRB(
-          compact ? 18 : 22,
-          compact ? 14 : 18,
-          compact ? 18 : 22,
-          compact ? 14 : 18,
-        ),
+        padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(28),
@@ -4766,11 +4371,11 @@ class _SceneryInfoBlock extends StatelessWidget {
             if (currentMedia != null) const SizedBox(height: 12),
             Text(
               currentMedia?.title ?? '还没有播放内容',
-              maxLines: compact ? 1 : 2,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w700,
-                fontSize: compact ? 29 : 38,
+                fontSize: 38,
                 height: 1.08,
                 letterSpacing: -0.5,
                 shadows: [
@@ -7981,128 +7586,134 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
 
     return _HeniDialog(
       title: const Text('当前播放列表'),
-      content: SizedBox(
-        width: 620,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
+      content: LayoutBuilder(
+        builder: (context, constraints) {
+          return SizedBox(
+            width: 620,
+            height: playbackQueueDialogContentHeight(constraints.maxHeight),
+            child: Column(
               children: [
-                Expanded(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _InfoPill(
-                        icon: Icons.library_music_outlined,
-                        label:
-                            '来源 ${queue.playlistById(queue.playbackSourceId).name}',
-                      ),
-                      _InfoPill(
-                        icon: Icons.queue_music_rounded,
-                        label: '${allItems.length} 首待播',
-                      ),
-                    ],
-                  ),
-                ),
-                if (current != null)
-                  Flexible(
-                    child: _RefreshStatusBadge(
-                      icon: Icons.graphic_eq,
-                      label: '当前 ${current.title}',
-                      accent: true,
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (value) => setState(() => _query = value.trim()),
-                    decoration: const InputDecoration(
-                      hintText: '搜索当前播放列表',
-                      prefixIcon: Icon(Icons.search_rounded),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  tooltip: '定位当前歌曲',
-                  onPressed:
-                      current == null
-                          ? null
-                          : () => unawaited(_locateCurrentTrack(queue)),
-                  icon: const Icon(Icons.my_location_rounded, size: 20),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 420),
-              child:
-                  items.isEmpty
-                      ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 44),
-                          child: Text(
-                            '播放列表会在你点击歌曲开始播放后生成',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.5),
-                            ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _InfoPill(
+                            icon: Icons.library_music_outlined,
+                            label:
+                                '来源 ${queue.playlistById(queue.playbackSourceId).name}',
                           ),
-                        ),
-                      )
-                      : ListView.separated(
-                        controller: _listController,
-                        shrinkWrap: true,
-                        itemCount: items.length,
-                        separatorBuilder:
-                            (context, index) => const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final item = items[index];
-                          final actualIndex = allItems.indexOf(item);
-                          final isCurrent = actualIndex == queue.currentIndex;
-
-                          return KeyedSubtree(
-                            key:
-                                isCurrent
-                                    ? _currentRowKey
-                                    : ValueKey(item.path),
-                            child: _PlaybackQueueRow(
-                              item: item,
-                              index: index,
-                              isCurrent: isCurrent,
-                              onPlay: () {
-                                Navigator.of(context).pop();
-                                unawaited(
-                                  ref
-                                      .read(
-                                        playbackQueueControllerProvider
-                                            .notifier,
-                                      )
-                                      .playQueueIndex(actualIndex),
-                                );
-                              },
-                              onRemove: () {
-                                unawaited(
-                                  ref
-                                      .read(
-                                        playbackQueueControllerProvider
-                                            .notifier,
-                                      )
-                                      .removePlaybackQueueItemAt(actualIndex),
-                                );
-                              },
-                            ),
-                          );
-                        },
+                          _InfoPill(
+                            icon: Icons.queue_music_rounded,
+                            label: '${allItems.length} 首待播',
+                          ),
+                        ],
                       ),
+                    ),
+                    if (current != null)
+                      Flexible(
+                        child: _RefreshStatusBadge(
+                          icon: Icons.graphic_eq,
+                          label: '当前 ${current.title}',
+                          accent: true,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged:
+                            (value) => setState(() => _query = value.trim()),
+                        decoration: const InputDecoration(
+                          hintText: '搜索当前播放列表',
+                          prefixIcon: Icon(Icons.search_rounded),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      tooltip: '定位当前歌曲',
+                      onPressed:
+                          current == null
+                              ? null
+                              : () => unawaited(_locateCurrentTrack(queue)),
+                      icon: const Icon(Icons.my_location_rounded, size: 20),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Expanded(
+                  child:
+                      items.isEmpty
+                          ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 44),
+                              child: Text(
+                                '播放列表会在你点击歌曲开始播放后生成',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                ),
+                              ),
+                            ),
+                          )
+                          : ListView.separated(
+                            controller: _listController,
+                            itemCount: items.length,
+                            separatorBuilder:
+                                (context, index) => const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              final item = items[index];
+                              final actualIndex = allItems.indexOf(item);
+                              final isCurrent =
+                                  actualIndex == queue.currentIndex;
+
+                              return KeyedSubtree(
+                                key:
+                                    isCurrent
+                                        ? _currentRowKey
+                                        : ValueKey(item.path),
+                                child: _PlaybackQueueRow(
+                                  item: item,
+                                  index: index,
+                                  isCurrent: isCurrent,
+                                  onPlay: () {
+                                    Navigator.of(context).pop();
+                                    unawaited(
+                                      ref
+                                          .read(
+                                            playbackQueueControllerProvider
+                                                .notifier,
+                                          )
+                                          .playQueueIndex(actualIndex),
+                                    );
+                                  },
+                                  onRemove: () {
+                                    unawaited(
+                                      ref
+                                          .read(
+                                            playbackQueueControllerProvider
+                                                .notifier,
+                                          )
+                                          .removePlaybackQueueItemAt(
+                                            actualIndex,
+                                          ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
       actions: [
         FilledButton(

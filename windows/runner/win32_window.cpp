@@ -1,5 +1,6 @@
 #include "win32_window.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <dwmapi.h>
 #include <flutter_windows.h>
@@ -25,7 +26,9 @@ constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 constexpr int kMinimumLogicalClientWidth = 900;
 constexpr int kMinimumLogicalClientHeight = 620;
 constexpr int kResizeBorderLogical = 8;
-constexpr DWORD kHeniWindowStyle = WS_OVERLAPPEDWINDOW & ~WS_CAPTION;
+constexpr DWORD kHeniWindowStyle =
+    WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU;
+constexpr UINT kEnsureMinimumSizeMessage = WM_APP + 1;
 
 /// Registry key for app theme preference.
 ///
@@ -161,6 +164,52 @@ void SaveWindowState(HWND hwnd) {
          << (placement.showCmd == SW_SHOWMAXIMIZED ? 1 : 0) << '\n';
 }
 
+void EnsureMinimumClientSize(HWND window) {
+  if (window == nullptr) {
+    return;
+  }
+
+  const UINT dpi = GetDpiForWindow(window);
+  if (IsZoomed(window)) {
+    return;
+  }
+
+  const int minimum_width =
+      Scale(kMinimumLogicalClientWidth, static_cast<double>(dpi) / 96.0);
+  const int minimum_height =
+      Scale(kMinimumLogicalClientHeight, static_cast<double>(dpi) / 96.0);
+  RECT client_rect;
+  if (!GetClientRect(window, &client_rect)) {
+    return;
+  }
+
+  const int client_width = client_rect.right - client_rect.left;
+  const int client_height = client_rect.bottom - client_rect.top;
+  if (client_width >= minimum_width && client_height >= minimum_height) {
+    return;
+  }
+
+  RECT minimum_rect = {
+      0,
+      0,
+      std::max(client_width, minimum_width),
+      std::max(client_height, minimum_height),
+  };
+  const DWORD style =
+      static_cast<DWORD>(GetWindowLongPtr(window, GWL_STYLE));
+  const DWORD extended_style =
+      static_cast<DWORD>(GetWindowLongPtr(window, GWL_EXSTYLE));
+  if (!AdjustWindowRectExForDpi(&minimum_rect, style, FALSE, extended_style,
+                                dpi)) {
+    return;
+  }
+
+  SetWindowPos(window, nullptr, 0, 0,
+               minimum_rect.right - minimum_rect.left,
+               minimum_rect.bottom - minimum_rect.top,
+               SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
 }  // namespace
 
 // Manages the Win32Window's window class registration.
@@ -247,6 +296,13 @@ bool Win32Window::Create(const std::wstring& title,
     top = restored_state->top;
     width = restored_state->width;
     height = restored_state->height;
+    const RECT restored_rect = {left, top, left + width, top + height};
+    const HMONITOR monitor =
+        MonitorFromRect(&restored_rect, MONITOR_DEFAULTTONEAREST);
+    const UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
+    const double scale_factor = dpi / 96.0;
+    width = std::max(width, Scale(kMinimumLogicalClientWidth, scale_factor));
+    height = std::max(height, Scale(kMinimumLogicalClientHeight, scale_factor));
     initial_show_command_ =
         restored_state->maximized ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL;
   } else {
@@ -272,12 +328,16 @@ bool Win32Window::Create(const std::wstring& title,
   }
 
   UpdateTheme(window);
+  EnsureMinimumClientSize(window);
 
   return OnCreate();
 }
 
 bool Win32Window::Show() {
-  return ShowWindow(window_handle_, initial_show_command_);
+  const bool was_visible =
+      ShowWindow(window_handle_, initial_show_command_) != FALSE;
+  PostMessage(window_handle_, kEnsureMinimumSizeMessage, 0, 0);
+  return was_visible;
 }
 
 // static
@@ -322,9 +382,13 @@ Win32Window::MessageHandler(HWND hwnd,
 
       SetWindowPos(hwnd, nullptr, newRectSize->left, newRectSize->top, newWidth,
                    newHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+      EnsureMinimumClientSize(hwnd);
 
       return 0;
     }
+    case kEnsureMinimumSizeMessage:
+      EnsureMinimumClientSize(hwnd);
+      return 0;
     case WM_GETMINMAXINFO: {
       auto min_max_info = reinterpret_cast<MINMAXINFO*>(lparam);
       const UINT dpi = GetDpiForWindow(hwnd);

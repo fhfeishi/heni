@@ -553,7 +553,6 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
       );
       ref.read(currentMediaProvider.notifier).set(null);
       ref.read(currentMediaProbeProvider.notifier).clear();
-      ref.read(currentLyricsProvider.notifier).clear();
       await ref.read(playbackEngineProvider).stop();
       return;
     }
@@ -600,6 +599,10 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
 
   void cyclePlaybackMode() {
     setPlaybackMode(state.playbackMode.next);
+  }
+
+  void reportStatus(String message) {
+    state = state.copyWith(statusMessage: message, lastError: null);
   }
 
   void setPlaybackMode(HeniPlaybackMode mode) {
@@ -833,7 +836,6 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     );
 
     ref.read(currentMediaProvider.notifier).set(item);
-    unawaited(ref.read(currentLyricsProvider.notifier).loadFor(item.path));
     await ref.read(playbackEngineProvider).openItem(item, play: true);
     unawaited(_inspectAndCacheDuration(item.path));
     unawaited(_cacheEngineDurationWhenAvailable(item.path));

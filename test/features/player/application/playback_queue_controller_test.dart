@@ -28,6 +28,20 @@ void main() {
       expect(state.library.name, '曲库');
     });
 
+    test('reports a non-blocking shell status message', () {
+      final engine = _FakePlaybackEngine();
+      final container = _container(engine);
+      addTearDown(container.dispose);
+
+      container
+          .read(playbackQueueControllerProvider.notifier)
+          .reportStatus('已打开文件位置');
+
+      final state = container.read(playbackQueueControllerProvider);
+      expect(state.statusMessage, '已打开文件位置');
+      expect(state.lastError, isNull);
+    });
+
     test('previous and next follow the independent playback queue', () async {
       final engine = _FakePlaybackEngine();
       final container = _container(engine);
