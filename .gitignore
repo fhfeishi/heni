@@ -32,3 +32,5 @@ windows/flutter/ephemeral/
 *.log
 *.tmp
 *.temp
+
+.superpowers/
