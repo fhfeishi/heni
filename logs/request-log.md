@@ -2164,3 +2164,46 @@ request that changes Heni.
   at width 1180.
 - Static analysis and the Windows Debug build pass. Flutter test execution
   remains blocked before assertions by the existing local listener timeout.
+
+## 2026-07-16 - Studio-Matte Console, Project Docs, And Release Delivery
+
+### User Request
+
+- Continue the approved `录音室哑光` direction with deep theme tinting.
+- Make the outer Windows UI match the theme instead of using the default frame.
+- Improve static presentation and practical interaction details.
+- After implementation, read/maintain the project Strata startup documentation.
+- Confirm the update is present in the Release build and push it to the remote.
+
+### Understanding
+
+- The player should feel like one themed desktop object, including its native
+  frame, background image, side navigation, playback stage, and bottom dock.
+- Audio playback needs honest source metadata and useful actions, not lyrics or
+  a misleading lossy-to-FLAC export.
+- Current-track location must be available directly from the listening console
+  and remain usable in a long queue and a short window.
+- Documentation must distinguish locally verified behavior from environment
+  limitations and from unverified bit-perfect claims.
+
+### Done
+
+- Integrated a captionless themed Windows frame with working drag, minimize,
+  maximize/restore, close, DPI hit testing, state restore, and a logical
+  `900 × 620` minimum client size.
+- Added a full-window scenery backdrop and deeper active-palette material
+  treatment.
+- Added the responsive listening console with source path, real ffprobe codec/
+  bitrate/sample-rate/channel metadata, conservative lossless labeling,
+  next-track preview, queue location, and file-location actions.
+- Removed the remaining lyric model/loading/UI path and kept user-facing audio
+  export absent.
+- Found and fixed a queue-dialog bottom overflow during real current-track
+  location QA by making its list use the available dialog height.
+- Added a short root `strata.md` router, a current `logs/plan.md`, and corrected
+  architecture, project overview, media-quality, Windows, and request logs.
+- Verified static analysis, 8 pure-Dart regression tests, Debug build, Release
+  build, captionless Release style, minimum-size clamping, custom maximize/
+  restore behavior, and DPI-aware Release screenshots.
+- `flutter test` remains blocked before suite loading by the host
+  `127.0.0.1` loopback failure; no widget assertion executed.

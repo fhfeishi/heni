@@ -1,6 +1,6 @@
 # Windows Development Log
 
-Last updated: 2026-05-16
+Last updated: 2026-07-16
 
 ## Status
 
@@ -38,9 +38,8 @@ Windows is the active development target.
     selector, and settings only.
   - Top "歌曲" tab opens the playlist/song-list view; the built-in all-media
     collection remains named "曲库" in the left sidebar.
-  - Refreshed shell styling toward a lighter product UI with rounded frosted
-    panels across the top bar, sidebar, content header, library view, lyric
-    panel, and bottom player bar.
+  - Refreshed shell styling with coordinated matte/glass surfaces across the
+    top bar, sidebar, content header, library view, and bottom player bar.
   - Added palette-tinted ambient backdrop lighting behind the shell so theme
     changes read more clearly across the full window.
   - Refined the top bar with a compact logo tile, calmer spacing, and a more
@@ -52,7 +51,7 @@ Windows is the active development target.
   - Bottom player bar refined with a clearer now-playing summary, stronger
     transport hierarchy, pill-style progress area, and calmer utility grouping.
   - The bottom-right utility group now includes a dedicated current playback
-    list control ahead of playback mode, volume, and FLAC export.
+    list control ahead of playback mode and volume.
   - The current playback queue dialog now has stronger hierarchy with source
     and count pills, current-track emphasis, and queue search.
   - Current playback queue rows now use calmer inline action buttons and more
@@ -85,9 +84,8 @@ Windows is the active development target.
     and clearer option-menu emphasis.
   - The 美景/歌曲 switcher now sits inside a clearer rounded shell and includes
     lightweight icons for stronger mode identity.
-  - The scenery playback page now uses a lighter floating hero and no longer
-    keeps an empty lyric placeholder panel over the background when lyrics are
-    missing.
+  - The scenery playback page now uses a dedicated listening console for audio
+    instead of an optional lyric surface.
   - The main play button now has subtle motion and glow changes between play
     and pause states.
   - Scenery image transitions now use slower layered fade/scale motion with a
@@ -100,8 +98,7 @@ Windows is the active development target.
     more connected to the transport state.
   - Bottom now-playing summary now reflects play state with small glow and
     emphasis changes.
-  - Video mode now reuses the lower-left scenery info block and compacts it
-    automatically when lyrics are present.
+  - Video mode now reuses the lower-left scenery info block.
   - Right-side songs-view header now distinguishes correctly between the full
     library and custom playlists when displaying counts and supporting metrics.
   - Settings now open as a dedicated dialog with grouped toggle cards and a
@@ -109,21 +106,15 @@ Windows is the active development target.
   - Songs-view empty states now use a more polished card instead of raw text.
   - Scenery audio mode now composes the ambient orb with the lower info block
     rather than leaving it static in the center of the stage.
-  - Lyric presentation now includes a clearer heading and a gentler focus style
-    for the active line.
   - Top navigation now has a gentler entrance feel and a more alive
     palette-responsive brand treatment.
   - Bottom now-playing information now transitions more smoothly when the
     current media changes.
-  - Lyric loading now supports richer `.lrc` metadata such as title, artist,
-    album, and offset.
   - Theme choice, UI mode, and scenery image selections are now restored as
     part of the app's persisted shell experience.
   - Library refresh is now a first-class action that rescans configured sources
     with current scan settings and keeps playlist path references aligned with
     refreshed library items.
-  - Lyric display now exposes richer metadata and a more follow-friendly active
-    line treatment when timed lyrics exist.
   - Songs-view header now shows gentler refresh progress/result pills, and the
     settings dialog includes an immediate refresh action.
   - Songs-view refresh feedback now uses calmer animated badges for active
@@ -166,13 +157,12 @@ Windows is the active development target.
   - Speaker volume opens a bare custom vertical slider with no visible panel,
     prompt, percent label, or inactive track; it starts from the actual cached
     current volume.
-  - Optional local lyric display for same-name `.lrc` and `.txt` files.
   - Unified app font family preferring Microsoft YaHei with desktop fallbacks.
   - UI style selector: 美景, 歌曲.
   - Chinese UI copy for the main Windows player.
   - Basic settings: recursive folder scan, include video files, autoplay on load.
   - Media metadata line.
-  - FLAC audio extraction action.
+  - No lyric surface and no user-facing audio export.
 - Playback abstraction implemented with `PlaybackEngine` and `media_kit`.
 - Video rendering implemented with `media_kit_video`.
 - Playback queue controller implemented for Heni-side playlist state and
@@ -192,12 +182,13 @@ Windows is the active development target.
 ```powershell
 flutter pub get
 flutter analyze
-flutter test
+dart test test/services/files/local_file_actions_test.dart test/features/player/presentation/playback_queue_location_test.dart
 flutter build windows --debug
 flutter build windows --release
 ```
 
-Current test count: 29 passing tests.
+The available pure-Dart regression set passes. `flutter test` is currently
+blocked before suite loading by the host loopback failure described below.
 
 ## Issues Seen And Resolved
 
@@ -208,10 +199,8 @@ Current test count: 29 passing tests.
 
 ## Current Gaps
 
-- Interactive UI testing with real audio/video files is still pending.
-- Playback behavior with different codecs and large files is still pending.
-- FLAC extraction has unit and process-level coverage, but needs manual UI
-  verification from the running app.
+- Broader Release playback behavior across representative codecs and large
+  files is still pending.
 - Playlist persistence now stores path references, not copied media files.
 - Playlist editing is basic: create/delete playlist, add library items, rename,
   edit descriptions, remove items, load folders, select and play items.
@@ -509,3 +498,41 @@ Current test count: 29 passing tests.
   expanded-sidebar QA capture.
 - DPI-aware screenshots verified expanded, narrow compact, hysteresis compact,
   restored expanded, and manual compact states.
+
+## 2026-07-16 - Studio-Matte Listening Console Release
+
+- Replaced the default Windows outer frame with a captionless themed frame and
+  integrated drag, minimize, maximize/restore, and close controls into Heni.
+- Applied the selected scenery image and active palette across the entire
+  player shell, with stronger treatment in playback and quieter treatment in
+  the library.
+- Added the responsive listening console:
+  - current source title/path and real ffprobe metadata;
+  - conservative lossless labeling;
+  - next-track preview;
+  - `定位当前曲目` and `打开文件位置`;
+  - useful empty-state file/folder actions.
+- Removed the remaining lyric state/UI and kept audio export absent.
+- The queue dialog now sizes its internal list from the available dialog
+  height. DPI-aware runtime QA caught a 93-pixel bottom overflow before this
+  adjustment and confirmed it is gone afterwards.
+- The captionless frame uses `WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX |
+  WS_MAXIMIZEBOX | WS_SYSMENU`. Release runtime style was `0x940F0000` with no
+  `WS_CAPTION`.
+- At 200% DPI, a requested `300 × 300` window was clamped to a DPI-aware
+  `1824 × 1264` physical outer size, preserving the `900 × 620` logical client
+  minimum.
+- Custom Release maximize and restore clicks changed `IsZoomed` from false to
+  true and back to false.
+- Verified:
+  - `flutter analyze`: no issues;
+  - 8 pure-Dart file-action/queue-location tests: passed;
+  - Windows Debug build: passed;
+  - Windows Release build and launch smoke: passed.
+- Release artifact:
+  `build/windows/x64/runner/Release/heni.exe`,
+  SHA-256
+  `0BE51F746CF5460B59FC76A4EEF236B5FFC2F2AD166D0C60178D6B7322448DDD`.
+- `flutter test` still fails before loading the suite because
+  `flutter_tester` cannot connect to its listener at `127.0.0.1`
+  (`SocketException`, Windows error 121). No widget-test assertion ran.

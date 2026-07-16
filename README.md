@@ -1,9 +1,9 @@
 # Heni
 
 Heni is a local audio and video player focused on a calm, beautiful playback
-surface. The first milestone is a polished player shell with selectable scenery
-images. The media layer is intentionally separated so future editing,
-transcoding, waveform, and export features can grow without tangling the UI.
+surface. The current Windows shell uses a studio-matte listening console,
+full-window scenery tinting, adaptive navigation, and a custom themed title
+bar. Playback and media inspection remain separated from the UI.
 
 Current focus: Windows desktop. Android, iOS, macOS, and Ubuntu/Linux are
 scaffolded but paused; see `logs/paused-platforms.md`.
@@ -12,8 +12,8 @@ scaffolded but paused; see `logs/paused-platforms.md`.
 
 - Flutter for the cross-platform application shell.
 - `media_kit` for playback.
-- `ffprobe`/`ffmpeg` as a process-backed media toolkit for inspection and
-  future editing jobs.
+- `ffprobe` for source metadata and retained low-level `ffmpeg` infrastructure
+  for possible future editing work. There is no user-facing audio export.
 - Riverpod for state boundaries.
 - Small domain models instead of code generation-heavy architecture at the
   beginning.
@@ -49,6 +49,10 @@ flutter test
 flutter build windows --release
 ```
 
+If `flutter test` cannot connect to its local listener, verify Windows loopback
+health first. The current development machine has an operating-system-level
+loopback failure; see `logs/plan.md`.
+
 Release output:
 
 ```text
@@ -57,9 +61,11 @@ build/windows/x64/runner/Release/heni.exe
 
 ## Docs
 
+- `strata.md` routes development tasks to the smallest relevant document set.
 - `docs/architecture.md` explains the application boundaries.
 - `docs/media-pipeline.md` explains the playback, probing, and future codec
   pipeline in learning-friendly terms.
 - `docs/project-overview.md` maps the current project structure.
+- `logs/plan.md` records current release acceptance and next priorities.
 - `logs/windows.md` records active Windows progress.
 - `logs/paused-platforms.md` records paused platform status.

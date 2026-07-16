@@ -23,14 +23,14 @@ lib/
     scenery/               # Scenery pack model.
   features/
     player/
-      application/         # Riverpod queue, settings, probe, export state.
-      presentation/        # Player screen.
-    scenery/
-      presentation/        # Full-screen scenery stage.
+      application/         # Riverpod queue, settings, probe, sidebar state.
+      presentation/        # Player shell, backdrop, console, progress, sidebar.
   services/
+    files/                 # Reveal media in the platform file manager.
     media/                 # PlaybackEngine and media_kit adapter.
-    ffmpeg/                # ffprobe, FFmpeg commands, jobs, editor use cases.
+    ffmpeg/                # ffprobe plus retained low-level FFmpeg utilities.
     storage/               # Local JSON library and playlist persistence.
+    window/                # Flutter-to-Windows custom frame channel.
 
 docs/                      # Architecture and media-learning notes.
 logs/                      # Platform progress logs.
@@ -47,26 +47,23 @@ flowchart TD
   Queue --> PlayerState["currentMediaProvider"]
   Queue --> Probe["CurrentMediaProbe / ffprobe"]
   Queue --> Engine["PlaybackEngine / media_kit"]
-  Engine --> UI["PlayerScreen"]
+  Engine --> UI["PlayerScreen / HeniListeningConsole"]
   Engine --> Video["media_kit_video output"]
   Probe --> UI
   Video --> UI
   Images["Pick scenery images"] --> SceneryState["sceneryImagePathsProvider"]
-  SceneryState --> Stage["SceneryStage"]
-  Export["Extract FLAC"] --> Controller["AudioExportController"]
-  Controller --> Editor["FfmpegMediaEditor"]
-  Editor --> Job["FfmpegJobRunner"]
-  Job --> Progress["FfmpegProgress"]
-  Progress --> UI
+  SceneryState --> Backdrop["GlobalSceneryBackdrop"]
+  WindowUI["Custom title-bar controls"] --> Channel["heni/window MethodChannel"]
+  Channel --> Runner["Windows runner"]
+  FileUI["Open file location"] --> FileService["LocalFileActions"]
 ```
 
 ## Important Boundaries
 
 - UI never builds FFmpeg shell strings.
 - UI calls controllers/use cases and renders state.
-- `FfmpegCommandBuilder` only returns `List<String>` arguments.
-- `FfmpegJobRunner` owns process execution, progress, logs, timeout, and
-  cancellation.
+- Retained FFmpeg utilities return structured `List<String>` arguments and own
+  process execution details; they are not connected to a player export action.
 - `FfprobeMediaInspector` owns media metadata extraction.
 - `PlaybackEngine` lets the app replace `media_kit` later if needed.
 - `PlaybackQueueController` owns the library, user playlists, the independent
@@ -108,14 +105,14 @@ build/windows/x64/runner/Release/heni.exe
   basic scan settings.
 - Playlist browsing that does not interrupt the current playback queue.
 - Desktop music-player layout:
-  - Minimal top navigation with Heni, 美景/歌曲, centered palette selector, and
-    settings.
-  - Left playlist sidebar.
-  - Top "歌曲" means the playlist/song-list view; left-side "曲库" is the
-    built-in all-media collection.
-  - Main playback/content area.
-  - Bottom transport bar.
-- Scenery background with fallback painting.
+  - Themed custom Windows frame with drag, minimize, maximize/restore, and
+    close controls.
+  - Global search and palette controls in the top work bar.
+  - Expanded labeled sidebar with an explicit compact rail; narrow windows
+    force compact mode with resize hysteresis.
+  - Main playback/list workspace and a fixed bottom transport dock.
+- Full-window scenery background with stronger playback treatment, quieter
+  library treatment, and fallback painting.
 - Actual video output for video files.
 - Compact top palette switching with solid color swatches, black/white choices,
   selected glow, and expanded preset themes.
@@ -132,14 +129,18 @@ build/windows/x64/runner/Release/heni.exe
   opens at the current cached volume.
 - Cleaner bottom bar layout with now-playing, centered transport/progress, and
   right-side utility controls.
-- Optional local lyric panel for same-name `.lrc` and `.txt` files.
-- ffprobe media detail display.
-- FLAC audio extraction with FFmpeg progress state.
+- Responsive progress display that preserves seeking and hides time labels
+  before they collide.
+- Listening console with current media, source path, ffprobe codec/bitrate/
+  sample-rate/channels, next track, queue location, and file location.
+- Playback-queue dialog that automatically locates the current track and
+  remains scrollable at the minimum window height.
+- No lyric surface and no user-facing FLAC/audio export.
 
 ## Near-Term Windows Focus
 
-1. Manually test real playback and extraction.
-2. Improve the player layout after seeing it in the running app.
-3. Add media detail/debug panel for codec learning.
-4. Add playlist reorder.
-5. Persist theme and scenery pack.
+1. Run Release playback coverage across representative source codecs.
+2. Add audio-output diagnostics only if Windows output/resampling questions
+   require them.
+3. Add playlist reorder.
+4. Add configurable `ffprobe` discovery.

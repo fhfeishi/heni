@@ -22,14 +22,13 @@ flowchart TD
   State --> Queue["PlaybackQueueController"]
   State --> Scenery["Scenery state"]
   State --> Probe["MediaInspector"]
-  State --> Export["AudioExportController"]
   State --> Store["HeniLibraryStore / JSON"]
   Queue --> Scanner["LocalMediaScanner"]
   Playback --> MediaKit["media_kit"]
   Playback --> Video["media_kit_video"]
   Probe --> FFprobe["ffprobe process"]
-  Export --> Editor["FfmpegMediaEditor"]
-  Editor --> FFmpeg["ffmpeg process"]
+  UI --> Window["Heni window channel / Windows runner"]
+  UI --> Files["Local file actions"]
 ```
 
 ## Package Shape
@@ -49,7 +48,11 @@ lib/
 - The current Windows implementation starts with a small JSON store for library
   roots, imported file paths, playlist references, and scan settings.
 - Editing can start with process-backed FFmpeg jobs before considering native
-  bindings.
+  bindings. The current player deliberately exposes no audio-export action.
+- The Windows runner owns custom frame styling, hit testing, minimum size, and
+  native window commands. Flutter owns the themed controls and drag regions.
+- File-manager integration stays behind `LocalFileActions` instead of being
+  assembled in presentation widgets.
 - Android/iOS-specific storage permissions should stay in platform services,
   away from the playback screen.
 - Platform progress is recorded in `logs/`, with Windows active and non-Windows

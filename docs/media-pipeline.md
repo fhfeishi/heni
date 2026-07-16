@@ -10,8 +10,9 @@ That keeps the UI responsive and lets us focus on controls, scenery, themes,
 and user workflow.
 
 Editing and export are different. They need deterministic jobs that can be
-retried, cancelled, inspected, and logged. For that path we start with FFmpeg
-as an external process.
+retried, cancelled, inspected, and logged. Heni retains low-level FFmpeg job
+infrastructure for possible future editing, but the current player has no
+user-facing audio-export action.
 
 ## Terms
 
@@ -24,6 +25,11 @@ as an external process.
 - Remux: changing the container while copying streams without re-encoding.
 
 ## Current Implementation
+
+`MediaKitPlaybackEngine` opens the selected local media path directly through
+`media_kit`. The player does not first convert the file with FFmpeg and does not
+add an equalizer, loudness normalizer, pitch filter, or lossy re-encode step.
+Status: `已验证` by source audit and Windows runtime playback on 2026-07-16.
 
 `FfprobeMediaInspector` calls:
 
@@ -49,16 +55,33 @@ The current FFmpeg build emits both `out_time_us` and `out_time_ms`. They carry
 the same microsecond value in practice, so Heni prefers `out_time_us` and treats
 `out_time_ms` as a compatibility fallback.
 
-`FfmpegMediaEditor` is the first use-case layer above raw commands. It exposes
-`extractAudio`, while internally using `FfmpegCommandBuilder` and
-`FfmpegJobRunner`. The UI now calls this use case through a Riverpod controller
-instead of knowing how to assemble FFmpeg arguments itself.
+`FfmpegCommandBuilder` and `FfmpegJobRunner` remain as low-level, tested
+infrastructure for trim/job experiments. The former audio-editor/controller
+path and the player FLAC export button were removed. Lossy AAC/MP3 converted to
+FLAC would only create a larger lossless wrapper around already-lost detail.
 
-## First Editing Capabilities To Add Later
+## Listening Quality Interpretation
+
+- MP4 is a container, not an audio-quality grade. A downloaded MP4 may contain
+  low-bitrate AAC or a higher-quality stream; inspect the audio codec and
+  bitrate before judging it by extension.
+- The listening console reports source codec, bitrate, sample rate, channel
+  count, and a conservative lossless label for FLAC, ALAC, WavPack, and PCM.
+- A high sample rate or FLAC label does not prove that the recording was never
+  transcoded earlier. It only describes the current source stream.
+- Heni currently makes no bit-perfect claim. Windows or the selected output
+  device may resample decoded PCM according to the system mix format. Status:
+  `待核验` per output device unless a future diagnostics view measures the
+  complete device path.
+- Perceived fatigue can come from the source master, clipping, low-bitrate
+  encoding, or repeated web transcoding even when player logic is neutral.
+
+## Possible Editing Capabilities Later
 
 1. Inspect media with `ffprobe`.
 2. Trim without re-encoding when possible.
-3. Extract audio to WAV/FLAC/Opus.
+3. Extract or transcode audio only as an explicit editing workflow, with copy
+   and re-encode semantics clearly explained.
 4. Generate waveform data or preview images.
 5. Export video with a small set of profiles.
 
