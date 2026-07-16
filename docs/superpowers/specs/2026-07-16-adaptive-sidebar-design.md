@@ -110,6 +110,9 @@ Examples:
 ### Expanded Sidebar
 
 - Width: `224` logical pixels.
+- Primary destinations display icon, text label, and item count.
+- Playlist entries display their playlist name and item count; text must not be
+  replaced by icon-only navigation while expanded.
 - Add a compact collapse button to the right of the `浏览` heading.
 - Tooltip: `收起侧边栏`.
 - Activating it changes the user preference to `compact`.
