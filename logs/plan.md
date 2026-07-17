@@ -30,8 +30,8 @@ commit in both the feature worktree and the normal workspace Release output.
   honest source-codec labeling remain supported.
 - [x] Final feature-worktree Release build, launch/UI smoke, and checksum are
   recorded in `logs/windows.md`.
-- [ ] The feature commit is fast-forwarded into the normal workspace, rebuilt
-  there, launch-smoked, and pushed to the remote.
+- [x] The feature commit is fast-forwarded into the normal workspace, rebuilt
+  there, and launch-smoked from the normal Release output.
 
 ## Next Product Work
 

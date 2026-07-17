@@ -575,4 +575,13 @@ blocked before suite loading by the host loopback failure described below.
 - `flutter test` was not reported as passing: the existing host loopback issue
   prevents the Flutter test harness from reaching assertions. The user approved
   the documented static-analysis/native-build exception for this delivery.
-- Normal-workspace rebuild and remote push are recorded after integration.
+- The implementation was fast-forwarded into the normal workspace on
+  `codex/player-usability-upgrade` at `1763aee`, then the normal workspace
+  repeated the 8 pure-Dart tests, clean static analysis, Windows Release build,
+  `912 × 632` minimum-size probe, captionless-style probe, and a complete
+  DPI-aware screenshot check.
+- Normal-workspace Release SHA-256:
+  `E5EE75DE0F62F91EF09F004889C616071B6E938E9B1F2060815BA283E1375CE2`.
+  The feature and normal outputs were built in different absolute worktree
+  paths, so executable hashes are recorded separately; both were built from
+  the same implementation commit.
