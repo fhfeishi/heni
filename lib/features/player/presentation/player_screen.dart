@@ -7197,43 +7197,41 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
   final _searchController = TextEditingController();
   final _listController = ScrollController();
   final _currentRowKey = GlobalKey();
+  Timer? _highlightTimer;
   var _query = '';
   var _scheduledInitialLocate = false;
+  var _highlightCurrent = false;
+  String? _locateMessage;
 
   @override
   void dispose() {
+    _highlightTimer?.cancel();
     _searchController.dispose();
     _listController.dispose();
     super.dispose();
   }
 
-  Future<void> _locateCurrentTrack(
-    PlaybackQueueState queue, {
-    bool clearBlockingQuery = true,
-  }) async {
-    if (queue.currentIndex < 0 ||
-        queue.currentIndex >= queue.playbackQueue.items.length) {
-      return;
-    }
-
-    final nextQuery = queryForLocatingCurrentTrack(
+  Future<void> _locateCurrentTrack(PlaybackQueueState queue) async {
+    final locateState = currentTrackLocateState(
       items: queue.playbackQueue.items,
       currentIndex: queue.currentIndex,
       query: _query,
     );
-    if (clearBlockingQuery && nextQuery != _query) {
-      setState(() {
-        _query = nextQuery;
-        _searchController.value = TextEditingValue(
-          text: nextQuery,
-          selection: TextSelection.collapsed(offset: nextQuery.length),
-        );
-      });
+    if (locateState == CurrentTrackLocateState.unavailable) {
+      setState(() => _locateMessage = '当前没有正在播放的曲目');
+      return;
+    }
+    if (locateState == CurrentTrackLocateState.hiddenByFilter) {
+      setState(() => _locateMessage = '当前曲目被搜索条件隐藏；清除搜索后即可定位');
+      return;
+    }
+    if (_locateMessage != null) {
+      setState(() => _locateMessage = null);
     }
 
     final visibleItems =
         queue.playbackQueue.items
-            .where((item) => _matchesQueueQuery(item, nextQuery))
+            .where((item) => _matchesQueueQuery(item, _query))
             .toList();
     final currentPath = queue.playbackQueue.items[queue.currentIndex].path;
     final visibleIndex = visibleItems.indexWhere(
@@ -7273,6 +7271,17 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
         curve: Curves.easeOutCubic,
       );
     }
+
+    if (!mounted) {
+      return;
+    }
+    _highlightTimer?.cancel();
+    setState(() => _highlightCurrent = true);
+    _highlightTimer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted) {
+        setState(() => _highlightCurrent = false);
+      }
+    });
   }
 
   bool _matchesQueueQuery(MediaItem item, String query) {
@@ -7286,6 +7295,8 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
   Widget build(BuildContext context) {
     final queue = ref.watch(playbackQueueControllerProvider);
     final theme = Theme.of(context);
+    final palette = ref.watch(activePaletteProvider);
+    final shellTheme = HeniShellTheme.fromPalette(palette);
     final allItems = queue.playbackQueue.items;
     final items =
         allItems.where((item) => _matchesQueueQuery(item, _query)).toList();
@@ -7295,7 +7306,7 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
       _scheduledInitialLocate = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          unawaited(_locateCurrentTrack(queue, clearBlockingQuery: false));
+          unawaited(_locateCurrentTrack(queue));
         }
       });
     }
@@ -7344,8 +7355,12 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
                     Expanded(
                       child: TextField(
                         controller: _searchController,
-                        onChanged:
-                            (value) => setState(() => _query = value.trim()),
+                        onChanged: (value) {
+                          setState(() {
+                            _query = value.trim();
+                            _locateMessage = null;
+                          });
+                        },
                         decoration: const InputDecoration(
                           hintText: '搜索当前播放列表',
                           prefixIcon: Icon(Icons.search_rounded),
@@ -7362,6 +7377,34 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
                       icon: const Icon(Icons.my_location_rounded, size: 20),
                     ),
                   ],
+                ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 180),
+                  alignment: Alignment.topLeft,
+                  child:
+                      _locateMessage == null
+                          ? const SizedBox.shrink()
+                          : Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.filter_alt_outlined,
+                                  size: 15,
+                                  color: shellTheme.secondaryText,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _locateMessage!,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: shellTheme.secondaryText,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                 ),
                 const SizedBox(height: 14),
                 Expanded(
@@ -7398,6 +7441,9 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
                                   item: item,
                                   index: index,
                                   isCurrent: isCurrent,
+                                  locateHighlighted:
+                                      isCurrent && _highlightCurrent,
+                                  shellTheme: shellTheme,
                                   onPlay: () {
                                     Navigator.of(context).pop();
                                     unawaited(
@@ -7446,6 +7492,8 @@ class _PlaybackQueueRow extends ConsumerStatefulWidget {
     required this.item,
     required this.index,
     required this.isCurrent,
+    required this.locateHighlighted,
+    required this.shellTheme,
     required this.onPlay,
     required this.onRemove,
   });
@@ -7453,6 +7501,8 @@ class _PlaybackQueueRow extends ConsumerStatefulWidget {
   final MediaItem item;
   final int index;
   final bool isCurrent;
+  final bool locateHighlighted;
+  final HeniShellTheme shellTheme;
   final VoidCallback onPlay;
   final VoidCallback onRemove;
 
@@ -7477,7 +7527,9 @@ class _PlaybackQueueRowState extends ConsumerState<_PlaybackQueueRow> {
         duration: _hoverDuration,
         decoration: BoxDecoration(
           color:
-              active
+              widget.locateHighlighted
+                  ? widget.shellTheme.selected
+                  : active
                   ? palette.seed.withValues(alpha: 0.16)
                   : _hovered
                   ? Colors.white.withValues(alpha: 0.05)

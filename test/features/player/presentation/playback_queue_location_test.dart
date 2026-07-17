@@ -17,36 +17,24 @@ void main() {
     ),
   ];
 
-  test('clears a query that hides the current track', () {
+  test('reports when the current track is hidden by the active filter', () {
     expect(
-      queryForLocatingCurrentTrack(
-        items: items,
-        currentIndex: 1,
-        query: 'alpha',
-      ),
-      isEmpty,
+      currentTrackLocateState(items: items, currentIndex: 1, query: 'alpha'),
+      CurrentTrackLocateState.hiddenByFilter,
     );
   });
 
-  test('keeps a query that already includes the current track', () {
+  test('reports when the current track is visible', () {
     expect(
-      queryForLocatingCurrentTrack(
-        items: items,
-        currentIndex: 1,
-        query: 'beta',
-      ),
-      'beta',
+      currentTrackLocateState(items: items, currentIndex: 1, query: 'beta'),
+      CurrentTrackLocateState.visible,
     );
   });
 
-  test('keeps the query when there is no valid current track', () {
+  test('reports when there is no valid current track', () {
     expect(
-      queryForLocatingCurrentTrack(
-        items: items,
-        currentIndex: -1,
-        query: 'alpha',
-      ),
-      'alpha',
+      currentTrackLocateState(items: items, currentIndex: -1, query: 'alpha'),
+      CurrentTrackLocateState.unavailable,
     );
   });
 
