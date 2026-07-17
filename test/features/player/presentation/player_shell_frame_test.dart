@@ -21,6 +21,15 @@ void main() {
     );
 
     await pump(false);
+    final decoration =
+        tester
+                .widget<AnimatedContainer>(
+                  find.byKey(const ValueKey('heni-panoramic-frame')),
+                )
+                .decoration!
+            as BoxDecoration;
+    expect(decoration.gradient, isNull);
+    expect(decoration.color, shell.border.withValues(alpha: 0.64));
     expect(
       tester
           .widget<AnimatedContainer>(

@@ -25,13 +25,7 @@ class HeniPanoramicShellFrame extends StatelessWidget {
       curve: Curves.easeOutCubic,
       padding: isMaximized ? EdgeInsets.zero : const EdgeInsets.all(1),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            shellTheme.border,
-            Colors.white.withValues(alpha: 0.10),
-            shellTheme.border.withValues(alpha: 0.60),
-          ],
-        ),
+        color: shellTheme.border.withValues(alpha: 0.64),
         borderRadius: BorderRadius.circular(radius),
       ),
       child: ClipRRect(
