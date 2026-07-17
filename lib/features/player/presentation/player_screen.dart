@@ -1777,9 +1777,14 @@ class _TopNavigation extends ConsumerWidget {
         children: [
           HeniWindowDragRegion(child: _TopBrand(layout: layout)),
           Expanded(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: layout.narrow ? 8 : 18),
-              child: _TopSearchField(layout: layout),
+            child: HeniTopChromeCenter(
+              search: Padding(
+                padding: EdgeInsets.only(
+                  left: layout.narrow ? 8 : 18,
+                  right: layout.narrow ? 8 : 12,
+                ),
+                child: _TopSearchField(layout: layout),
+              ),
             ),
           ),
           _CompactPaletteButton(active: palette),
@@ -1925,6 +1930,7 @@ class _TopBrand extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: layout.quiet ? 54 : 82,
+      height: double.infinity,
       child: const Align(
         alignment: Alignment.centerLeft,
         child: HeniBrandWordmark(),

@@ -81,4 +81,76 @@ void main() {
 
     expect(methods, contains('toggleMaximize'));
   });
+
+  testWidgets('wide top chrome exposes drag spacer without stealing search', (
+    tester,
+  ) async {
+    final focusNode = FocusNode();
+    addTearDown(focusNode.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 800,
+              height: 48,
+              child: HeniTopChromeCenter(
+                search: TextField(
+                  key: const ValueKey('chrome-search'),
+                  focusNode: focusNode,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    methods.clear();
+
+    expect(
+      find.byKey(const ValueKey('heni-top-chrome-drag-spacer')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('chrome-search')));
+    await tester.pump();
+    expect(focusNode.hasFocus, isTrue);
+    expect(methods, isNot(contains('beginDrag')));
+
+    await tester.drag(
+      find.byKey(const ValueKey('heni-top-chrome-drag-spacer')),
+      const Offset(40, 0),
+    );
+    await tester.pump();
+    expect(methods, contains('beginDrag'));
+  });
+
+  testWidgets('narrow top chrome gives all center width to search', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 560,
+              height: 48,
+              child: HeniTopChromeCenter(
+                search: SizedBox(key: ValueKey('chrome-search')),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('heni-top-chrome-drag-spacer')),
+      findsNothing,
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('chrome-search'))).width,
+      560,
+    );
+  });
 }

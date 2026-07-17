@@ -46,6 +46,46 @@ class HeniWindowDragRegion extends ConsumerWidget {
   }
 }
 
+class HeniTopChromeCenter extends StatelessWidget {
+  const HeniTopChromeCenter({required this.search, super.key});
+
+  static const dragSpacerBreakpoint = 720.0;
+  static const searchMaxWidth = 640.0;
+  static const minimumDragWidth = 84.0;
+  static const searchToDragGap = 12.0;
+
+  final Widget search;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available = constraints.maxWidth;
+        if (available < dragSpacerBreakpoint) {
+          return SizedBox(width: available, child: search);
+        }
+
+        final searchWidth =
+            (available - minimumDragWidth - searchToDragGap)
+                .clamp(0.0, searchMaxWidth)
+                .toDouble();
+        return Row(
+          children: [
+            SizedBox(width: searchWidth, child: search),
+            const SizedBox(width: searchToDragGap),
+            const Expanded(
+              child: HeniWindowDragRegion(
+                key: ValueKey('heni-top-chrome-drag-spacer'),
+                child: SizedBox.expand(),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class HeniWindowControls extends ConsumerWidget {
   const HeniWindowControls({required this.shellTheme, super.key});
 
