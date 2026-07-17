@@ -10,6 +10,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../design/app_theme.dart';
+import '../../../design/heni_shell_theme.dart';
 import '../../../domain/media/media_item.dart';
 import '../../../domain/media/media_kind.dart';
 import '../../../domain/media/media_path.dart';
@@ -1101,6 +1102,7 @@ class PlayerScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = ref.watch(activePaletteProvider);
+    final shellTheme = HeniShellTheme.fromPalette(palette);
     final uiStyle = ref.watch(activeUiStyleProvider);
     final sceneryImages = ref.watch(sceneryImagePathsProvider);
     final queue = ref.watch(playbackQueueControllerProvider);
@@ -1118,6 +1120,7 @@ class PlayerScreen extends ConsumerWidget {
             child: GlobalSceneryBackdrop(
               imagePaths: sceneryImages,
               palette: palette,
+              shellTheme: shellTheme,
               mode:
                   uiStyle == HeniUiStyle.scenery
                       ? HeniBackdropMode.playback

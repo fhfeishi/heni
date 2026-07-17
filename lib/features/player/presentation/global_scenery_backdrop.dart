@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../../../design/app_theme.dart';
+import '../../../design/heni_shell_theme.dart';
 
 enum HeniBackdropMode { playback, library }
 
@@ -25,17 +26,17 @@ class HeniBackdropTreatment {
   }
 
   static const playback = HeniBackdropTreatment(
-    blurSigma: 12,
-    overlayOpacity: 0.44,
-    saturation: 0.72,
-    seedWashOpacity: 0.18,
+    blurSigma: 10,
+    overlayOpacity: 0.30,
+    saturation: 0.84,
+    seedWashOpacity: 0.16,
   );
 
   static const library = HeniBackdropTreatment(
-    blurSigma: 24,
-    overlayOpacity: 0.68,
-    saturation: 0.52,
-    seedWashOpacity: 0.24,
+    blurSigma: 16,
+    overlayOpacity: 0.46,
+    saturation: 0.72,
+    seedWashOpacity: 0.18,
   );
 
   final double blurSigma;
@@ -44,16 +45,21 @@ class HeniBackdropTreatment {
   final double seedWashOpacity;
 }
 
+Duration heniBackdropTransitionDuration({required bool disableAnimations}) =>
+    disableAnimations ? Duration.zero : const Duration(milliseconds: 820);
+
 class GlobalSceneryBackdrop extends StatefulWidget {
   const GlobalSceneryBackdrop({
     required this.imagePaths,
     required this.palette,
+    required this.shellTheme,
     required this.mode,
     super.key,
   });
 
   final List<String> imagePaths;
   final HeniPalette palette;
+  final HeniShellTheme shellTheme;
   final HeniBackdropMode mode;
 
   @override
@@ -94,12 +100,14 @@ class _GlobalSceneryBackdropState extends State<GlobalSceneryBackdrop> {
   Widget build(BuildContext context) {
     final treatment = HeniBackdropTreatment.forMode(widget.mode);
     final paths = _validPaths;
+    final disableAnimations =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     return IgnorePointer(
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 380),
         curve: Curves.easeOutCubic,
-        color: widget.palette.surface,
+        color: widget.shellTheme.canvas,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -110,7 +118,9 @@ class _GlobalSceneryBackdropState extends State<GlobalSceneryBackdrop> {
               )
             else
               AnimatedSwitcher(
-                duration: const Duration(milliseconds: 1200),
+                duration: heniBackdropTransitionDuration(
+                  disableAnimations: disableAnimations,
+                ),
                 switchInCurve: Curves.easeOutCubic,
                 switchOutCurve: Curves.easeInOutCubic,
                 child: _SceneryImage(
@@ -123,11 +133,8 @@ class _GlobalSceneryBackdropState extends State<GlobalSceneryBackdrop> {
             AnimatedContainer(
               duration: const Duration(milliseconds: 380),
               curve: Curves.easeOutCubic,
-              color: Color.alphaBlend(
-                widget.palette.surface.withValues(
-                  alpha: treatment.overlayOpacity,
-                ),
-                Colors.black.withValues(alpha: treatment.overlayOpacity * 0.16),
+              color: widget.shellTheme.canvas.withValues(
+                alpha: treatment.overlayOpacity,
               ),
             ),
             AnimatedContainer(
