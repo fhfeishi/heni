@@ -18,6 +18,7 @@ lib/
     router.dart            # Route table.
   design/
     app_theme.dart         # Theme palettes and theme construction.
+    heni_shell_theme.dart  # Semantic panoramic shell surface tokens.
   domain/
     media/                 # Media kind, item, ffprobe data models.
     scenery/               # Scenery pack model.
@@ -107,12 +108,13 @@ build/windows/x64/runner/Release/heni.exe
 - Desktop music-player layout:
   - Themed custom Windows frame with drag, minimize, maximize/restore, and
     close controls.
+  - Lowercase `heni` wordmark and matching multi-resolution Windows icon.
   - Global search and palette controls in the top work bar.
   - Expanded labeled sidebar with an explicit compact rail; narrow windows
     force compact mode with resize hysteresis.
   - Main playback/list workspace and a fixed bottom transport dock.
-- Full-window scenery background with stronger playback treatment, quieter
-  library treatment, and fallback painting.
+- Edge-to-edge panoramic scenery background that reaches the title bar,
+  navigation, workspace, and bottom dock, with theme-derived semantic veils.
 - Actual video output for video files.
 - Compact top palette switching with solid color swatches, black/white choices,
   selected glow, and expanded preset themes.
@@ -125,16 +127,17 @@ build/windows/x64/runner/Release/heni.exe
 - Previous/next controls backed by the current playback queue.
 - Icon-only playback mode control: 顺序播放, 列表循环, 单曲循环, 随机播放.
 - Progress slider.
-- Speaker-only volume control with a bare palette-colored vertical slider that
-  opens at the current cached volume.
+- Theme-matched horizontal volume popover with live adjustment, mute/restore,
+  percentage feedback, wheel adjustment, and persisted final values.
 - Cleaner bottom bar layout with now-playing, centered transport/progress, and
   right-side utility controls.
 - Responsive progress display that preserves seeking and hides time labels
   before they collide.
 - Listening console with current media, source path, ffprobe codec/bitrate/
   sample-rate/channels, next track, queue location, and file location.
-- Playback-queue dialog that automatically locates the current track and
-  remains scrollable at the minimum window height.
+- Playback-queue dialog that automatically locates and briefly highlights the
+  current track, preserves active search filters, and remains scrollable at the
+  minimum window height.
 - No lyric surface and no user-facing FLAC/audio export.
 
 ## Near-Term Windows Focus

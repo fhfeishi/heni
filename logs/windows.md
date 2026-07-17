@@ -1,6 +1,6 @@
 # Windows Development Log
 
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 ## Status
 
@@ -536,3 +536,43 @@ blocked before suite loading by the host loopback failure described below.
 - `flutter test` still fails before loading the suite because
   `flutter_tester` cannot connect to its listener at `127.0.0.1`
   (`SocketException`, Windows error 121). No widget-test assertion ran.
+
+## 2026-07-17 - Panoramic Theme Canvas And Usability Finish
+
+- Replaced the remaining layered gray shell impression with one edge-to-edge
+  scenery canvas and semantic theme surfaces for chrome, rail, content, dock,
+  hover, pressed, selected, border, and text roles.
+- The selected scenery now visibly continues behind the custom title bar,
+  navigation, library/playback workspace, and bottom transport dock. Playback
+  and library modes use different veil strengths while keeping the same theme.
+- Standardized the visible brand to lowercase `heni` and generated a matching
+  five-frame Windows ICO (16, 24, 32, 48, and 256 pixels).
+- Calibrated the expanded/compact sidebar transition for the `900 × 620`
+  minimum-size shell: narrow widths force the compact rail and wider widths
+  restore the labeled expanded rail with hysteresis.
+- Preserved the seek track and separated time geometry throughout horizontal
+  resizing; minimum-size runtime checks remain available in
+  `tool/verify_windows_minimum_size.ps1`.
+- Replaced the old volume bubble with a theme-matched horizontal popover that
+  supports live adjustment, final-value persistence, mute/restore, percentage
+  feedback, and wheel steps.
+- Changed queue location so an active search filter is never silently cleared.
+  A visible current item is centered and highlighted for 900 ms; a hidden item
+  produces an explanatory filter message.
+- Confirmed the panoramic work does not change the `media_kit` playback engine,
+  FFmpeg filters, equalization, loudness, pitch, or source-path behavior.
+- Verification in the feature worktree:
+  - `dart test` pure-Dart subset: 8 tests passed;
+  - `flutter analyze`: no issues;
+  - Windows Debug and Release builds: passed;
+  - Release minimum resize: `912 × 632` logical outer window;
+  - Release style: `0x940F0000`, no `WS_CAPTION`;
+  - custom maximize and restore clicks: passed;
+  - DPI-aware wide, minimum-size, and volume-popover screenshots: no visible
+    overflow banner or progress/time collision;
+  - Release SHA-256:
+    `C1270F3F074B23679D314EFC733EF2FA14BBACA311D537416327A75E38C7BE32`.
+- `flutter test` was not reported as passing: the existing host loopback issue
+  prevents the Flutter test harness from reaching assertions. The user approved
+  the documented static-analysis/native-build exception for this delivery.
+- Normal-workspace rebuild and remote push are recorded after integration.

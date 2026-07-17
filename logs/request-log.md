@@ -2207,3 +2207,48 @@ request that changes Heni.
   restore behavior, and DPI-aware Release screenshots.
 - `flutter test` remains blocked before suite loading by the host
   `127.0.0.1` loopback failure; no widget assertion executed.
+
+## 2026-07-17 - Panoramic Theme Canvas And Final Usability Pass
+
+### User Request
+
+- Make the outermost UI genuinely merge with the selected theme instead of
+  looking like a default or rough product frame.
+- Continue the approved option B panoramic design with lowercase `heni` as the
+  only icon/wordmark treatment.
+- Retain all earlier requirements: full-background imagery, mature two-mode
+  sidebar behavior, usable minimum size, stable progress geometry, quick queue
+  location, improved volume interaction, no lyrics, and no FLAC export.
+- Maintain `strata.md` and project documentation, confirm the update appears in
+  the normal-workspace Release build, and push the update to the remote.
+
+### Understanding
+
+- The background must be a shared canvas under every shell region, not an image
+  trapped inside the playback content card.
+- Theme matching is a semantic surface system: chrome, rail, workspace, dock,
+  states, borders, and text need related but distinct opacity/contrast roles.
+- Automatic responsive behavior must not erase a user's stored sidebar choice,
+  and locator actions must not erase a user's queue search.
+- Playback quality logic should remain neutral; this visual/usability change
+  must not introduce processing or imply that a lossy source can be restored.
+
+### Done
+
+- Added the panoramic shell theme token model and applied one full-window
+  scenery canvas across title bar, sidebar, workspace, and transport dock.
+- Rebuilt the custom title-bar surfaces and controls around the active palette,
+  with lowercase `heni` branding and a matching multi-resolution Windows icon.
+- Finished the labeled expanded sidebar, forced compact narrow state, automatic
+  wide restoration, minimum-size boundary, and responsive progress treatment.
+- Added a theme-matched volume popover with mute/restore, wheel adjustment,
+  percentage feedback, live engine updates, and persisted final values.
+- Updated queue location to preserve active filters, explain hidden current
+  tracks, center visible current tracks, and apply a short selection highlight.
+- Kept lyrics and user-facing FLAC/audio export absent and left the playback
+  engine/DSP path unchanged.
+- Added focused regression specifications for shell tokens, panoramic backdrop,
+  window chrome, sidebar behavior, progress geometry, queue location, volume,
+  and the window controller. Widget execution remains blocked by the local
+  Flutter listener environment; static analysis and native builds remain the
+  authoritative executable checks for this machine.

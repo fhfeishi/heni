@@ -1,26 +1,37 @@
 # Heni Windows Plan
 
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 ## Current Focus
 
-Ship the studio-matte listening-console update as the new Windows baseline.
+Ship the panoramic theme canvas as the Windows baseline and verify the same
+commit in both the feature worktree and the normal workspace Release output.
 
 ## Release Acceptance
 
-- [x] The outer Windows frame follows the active Heni theme.
-- [x] Custom minimize, maximize/restore, close, and drag behavior works.
+- [x] The scenery image reaches the full UI, including title bar, navigation,
+  workspace, and bottom dock.
+- [x] Theme-derived semantic surfaces keep controls readable without restoring
+  a default gray outer frame.
+- [x] The only shell wordmark is lowercase `heni`; the Windows icon uses the
+  same lowercase wordmark and contains 16/24/32/48/256-pixel frames.
+- [x] Custom minimize, maximize/restore, close, and drag behavior remains wired.
 - [x] The window cannot shrink below the usable `900 × 620` logical client
   area.
-- [x] The background image affects the full shell while retaining readable
-  matte surfaces.
-- [x] Audio playback shows the current track, source path, real probe metadata,
-  next track, file location, and queue-location actions.
-- [x] The queue dialog opens centered on the current track and remains
-  scrollable in shorter windows.
-- [x] Lyrics and user-facing FLAC export are absent.
-- [x] Final Windows Release build and launch smoke are recorded in
-  `logs/windows.md`.
+- [x] The sidebar defaults to labeled expanded mode, forces compact mode below
+  the narrow threshold, and restores expanded mode with resize hysteresis.
+- [x] The progress display preserves its seek track and keeps time labels from
+  colliding while the window width changes.
+- [x] The queue locator centers and briefly highlights the current track without
+  clearing an active search filter.
+- [x] Volume uses a theme-matched horizontal popover with mute/restore, wheel
+  adjustment, percentage feedback, and persisted final values.
+- [x] Lyrics and user-facing FLAC/audio export are absent; FLAC playback and
+  honest source-codec labeling remain supported.
+- [x] Final feature-worktree Release build, launch/UI smoke, and checksum are
+  recorded in `logs/windows.md`.
+- [ ] The feature commit is fast-forwarded into the normal workspace, rebuilt
+  there, launch-smoked, and pushed to the remote.
 
 ## Next Product Work
 
@@ -36,7 +47,8 @@ Ship the studio-matte listening-console update as the new Windows baseline.
 
 ## Known Environment Risk
 
-- `flutter test` cannot start its test harness on this machine because both
-  `127.0.0.1` and `::1` loopback connections fail before any test assertion.
-  Pure-Dart tests and Windows runtime checks remain usable. Status: `已验证`
-  as an operating-system/network limitation on 2026-07-16.
+- `flutter test` cannot start its test harness on this machine because the
+  runner cannot connect to its local listener on `127.0.0.1` before any test
+  assertion. Status: `已验证` as a host-environment limitation on 2026-07-17.
+  Use static analysis, the available pure-Dart subset, Windows builds, and
+  native runtime checks; never report the blocked widget suite as passing.

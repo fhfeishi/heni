@@ -1,7 +1,8 @@
 # Heni Project Router
 
-Heni is a Windows-first Flutter local music player. Keep this file short: use it
-to choose the smallest relevant document set before changing code.
+Heni is a Windows-first Flutter local music player with a panoramic,
+theme-derived desktop shell. Keep this file short: use it to choose the
+smallest relevant document set before changing code.
 
 ## Start Here
 
@@ -22,11 +23,16 @@ to choose the smallest relevant document set before changing code.
 - No user-facing FLAC/audio export. Converting lossy audio to FLAC does not
   restore lost detail.
 - Minimum full-player client size: `900 × 620` logical pixels.
+- Lowercase `heni` is the product wordmark in the shell and Windows icon.
+- The default sidebar is labeled and expanded; narrow widths temporarily force
+  the compact icon rail without overwriting the stored preference.
 
 ## Task Routing
 
 - UI, resize, title bar, queue, or playback interaction:
-  `docs/project-overview.md` → `logs/plan.md` → relevant recent design plan.
+  `docs/project-overview.md` → `logs/plan.md` →
+  `docs/plans/2026-07-17-panoramic-theme-shell-design.md` when the task affects
+  the panoramic shell.
 - Playback quality, codec, bitrate, or web-downloaded MP4:
   `docs/media-pipeline.md` → playback service and probe models.
 - Windows build or release:
