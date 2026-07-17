@@ -32,6 +32,7 @@ import 'player_progress.dart';
 import 'player_responsive_layout.dart';
 import 'player_shell_frame.dart';
 import 'player_window_chrome.dart';
+import 'volume_control.dart';
 
 const _hoverDuration = Duration(milliseconds: 220);
 const _hoverCurve = Curves.easeOutCubic;
@@ -5966,6 +5967,7 @@ class _BottomPlayerBar extends ConsumerWidget {
           compactBottom
               ? _CompactBottomBar(
                 palette: palette,
+                shellTheme: shellTheme,
                 currentMedia: currentMedia,
                 engine: engine,
                 queue: queue,
@@ -6014,6 +6016,7 @@ class _BottomPlayerBar extends ConsumerWidget {
                   SizedBox(width: layout.quiet ? 10 : 16),
                   _UtilityControls(
                     palette: palette,
+                    shellTheme: shellTheme,
                     mode: queue.playbackMode,
                     engine: engine,
                     queue: queue,
@@ -6030,6 +6033,7 @@ class _BottomPlayerBar extends ConsumerWidget {
 class _CompactBottomBar extends StatelessWidget {
   const _CompactBottomBar({
     required this.palette,
+    required this.shellTheme,
     required this.currentMedia,
     required this.engine,
     required this.queue,
@@ -6041,6 +6045,7 @@ class _CompactBottomBar extends StatelessWidget {
   });
 
   final HeniPalette palette;
+  final HeniShellTheme shellTheme;
   final MediaItem? currentMedia;
   final PlaybackEngine engine;
   final PlaybackQueueState queue;
@@ -6182,10 +6187,11 @@ class _CompactBottomBar extends StatelessWidget {
                   ),
                 if (!veryTight) ...[
                   const SizedBox(width: 4),
-                  _VolumeMenuButton(
+                  HeniVolumeControl(
                     engine: engine,
                     palette: palette,
-                    onVolumeChanged: onPersistVolume,
+                    shellTheme: shellTheme,
+                    onVolumeCommitted: onPersistVolume,
                   ),
                 ],
                 if (!tiny)
@@ -6838,6 +6844,7 @@ class _EqualizerBarsState extends State<_EqualizerBars>
 class _UtilityControls extends StatelessWidget {
   const _UtilityControls({
     required this.palette,
+    required this.shellTheme,
     required this.mode,
     required this.engine,
     required this.queue,
@@ -6847,6 +6854,7 @@ class _UtilityControls extends StatelessWidget {
   });
 
   final HeniPalette palette;
+  final HeniShellTheme shellTheme;
   final HeniPlaybackMode mode;
   final PlaybackEngine engine;
   final PlaybackQueueState queue;
@@ -6867,10 +6875,11 @@ class _UtilityControls extends StatelessWidget {
         const SizedBox(width: 4),
         _PlaybackModeIconButton(mode: mode, onPressed: onCyclePlaybackMode),
         const SizedBox(width: 4),
-        _VolumeMenuButton(
+        HeniVolumeControl(
           engine: engine,
           palette: palette,
-          onVolumeChanged: onPersistVolume,
+          shellTheme: shellTheme,
+          onVolumeCommitted: onPersistVolume,
         ),
       ],
     );
@@ -6952,254 +6961,6 @@ class _CurrentQueueButton extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _VolumeMenuButton extends StatelessWidget {
-  const _VolumeMenuButton({
-    required this.engine,
-    required this.palette,
-    required this.onVolumeChanged,
-  });
-
-  final PlaybackEngine engine;
-  final HeniPalette palette;
-  final ValueChanged<double> onVolumeChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return MenuAnchor(
-      style: const MenuStyle(
-        backgroundColor: WidgetStatePropertyAll(Colors.transparent),
-        elevation: WidgetStatePropertyAll(0),
-        padding: WidgetStatePropertyAll(EdgeInsets.zero),
-        minimumSize: WidgetStatePropertyAll(Size.zero),
-        shadowColor: WidgetStatePropertyAll(Colors.transparent),
-        surfaceTintColor: WidgetStatePropertyAll(Colors.transparent),
-      ),
-      alignmentOffset: const Offset(-200, -56),
-      menuChildren: [
-        _VolumeBubble(
-          engine: engine,
-          palette: palette,
-          onVolumeChanged: onVolumeChanged,
-        ),
-      ],
-      builder: (context, controller, child) {
-        return StreamBuilder<double>(
-          stream: engine.volume,
-          initialData: engine.currentVolume,
-          builder: (context, snapshot) {
-            final volume =
-                (snapshot.data ?? engine.currentVolume)
-                    .clamp(0, 100)
-                    .toDouble();
-            final icon = switch (volume.round()) {
-              <= 0 => Icons.volume_off_rounded,
-              < 50 => Icons.volume_down_rounded,
-              _ => Icons.volume_up_rounded,
-            };
-
-            return IconButton(
-              tooltip: '音量 ${volume.round()}',
-              onPressed: () {
-                if (controller.isOpen) {
-                  controller.close();
-                } else {
-                  controller.open();
-                }
-              },
-              style: IconButton.styleFrom(
-                foregroundColor: _secondaryGlassText(emphasis: 1.05),
-              ),
-              icon: Icon(icon),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _VolumeBubble extends StatefulWidget {
-  const _VolumeBubble({
-    required this.engine,
-    required this.palette,
-    required this.onVolumeChanged,
-  });
-
-  final PlaybackEngine engine;
-  final HeniPalette palette;
-  final ValueChanged<double> onVolumeChanged;
-
-  @override
-  State<_VolumeBubble> createState() => _VolumeBubbleState();
-}
-
-class _VolumeBubbleState extends State<_VolumeBubble> {
-  late double _volume;
-  StreamSubscription<double>? _sub;
-
-  @override
-  void initState() {
-    super.initState();
-    _volume = widget.engine.currentVolume.clamp(0, 100).toDouble();
-    _sub = widget.engine.volume.listen((v) {
-      if (!mounted) return;
-      setState(() => _volume = v.clamp(0, 100).toDouble());
-    });
-  }
-
-  @override
-  void dispose() {
-    unawaited(_sub?.cancel());
-    super.dispose();
-  }
-
-  void _set(double v) {
-    final clamped = v.clamp(0.0, 100.0).toDouble();
-    setState(() => _volume = clamped);
-    unawaited(widget.engine.setVolume(clamped));
-    widget.onVolumeChanged(clamped);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = widget.palette;
-    final blended = Color.lerp(p.seed, p.accent, 0.55)!;
-
-    return Container(
-      width: 244,
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: Color.alphaBlend(
-          Colors.white.withValues(alpha: 0.06),
-          Colors.black.withValues(alpha: 0.86),
-        ),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: p.seed.withValues(alpha: 0.22), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.36),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
-          ),
-          BoxShadow(color: p.seed.withValues(alpha: 0.16), blurRadius: 18),
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(
-            switch (_volume.round()) {
-              <= 0 => Icons.volume_off_rounded,
-              < 50 => Icons.volume_down_rounded,
-              _ => Icons.volume_up_rounded,
-            },
-            size: 18,
-            color: Colors.white.withValues(alpha: 0.86),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final w = constraints.maxWidth;
-                void updateFromX(double x) {
-                  _set((x / w).clamp(0.0, 1.0) * 100);
-                }
-
-                return GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTapDown: (d) => updateFromX(d.localPosition.dx),
-                  onHorizontalDragUpdate:
-                      (d) => updateFromX(d.localPosition.dx),
-                  child: SizedBox(
-                    height: 30,
-                    child: CustomPaint(
-                      painter: _VolumeBarPainter(
-                        fraction: _volume / 100,
-                        seedColor: p.seed,
-                        accentColor: blended,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 28,
-            child: Text(
-              _volume.round().toString(),
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                fontFeatures: [ui.FontFeature.tabularFigures()],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VolumeBarPainter extends CustomPainter {
-  const _VolumeBarPainter({
-    required this.fraction,
-    required this.seedColor,
-    required this.accentColor,
-  });
-
-  final double fraction;
-  final Color seedColor;
-  final Color accentColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const trackH = 4.0;
-    final cy = size.height / 2;
-    final track = Rect.fromLTWH(0, cy - trackH / 2, size.width, trackH);
-    final radius = const Radius.circular(4);
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(track, radius),
-      Paint()..color = Colors.white.withValues(alpha: 0.14),
-    );
-
-    final f = fraction.clamp(0.0, 1.0);
-    if (f > 0) {
-      final fillW = size.width * f;
-      final fillRect = Rect.fromLTWH(0, cy - trackH / 2, fillW, trackH);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(fillRect, radius),
-        Paint()
-          ..shader = LinearGradient(
-            colors: [seedColor, accentColor],
-          ).createShader(Rect.fromLTWH(0, 0, size.width, trackH)),
-      );
-
-      final thumbX = fillW.clamp(0.0, size.width);
-      final center = Offset(thumbX, cy);
-      canvas.drawCircle(
-        center,
-        9,
-        Paint()
-          ..color = seedColor.withValues(alpha: 0.42)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-      );
-      canvas.drawCircle(center, 6, Paint()..color = Colors.white);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _VolumeBarPainter old) {
-    return old.fraction != fraction ||
-        old.seedColor != seedColor ||
-        old.accentColor != accentColor;
   }
 }
 
