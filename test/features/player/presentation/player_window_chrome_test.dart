@@ -112,6 +112,15 @@ void main() {
       find.byKey(const ValueKey('heni-top-chrome-drag-spacer')),
       findsOneWidget,
     );
+    final searchRect = tester.getRect(
+      find.byKey(const ValueKey('chrome-search')),
+    );
+    final spacerRect = tester.getRect(
+      find.byKey(const ValueKey('heni-top-chrome-drag-spacer')),
+    );
+    expect(searchRect.width, 640);
+    expect(spacerRect.width, 148);
+    expect(spacerRect.left - searchRect.right, 12);
     await tester.tap(find.byKey(const ValueKey('chrome-search')));
     await tester.pump();
     expect(focusNode.hasFocus, isTrue);
@@ -123,6 +132,36 @@ void main() {
     );
     await tester.pump();
     expect(methods, contains('beginDrag'));
+  });
+
+  testWidgets('breakpoint top chrome reserves minimum drag spacer geometry', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 720,
+              height: 48,
+              child: HeniTopChromeCenter(
+                search: SizedBox(key: ValueKey('chrome-search')),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final searchRect = tester.getRect(
+      find.byKey(const ValueKey('chrome-search')),
+    );
+    final spacerRect = tester.getRect(
+      find.byKey(const ValueKey('heni-top-chrome-drag-spacer')),
+    );
+    expect(searchRect.width, 624);
+    expect(spacerRect.width, 84);
+    expect(spacerRect.left - searchRect.right, 12);
   });
 
   testWidgets('narrow top chrome gives all center width to search', (
