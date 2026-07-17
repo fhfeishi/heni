@@ -585,3 +585,53 @@ blocked before suite loading by the host loopback failure described below.
   The feature and normal outputs were built in different absolute worktree
   paths, so executable hashes are recorded separately; both were built from
   the same implementation commit.
+
+## 2026-07-17 - Full-Bleed Windows Frame And Drag Zones
+
+- Confirmed the original six-logical-pixel visual gap was the `WS_THICKFRAME`
+  non-client inset (`L6/T6`), not a Flutter layout margin. `WM_NCCALCSIZE` now
+  assigns the complete window to the client and the runner makes a best-effort
+  DWM border-colour suppression call; `WS_THICKFRAME` remains in the window
+  style for native resize and Snap behavior.
+- Release native chrome probe: `outer=1180x760`, `client=1180x760`,
+  `inset=L0/T0`; its deliberate input checks report
+  `brand=True searchProtected=True spacer=True`. The wide title area therefore
+  leaves search text selection intact while `heni` and the reserved spacer drag
+  the restored window.
+- Replaced the previous decorative outer gradient with the single
+  theme-derived one-pixel shell border. Maximized windows remain square and
+  flush.
+- Release minimum-size probe reports `900x620`. Native frame verification
+  reports style `0x940F0000`, `WM_NCHITTEST` values `HTRIGHT=11` and
+  `HTBOTTOMRIGHT=17`, preserving edge and corner resize zones.
+- Verification evidence in the feature worktree:
+  - 8 pure-Dart file-action/queue-location tests passed;
+  - `flutter analyze` reported `No issues found!`;
+  - Windows Debug and Release builds passed;
+  - Release SHA-256:
+    `21EF7343DCD51A544AAF9F5500D14175E8942D212FD02BDFE2CCBEAF46B74652`;
+  - DPI-aware `PrintWindow` screenshots are at
+    `build/visual-check/final-full-bleed-frame-wide.png` (2360 x 1520 physical,
+    1180 x 760 logical) and
+    `build/visual-check/final-full-bleed-frame-minimum.png` (1800 x 1240
+    physical, 900 x 620 logical). Visual inspection confirmed the full themed
+    title edge, semantic border, search/actions/window controls, compact rail,
+    bottom dock, and no overflow banner.
+- Custom maximize/restore native automation changed `IsZoomed` from false to
+  true and back to false. Hardware cursor resize drags did not change geometry
+  in this host automation session despite the native hit-test evidence; Windows
+  Snap preview has no queryable state and was not claimed as visually observed.
+  These remain manual desktop checks.
+- All five implementation Dart files changed since `c498322` pass individual
+  formatter checks. The repository-wide formatter command nevertheless reports
+  ten unrelated pre-existing paths and exits 1:
+  `lib/app/router.dart`, `lib/domain/media/media_item.dart`,
+  `lib/domain/media/media_probe.dart`, `lib/domain/playback/playback_order.dart`,
+  `lib/domain/scenery/scenery_pack.dart`, the three FFmpeg service files, and
+  `test/services/ffmpeg/ffmpeg_progress_test.dart` plus
+  `test/services/media/local_media_scanner_test.dart`. Git status and
+  `git diff --check` remain clean outside this log update. This is recorded as
+  repository-wide formatting debt, not silently reported as a clean gate.
+- The broad Flutter widget suite remains blocked before assertions because the
+  harness cannot establish its local `127.0.0.1` listener connection (Windows
+  error 121). No widget suite is reported as passing.

@@ -2252,3 +2252,44 @@ request that changes Heni.
   and the window controller. Widget execution remains blocked by the local
   Flutter listener environment; static analysis and native builds remain the
   authoritative executable checks for this machine.
+
+## 2026-07-17 - Full-Bleed Windows Frame And Drag Zones
+
+### User Request
+
+- Remove the unexplained top whitespace and refine the outer border so it feels
+  like part of Heni's selected theme.
+- Make the window move like a normal desktop application while keeping search
+  and controls usable.
+
+### Done
+
+- Removed the six-pixel native non-client frame inset with full-client
+  `WM_NCCALCSIZE` handling and best-effort DWM border suppression, while
+  retaining `WS_THICKFRAME` and native resize hit testing.
+- Made `heni` and an explicit wide-title drag spacer movable targets; search,
+  palette, settings, and window controls remain protected from drag handling.
+- Simplified the outer treatment to one theme-derived pixel in restored state;
+  maximized windows remain flush.
+- Release probe evidence confirms zero inset, correct brand/search/spacer drag
+  results, the exact `900 x 620` minimum, and custom maximize/restore from
+  false to true to false.
+- DPI-aware wide and minimum screenshots show the whole rendered window rather
+  than the earlier DPI-virtualized top-left crop. They retain title controls,
+  search, compact navigation, bottom player dock, and contain no overflow
+  banner.
+
+### Verification Limits
+
+- Native edge/corner hit testing returns the expected resize codes, but host
+  cursor automation did not move the window and Windows Snap preview has no
+  queryable state; visual Snap-preview confirmation remains manual.
+- The pure-Dart subset (8 tests), analysis, and Debug/Release builds pass.
+  The broad Flutter widget harness still fails before assertions on the host
+  `127.0.0.1` listener (Windows error 121), so it is not reported as passing.
+- Every Dart file changed by this full-bleed implementation passes its
+  individual formatter check. The repository-wide formatter still reports ten
+  unrelated pre-existing files (router, media/domain, FFmpeg, and two existing
+  FFmpeg/media tests) and exits 1, while Git status and whitespace checks stay
+  clean outside this record; this is tracked as repository formatting debt,
+  not silently reported as a clean whole-repository gate.
