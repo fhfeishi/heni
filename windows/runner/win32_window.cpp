@@ -22,6 +22,14 @@ namespace {
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
+#ifndef DWMWA_BORDER_COLOR
+#define DWMWA_BORDER_COLOR 34
+#endif
+
+#ifndef DWMWA_COLOR_NONE
+#define DWMWA_COLOR_NONE 0xFFFFFFFE
+#endif
+
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 constexpr int kMinimumLogicalClientWidth = 900;
 constexpr int kMinimumLogicalClientHeight = 620;
@@ -189,24 +197,9 @@ void EnsureMinimumClientSize(HWND window) {
     return;
   }
 
-  RECT minimum_rect = {
-      0,
-      0,
-      std::max(client_width, minimum_width),
-      std::max(client_height, minimum_height),
-  };
-  const DWORD style =
-      static_cast<DWORD>(GetWindowLongPtr(window, GWL_STYLE));
-  const DWORD extended_style =
-      static_cast<DWORD>(GetWindowLongPtr(window, GWL_EXSTYLE));
-  if (!AdjustWindowRectExForDpi(&minimum_rect, style, FALSE, extended_style,
-                                dpi)) {
-    return;
-  }
-
   SetWindowPos(window, nullptr, 0, 0,
-               minimum_rect.right - minimum_rect.left,
-               minimum_rect.bottom - minimum_rect.top,
+               std::max(client_width, minimum_width),
+               std::max(client_height, minimum_height),
                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
@@ -375,6 +368,21 @@ Win32Window::MessageHandler(HWND hwnd,
       }
       return 0;
 
+    case WM_NCCALCSIZE:
+      if (wparam == TRUE) {
+        if (IsZoomed(hwnd)) {
+          auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+          const HMONITOR monitor =
+              MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+          MONITORINFO monitor_info{sizeof(MONITORINFO)};
+          if (GetMonitorInfo(monitor, &monitor_info)) {
+            params->rgrc[0] = monitor_info.rcWork;
+          }
+        }
+        return 0;
+      }
+      break;
+
     case WM_DPICHANGED: {
       auto newRectSize = reinterpret_cast<RECT*>(lparam);
       LONG newWidth = newRectSize->right - newRectSize->left;
@@ -393,29 +401,10 @@ Win32Window::MessageHandler(HWND hwnd,
       auto min_max_info = reinterpret_cast<MINMAXINFO*>(lparam);
       const UINT dpi = GetDpiForWindow(hwnd);
       const double scale_factor = dpi / 96.0;
-      RECT minimum_client_rect = {
-          0,
-          0,
-          Scale(kMinimumLogicalClientWidth, scale_factor),
-          Scale(kMinimumLogicalClientHeight, scale_factor),
-      };
-      const DWORD style = static_cast<DWORD>(
-          GetWindowLongPtr(hwnd, GWL_STYLE));
-      const DWORD extended_style = static_cast<DWORD>(
-          GetWindowLongPtr(hwnd, GWL_EXSTYLE));
-
-      if (AdjustWindowRectExForDpi(&minimum_client_rect, style, FALSE,
-                                   extended_style, dpi)) {
-        min_max_info->ptMinTrackSize.x =
-            minimum_client_rect.right - minimum_client_rect.left;
-        min_max_info->ptMinTrackSize.y =
-            minimum_client_rect.bottom - minimum_client_rect.top;
-      } else {
-        min_max_info->ptMinTrackSize.x =
-            Scale(kMinimumLogicalClientWidth, scale_factor);
-        min_max_info->ptMinTrackSize.y =
-            Scale(kMinimumLogicalClientHeight, scale_factor);
-      }
+      min_max_info->ptMinTrackSize.x =
+          Scale(kMinimumLogicalClientWidth, scale_factor);
+      min_max_info->ptMinTrackSize.y =
+          Scale(kMinimumLogicalClientHeight, scale_factor);
       return 0;
     }
     case WM_NCHITTEST: {
@@ -560,4 +549,8 @@ void Win32Window::UpdateTheme(HWND const window) {
     DwmSetWindowAttribute(window, DWMWA_USE_IMMERSIVE_DARK_MODE,
                           &enable_dark_mode, sizeof(enable_dark_mode));
   }
+
+  const COLORREF border_color = DWMWA_COLOR_NONE;
+  DwmSetWindowAttribute(window, DWMWA_BORDER_COLOR, &border_color,
+                        sizeof(border_color));
 }
