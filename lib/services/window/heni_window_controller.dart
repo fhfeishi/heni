@@ -20,11 +20,15 @@ class HeniWindowController extends Notifier<bool> {
     return false;
   }
 
-  Future<void> minimize() => _invoke('minimize');
+  Future<void> minimize() async {
+    await _invoke('minimize');
+  }
 
-  Future<void> close() => _invoke('close');
+  Future<bool> close() => _invoke('close');
 
-  Future<void> beginDrag() => _invoke('beginDrag');
+  Future<void> beginDrag() async {
+    await _invoke('beginDrag');
+  }
 
   Future<void> toggleMaximize() async {
     await _invoke('toggleMaximize');
@@ -41,13 +45,16 @@ class HeniWindowController extends Notifier<bool> {
     }
   }
 
-  Future<void> _invoke(String method) async {
+  Future<bool> _invoke(String method) async {
     try {
       await _channel.invokeMethod<void>(method);
+      return true;
     } on PlatformException catch (error) {
       debugPrint('Heni window action $method failed: $error');
+      return false;
     } on MissingPluginException catch (error) {
       debugPrint('Heni window action $method unavailable: $error');
+      return false;
     }
   }
 

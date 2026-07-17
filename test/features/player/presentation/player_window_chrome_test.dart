@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heni/design/app_theme.dart';
+import 'package:heni/design/heni_shell_theme.dart';
 import 'package:heni/features/player/presentation/player_window_chrome.dart';
 
 void main() {
@@ -29,10 +30,11 @@ void main() {
   });
 
   testWidgets('window controls invoke native actions', (tester) async {
+    final shellTheme = HeniShellTheme.fromPalette(HeniPalette.plum);
     await tester.pumpWidget(
-      const ProviderScope(
+      ProviderScope(
         child: MaterialApp(
-          home: Scaffold(body: HeniWindowControls(palette: HeniPalette.plum)),
+          home: Scaffold(body: HeniWindowControls(shellTheme: shellTheme)),
         ),
       ),
     );
@@ -45,6 +47,18 @@ void main() {
     await tester.pump();
 
     expect(methods, ['minimize', 'toggleMaximize', 'isMaximized', 'close']);
+  });
+
+  testWidgets('brand is lowercase heni without uppercase badge', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: HeniBrandWordmark())),
+    );
+
+    expect(find.text('heni'), findsOneWidget);
+    expect(find.text('H'), findsNothing);
+    expect(find.text('HENI'), findsNothing);
   });
 
   testWidgets('double-clicking drag region toggles maximize', (tester) async {

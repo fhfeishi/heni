@@ -64,4 +64,24 @@ void main() {
 
     expect(container.read(heniWindowControllerProvider), isTrue);
   });
+
+  test('close reports a native channel failure', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'close') {
+            throw PlatformException(code: 'close-failed');
+          }
+          if (call.method == 'isMaximized') {
+            return false;
+          }
+          return null;
+        });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final closed =
+        await container.read(heniWindowControllerProvider.notifier).close();
+
+    expect(closed, isFalse);
+  });
 }

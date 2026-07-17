@@ -1790,7 +1790,7 @@ class _TopNavigation extends ConsumerWidget {
             color: palette.seed.withValues(alpha: 0.14),
           ),
           SizedBox(width: layout.quiet ? 4 : 6),
-          HeniWindowControls(palette: palette),
+          HeniWindowControls(shellTheme: HeniShellTheme.fromPalette(palette)),
         ],
       ),
     );
@@ -4156,7 +4156,9 @@ class _FocusRecallStripState extends State<_FocusRecallStrip>
           Positioned(left: 0, right: 134, child: recall),
           Positioned(
             right: 6,
-            child: HeniWindowControls(palette: widget.palette),
+            child: HeniWindowControls(
+              shellTheme: HeniShellTheme.fromPalette(widget.palette),
+            ),
           ),
         ],
       ),
