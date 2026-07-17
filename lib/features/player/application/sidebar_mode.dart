@@ -28,10 +28,10 @@ bool resolveSidebarWidthForcedCompact({
   required bool? wasForcedCompact,
 }) {
   if (wasForcedCompact == null) {
-    return width < 1080;
+    return width < 1148;
   }
   if (wasForcedCompact) {
-    return width < 1140;
+    return width < 1180;
   }
-  return width <= 1040;
+  return width < 1148;
 }

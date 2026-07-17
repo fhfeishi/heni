@@ -20,6 +20,7 @@ import '../../../domain/playback/playback_mode.dart';
 import '../../../services/files/local_file_actions.dart';
 import '../../../services/media/playback_engine.dart';
 import '../../../services/media/playback_providers.dart';
+import '../../../services/window/heni_window_controller.dart';
 import '../application/playback_queue_controller.dart';
 import '../application/player_state.dart';
 import '../application/sidebar_mode.dart';
@@ -29,6 +30,7 @@ import 'listening_console.dart';
 import 'playback_queue_location.dart';
 import 'player_progress.dart';
 import 'player_responsive_layout.dart';
+import 'player_shell_frame.dart';
 import 'player_window_chrome.dart';
 
 const _hoverDuration = Duration(milliseconds: 220);
@@ -731,19 +733,21 @@ class _AuroraBarState extends State<_AuroraBar>
 class _ShellBand extends StatelessWidget {
   const _ShellBand({
     required this.child,
-    required this.palette,
+    required this.shellTheme,
+    required this.role,
     required this.padding,
     this.margin = EdgeInsets.zero,
     this.height,
-    this.emphasis = 1,
+    this.radius = 12,
   });
 
   final Widget child;
-  final HeniPalette palette;
+  final HeniShellTheme shellTheme;
+  final HeniShellSurfaceRole role;
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry margin;
   final double? height;
-  final double emphasis;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
@@ -753,10 +757,10 @@ class _ShellBand extends StatelessWidget {
         duration: _contentSwitchDuration,
         curve: _hoverCurve,
         height: height,
-        child: _GlassPanel(
-          radius: 18,
-          fillColor: _shellGlassFill(palette, emphasis: emphasis),
-          borderColor: _shellGlassBorder(palette, emphasis: emphasis),
+        child: HeniShellSurface(
+          shellTheme: shellTheme,
+          role: role,
+          radius: radius,
           padding: padding,
           child: child,
         ),
@@ -1112,30 +1116,27 @@ class PlayerScreen extends ConsumerWidget {
     final videoController = ref.watch(videoControllerProvider);
     final focusMode = ref.watch(focusModeProvider);
     final sidebarPreference = ref.watch(sidebarModeProvider);
+    final isMaximized = ref.watch(heniWindowControllerProvider);
 
     return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: GlobalSceneryBackdrop(
-              imagePaths: sceneryImages,
-              palette: palette,
-              shellTheme: shellTheme,
-              mode:
-                  uiStyle == HeniUiStyle.scenery
-                      ? HeniBackdropMode.playback
-                      : HeniBackdropMode.library,
-            ),
-          ),
-          Positioned.fill(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 520),
-              curve: Curves.easeOutCubic,
-              decoration: BoxDecoration(
-                color: palette.surface.withValues(
-                  alpha: uiStyle == HeniUiStyle.scenery ? 0.16 : 0.30,
-                ),
+      backgroundColor: Colors.transparent,
+      body: HeniPanoramicShellFrame(
+        shellTheme: shellTheme,
+        isMaximized: isMaximized,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: GlobalSceneryBackdrop(
+                imagePaths: sceneryImages,
+                palette: palette,
+                shellTheme: shellTheme,
+                mode:
+                    uiStyle == HeniUiStyle.scenery
+                        ? HeniBackdropMode.playback
+                        : HeniBackdropMode.library,
               ),
+            ),
+            Positioned.fill(
               child: SafeArea(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -1165,6 +1166,7 @@ class PlayerScreen extends ConsumerWidget {
                                         )
                                         : _TopNavigation(
                                           palette: palette,
+                                          shellTheme: shellTheme,
                                           queue: queue,
                                           layout: layout,
                                         ),
@@ -1203,6 +1205,7 @@ class PlayerScreen extends ConsumerWidget {
                                                 ) {
                                                   return _Sidebar(
                                                     palette: palette,
+                                                    shellTheme: shellTheme,
                                                     queue: queue,
                                                     layout: layout,
                                                     mode: effectiveMode,
@@ -1286,6 +1289,7 @@ class PlayerScreen extends ConsumerWidget {
                                     Expanded(
                                       child: _ContentArea(
                                         palette: palette,
+                                        shellTheme: shellTheme,
                                         uiStyle: uiStyle,
                                         queue: queue,
                                         currentMedia: currentMedia,
@@ -1429,6 +1433,7 @@ class PlayerScreen extends ConsumerWidget {
                           height: layout.bottomDockExtent,
                           child: _BottomPlayerBar(
                             palette: palette,
+                            shellTheme: shellTheme,
                             currentMedia: currentMedia,
                             mediaProbe: mediaProbe,
                             queue: queue,
@@ -1479,11 +1484,11 @@ class PlayerScreen extends ConsumerWidget {
                 ),
               ),
             ),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(child: _ToastOverlay(palette: palette)),
-          ),
-        ],
+            Positioned.fill(
+              child: IgnorePointer(child: _ToastOverlay(palette: palette)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1745,35 +1750,31 @@ class PlayerScreen extends ConsumerWidget {
 class _TopNavigation extends ConsumerWidget {
   const _TopNavigation({
     required this.palette,
+    required this.shellTheme,
     required this.queue,
     required this.layout,
   });
 
   final HeniPalette palette;
+  final HeniShellTheme shellTheme;
   final PlaybackQueueState queue;
   final _ShellLayout layout;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return _ShellBand(
-      palette: palette,
-      margin: EdgeInsets.fromLTRB(
-        layout.topHorizontalMargin,
-        layout.narrow ? 6 : 10,
-        layout.topHorizontalMargin,
-        6,
-      ),
+      shellTheme: shellTheme,
+      role: HeniShellSurfaceRole.chrome,
+      margin: const EdgeInsets.only(bottom: 6),
       padding: EdgeInsets.symmetric(
         horizontal: layout.narrow ? 10 : 14,
         vertical: 8,
       ),
       height: layout.topHeight,
-      emphasis: 0.5,
+      radius: 0,
       child: Row(
         children: [
-          HeniWindowDragRegion(
-            child: _TopBrand(palette: palette, layout: layout),
-          ),
+          HeniWindowDragRegion(child: _TopBrand(layout: layout)),
           Expanded(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: layout.narrow ? 8 : 18),
@@ -1790,7 +1791,7 @@ class _TopNavigation extends ConsumerWidget {
             color: palette.seed.withValues(alpha: 0.14),
           ),
           SizedBox(width: layout.quiet ? 4 : 6),
-          HeniWindowControls(shellTheme: HeniShellTheme.fromPalette(palette)),
+          HeniWindowControls(shellTheme: shellTheme),
         ],
       ),
     );
@@ -1915,73 +1916,17 @@ class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
 }
 
 class _TopBrand extends StatelessWidget {
-  const _TopBrand({required this.palette, required this.layout});
+  const _TopBrand({required this.layout});
 
-  final HeniPalette palette;
   final _ShellLayout layout;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return SizedBox(
-      width: layout.quiet ? 38 : 112,
-      child: Row(
-        children: [
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.985, end: 1),
-            duration: const Duration(milliseconds: 900),
-            curve: Curves.easeOutCubic,
-            builder: (context, scale, child) {
-              return Transform.scale(scale: scale, child: child);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              width: layout.narrow ? 30 : 32,
-              height: layout.narrow ? 30 : 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    Color.lerp(palette.accent, palette.seed, 0.3)!,
-                    palette.seed,
-                  ],
-                ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                boxShadow: [
-                  BoxShadow(
-                    color: palette.seed.withValues(alpha: 0.22),
-                    blurRadius: 8,
-                    spreadRadius: 0,
-                  ),
-                ],
-              ),
-              child: Text(
-                'H',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 14,
-                  color: heniReadableForegroundOn(palette.seed),
-                ),
-              ),
-            ),
-          ),
-          if (!layout.quiet) ...[
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'HENI',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                  letterSpacing: 2.0,
-                  color: _primaryGlassText(emphasis: 0.94),
-                ),
-              ),
-            ),
-          ],
-        ],
+      width: layout.quiet ? 54 : 82,
+      child: const Align(
+        alignment: Alignment.centerLeft,
+        child: HeniBrandWordmark(),
       ),
     );
   }
@@ -1990,6 +1935,7 @@ class _TopBrand extends StatelessWidget {
 class _Sidebar extends StatelessWidget {
   const _Sidebar({
     required this.palette,
+    required this.shellTheme,
     required this.queue,
     required this.layout,
     required this.mode,
@@ -2004,6 +1950,7 @@ class _Sidebar extends StatelessWidget {
   });
 
   final HeniPalette palette;
+  final HeniShellTheme shellTheme;
   final PlaybackQueueState queue;
   final _ShellLayout layout;
   final HeniSidebarMode mode;
@@ -2021,6 +1968,7 @@ class _Sidebar extends StatelessWidget {
     if (mode == HeniSidebarMode.compact) {
       return _CompactSidebar(
         palette: palette,
+        shellTheme: shellTheme,
         queue: queue,
         layout: layout,
         widthForcedCompact: widthForcedCompact,
@@ -2048,167 +1996,160 @@ class _Sidebar extends StatelessWidget {
         layout.quiet ? 10 : 12,
         layout.sidebarPadding,
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          _GlassPanel(
-            radius: 18,
-            fillColor: _shellGlassFill(palette, emphasis: 0.48),
-            borderColor: _shellGlassBorder(palette, emphasis: 0.46),
-            padding: EdgeInsets.fromLTRB(
-              layout.quiet ? 10 : 12,
-              layout.quiet ? 12 : 14,
-              layout.quiet ? 8 : 10,
-              layout.quiet ? 12 : 14,
-            ),
-            child: AnimatedContainer(
-              duration: _contentSwitchDuration,
-              curve: _hoverCurve,
-              width: layout.sidebarWidth(mode),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _SidebarSectionHeader(
-                    title: '浏览',
-                    action: IconButton(
-                      tooltip: '收起侧边栏',
-                      onPressed: () => onModeChanged(HeniSidebarMode.compact),
-                      icon: const Icon(
-                        Icons.keyboard_double_arrow_left_rounded,
-                        size: 18,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 28,
-                        minHeight: 28,
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
+      child: HeniShellSurface(
+        shellTheme: shellTheme,
+        role: HeniShellSurfaceRole.rail,
+        radius: 12,
+        padding: EdgeInsets.fromLTRB(
+          layout.quiet ? 10 : 12,
+          layout.quiet ? 12 : 14,
+          layout.quiet ? 8 : 10,
+          layout.quiet ? 12 : 14,
+        ),
+        child: AnimatedContainer(
+          duration: _contentSwitchDuration,
+          curve: _hoverCurve,
+          width: layout.sidebarWidth(mode),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SidebarSectionHeader(
+                title: '浏览',
+                action: IconButton(
+                  tooltip: '收起侧边栏',
+                  onPressed: () => onModeChanged(HeniSidebarMode.compact),
+                  icon: const Icon(
+                    Icons.keyboard_double_arrow_left_rounded,
+                    size: 18,
                   ),
-                  const SizedBox(height: 6),
-                  _PlaylistTile(
-                    palette: palette,
-                    playlist: queue.library,
-                    selected: queue.activePlaylistId == queue.library.id,
-                    isPlayingHere: queue.currentItem != null,
-                    onTap: () => onSelectPlaylist(queue.library.id),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
                   ),
-                  const SizedBox(height: 4),
-                  _PlaylistTile(
-                    palette: palette,
-                    playlist: playbackQueuePlaylist,
-                    selected: queue.activePlaylistId == heniPlaybackQueueId,
-                    isPlayingHere: queue.currentItem != null,
-                    onTap: () => onSelectPlaylist(heniPlaybackQueueId),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _PlaylistTile(
+                palette: palette,
+                playlist: queue.library,
+                selected: queue.activePlaylistId == queue.library.id,
+                isPlayingHere: queue.currentItem != null,
+                onTap: () => onSelectPlaylist(queue.library.id),
+              ),
+              const SizedBox(height: 4),
+              _PlaylistTile(
+                palette: palette,
+                playlist: playbackQueuePlaylist,
+                selected: queue.activePlaylistId == heniPlaybackQueueId,
+                isPlayingHere: queue.currentItem != null,
+                onTap: () => onSelectPlaylist(heniPlaybackQueueId),
+              ),
+              SizedBox(height: layout.quiet ? 16 : 22),
+              _SidebarSectionHeader(
+                title: '我的歌单',
+                action: IconButton(
+                  tooltip: '新建歌单',
+                  onPressed: onCreatePlaylist,
+                  icon: const Icon(Icons.add, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
                   ),
-                  SizedBox(height: layout.quiet ? 16 : 22),
-                  _SidebarSectionHeader(
-                    title: '我的歌单',
-                    action: IconButton(
-                      tooltip: '新建歌单',
-                      onPressed: onCreatePlaylist,
-                      icon: const Icon(Icons.add, size: 18),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 28,
-                        minHeight: 28,
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Expanded(
-                    flex: 2,
-                    child:
-                        queue.playlists.isEmpty
-                            ? _SidebarEmptyState(
-                              palette: palette,
-                              message: '从曲库挑歌加入歌单，慢慢搭起自己的收藏。',
-                            )
-                            : ListView(
-                              key: const PageStorageKey(
-                                'expanded-sidebar-playlists',
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Expanded(
+                flex: 2,
+                child:
+                    queue.playlists.isEmpty
+                        ? _SidebarEmptyState(
+                          palette: palette,
+                          message: '从曲库挑歌加入歌单，慢慢搭起自己的收藏。',
+                        )
+                        : ListView(
+                          key: const PageStorageKey(
+                            'expanded-sidebar-playlists',
+                          ),
+                          children: [
+                            for (final playlist in queue.playlists)
+                              _PlaylistTile(
+                                palette: palette,
+                                playlist: playlist,
+                                selected: playlist.id == queue.activePlaylistId,
+                                isPlayingHere:
+                                    queue.currentItem != null &&
+                                    playlist.items.any(
+                                      (it) =>
+                                          it.path == queue.currentItem!.path,
+                                    ),
+                                onTap: () => onSelectPlaylist(playlist.id),
+                                onAddFromLibrary:
+                                    () => onAddFromLibrary(playlist.id),
+                                onRename: () => onRenamePlaylist(playlist),
+                                onEditDescription:
+                                    () => onEditDescription(playlist),
+                                onDelete: () => onDeletePlaylist(playlist),
                               ),
-                              children: [
-                                for (final playlist in queue.playlists)
-                                  _PlaylistTile(
-                                    palette: palette,
-                                    playlist: playlist,
-                                    selected:
-                                        playlist.id == queue.activePlaylistId,
-                                    isPlayingHere:
-                                        queue.currentItem != null &&
-                                        playlist.items.any(
-                                          (it) =>
-                                              it.path ==
-                                              queue.currentItem!.path,
-                                        ),
-                                    onTap: () => onSelectPlaylist(playlist.id),
-                                    onAddFromLibrary:
-                                        () => onAddFromLibrary(playlist.id),
-                                    onRename: () => onRenamePlaylist(playlist),
-                                    onEditDescription:
-                                        () => onEditDescription(playlist),
-                                    onDelete: () => onDeletePlaylist(playlist),
-                                  ),
-                              ],
-                            ),
+                          ],
+                        ),
+              ),
+              SizedBox(height: layout.quiet ? 12 : 16),
+              const Spacer(),
+              if (layout.showSidebarStatus &&
+                  (queue.statusMessage != null || queue.lastError != null))
+                Container(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.024),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.04),
+                    ),
                   ),
-                  SizedBox(height: layout.quiet ? 12 : 16),
-                  const Spacer(),
-                  if (layout.showSidebarStatus &&
-                      (queue.statusMessage != null || queue.lastError != null))
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.024),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.04),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '当前状态',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: _tertiaryGlassText(),
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '当前状态',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: _tertiaryGlassText(),
-                              fontWeight: FontWeight.w800,
-                            ),
+                      if (queue.statusMessage != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          queue.statusMessage!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: _secondaryGlassText(emphasis: 0.96),
+                            height: 1.38,
                           ),
-                          if (queue.statusMessage != null) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              queue.statusMessage!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: _secondaryGlassText(emphasis: 0.96),
-                                height: 1.38,
-                              ),
-                            ),
-                          ],
-                          if (queue.lastError != null) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              queue.lastError!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.error,
-                                height: 1.38,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
+                        ),
+                      ],
+                      if (queue.lastError != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          queue.lastError!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.error,
+                            height: 1.38,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -2217,6 +2158,7 @@ class _Sidebar extends StatelessWidget {
 class _CompactSidebar extends StatelessWidget {
   const _CompactSidebar({
     required this.palette,
+    required this.shellTheme,
     required this.queue,
     required this.layout,
     required this.widthForcedCompact,
@@ -2226,6 +2168,7 @@ class _CompactSidebar extends StatelessWidget {
   });
 
   final HeniPalette palette;
+  final HeniShellTheme shellTheme;
   final PlaybackQueueState queue;
   final _ShellLayout layout;
   final bool widthForcedCompact;
@@ -2308,10 +2251,10 @@ class _CompactSidebar extends StatelessWidget {
         6,
         layout.sidebarPadding,
       ),
-      child: _GlassPanel(
-        radius: 18,
-        fillColor: _shellGlassFill(palette, emphasis: 0.45),
-        borderColor: _shellGlassBorder(palette, emphasis: 0.42),
+      child: HeniShellSurface(
+        shellTheme: shellTheme,
+        role: HeniShellSurfaceRole.rail,
+        radius: 12,
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 10),
         child: SizedBox(
           width: layout.sidebarWidth(HeniSidebarMode.compact),
@@ -2988,6 +2931,7 @@ enum _PlaylistAction { addFromLibrary, rename, description, delete }
 class _ContentArea extends ConsumerWidget {
   const _ContentArea({
     required this.palette,
+    required this.shellTheme,
     required this.uiStyle,
     required this.queue,
     required this.currentMedia,
@@ -3013,6 +2957,7 @@ class _ContentArea extends ConsumerWidget {
   });
 
   final HeniPalette palette;
+  final HeniShellTheme shellTheme;
   final HeniUiStyle uiStyle;
   final PlaybackQueueState queue;
   final MediaItem? currentMedia;
@@ -3088,6 +3033,7 @@ class _ContentArea extends ConsumerWidget {
             child: switch (uiStyle) {
               HeniUiStyle.library => _LibraryContent(
                 palette: palette,
+                shellTheme: shellTheme,
                 queue: queue,
                 layout: layout,
                 onPlayIndex: onPlayIndex,
@@ -4413,6 +4359,7 @@ class _SceneryInfoBlock extends StatelessWidget {
 class _LibraryContent extends ConsumerStatefulWidget {
   const _LibraryContent({
     required this.palette,
+    required this.shellTheme,
     required this.queue,
     required this.layout,
     required this.onPlayIndex,
@@ -4430,6 +4377,7 @@ class _LibraryContent extends ConsumerStatefulWidget {
   });
 
   final HeniPalette palette;
+  final HeniShellTheme shellTheme;
   final PlaybackQueueState queue;
   final _ShellLayout layout;
   final ValueChanged<int> onPlayIndex;
@@ -4595,11 +4543,10 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
         ),
         SizedBox(height: widget.layout.contentGap),
         Expanded(
-          child: _GlassPanel(
-            radius: 18,
-            fillColor: _shellGlassFill(widget.palette, emphasis: 0.46),
-            borderColor: _shellGlassBorder(widget.palette, emphasis: 0.44),
-            hoverAccentPalette: widget.palette,
+          child: HeniShellSurface(
+            shellTheme: widget.shellTheme,
+            role: HeniShellSurfaceRole.content,
+            radius: 12,
             child: Column(
               children: [
                 Padding(
@@ -5957,6 +5904,7 @@ class _AddFromLibraryDialogState extends State<_AddFromLibraryDialog> {
 class _BottomPlayerBar extends ConsumerWidget {
   const _BottomPlayerBar({
     required this.palette,
+    required this.shellTheme,
     required this.currentMedia,
     required this.mediaProbe,
     required this.queue,
@@ -5970,6 +5918,7 @@ class _BottomPlayerBar extends ConsumerWidget {
   });
 
   final HeniPalette palette;
+  final HeniShellTheme shellTheme;
   final MediaItem? currentMedia;
   final AsyncValue<MediaProbe?> mediaProbe;
   final PlaybackQueueState queue;
@@ -5992,7 +5941,8 @@ class _BottomPlayerBar extends ConsumerWidget {
     );
 
     return _ShellBand(
-      palette: palette,
+      shellTheme: shellTheme,
+      role: HeniShellSurfaceRole.dock,
       margin: EdgeInsets.fromLTRB(
         layout.topHorizontalMargin,
         0,
@@ -6011,7 +5961,7 @@ class _BottomPlayerBar extends ConsumerWidget {
                   ? 66
                   : 72
               : layout.bottomHeight,
-      emphasis: 0.55,
+      radius: 12,
       child:
           compactBottom
               ? _CompactBottomBar(

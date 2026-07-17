@@ -32,6 +32,35 @@ void main() {
     expect(find.text('00:30 / 04:00'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('wide progress keeps both times outside the seek track', (
+    tester,
+  ) async {
+    final engine = _FakePlaybackEngine();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 240,
+            child: PlayerProgressWithTime(
+              engine: engine,
+              palette: HeniPalette.cobalt,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final track = tester.getRect(
+      find.byKey(const ValueKey('player-progress-track')),
+    );
+    final position = tester.getRect(find.text('00:30'));
+    final duration = tester.getRect(find.text('04:00'));
+    expect(position.right, lessThanOrEqualTo(track.left));
+    expect(duration.left, greaterThanOrEqualTo(track.right));
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _FakePlaybackEngine implements PlaybackEngine {

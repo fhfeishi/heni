@@ -50,13 +50,19 @@ class _HeniAdaptiveSidebarState extends State<HeniAdaptiveSidebar> {
   Widget build(BuildContext context) {
     final effectiveMode =
         _widthForcedCompact ? HeniSidebarMode.compact : widget.preference;
+    final disableAnimations =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final sizeDuration =
+        disableAnimations ? Duration.zero : const Duration(milliseconds: 240);
+    final switchDuration =
+        disableAnimations ? Duration.zero : const Duration(milliseconds: 180);
 
     return AnimatedSize(
-      duration: const Duration(milliseconds: 200),
+      duration: sizeDuration,
       curve: Curves.easeOutCubic,
       alignment: Alignment.centerLeft,
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 160),
+        duration: switchDuration,
         switchInCurve: Curves.easeOutCubic,
         switchOutCurve: Curves.easeInCubic,
         child: KeyedSubtree(
