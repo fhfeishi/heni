@@ -27,6 +27,7 @@ import '../application/sidebar_mode.dart';
 import 'adaptive_sidebar.dart';
 import 'global_scenery_backdrop.dart';
 import 'listening_console.dart';
+import 'playback_mode_controls.dart';
 import 'playback_queue_location.dart';
 import 'player_progress.dart';
 import 'player_responsive_layout.dart';
@@ -511,15 +512,6 @@ class _ShellLayout {
   bool get showNowPlayingDetails => !quiet;
   bool get showNowPlayingMeta => !quiet;
   bool get preferCompactUtility => compact;
-}
-
-IconData _playbackModeIcon(HeniPlaybackMode mode) {
-  return switch (mode) {
-    HeniPlaybackMode.sequence => Icons.format_list_numbered,
-    HeniPlaybackMode.listLoop => Icons.repeat,
-    HeniPlaybackMode.singleLoop => Icons.repeat_one,
-    HeniPlaybackMode.random => Icons.shuffle,
-  };
 }
 
 class _GlassPanel extends StatefulWidget {
@@ -1477,12 +1469,19 @@ class PlayerScreen extends ConsumerWidget {
                                     .playNext(),
                               );
                             },
-                            onCyclePlaybackMode: () {
+                            onToggleShuffle: () {
                               ref
                                   .read(
                                     playbackQueueControllerProvider.notifier,
                                   )
-                                  .cyclePlaybackMode();
+                                  .toggleShuffle();
+                            },
+                            onCycleRepeat: () {
+                              ref
+                                  .read(
+                                    playbackQueueControllerProvider.notifier,
+                                  )
+                                  .cycleRepeatMode();
                             },
                             onShowPlaybackQueue: () {
                               _showPlaybackQueue(context, ref);
@@ -5933,7 +5932,8 @@ class _BottomPlayerBar extends ConsumerWidget {
     required this.layout,
     required this.onPreviousTrack,
     required this.onNextTrack,
-    required this.onCyclePlaybackMode,
+    required this.onToggleShuffle,
+    required this.onCycleRepeat,
     required this.onShowPlaybackQueue,
     required this.onPersistVolume,
   });
@@ -5947,7 +5947,8 @@ class _BottomPlayerBar extends ConsumerWidget {
   final _ShellLayout layout;
   final VoidCallback onPreviousTrack;
   final VoidCallback onNextTrack;
-  final VoidCallback onCyclePlaybackMode;
+  final VoidCallback onToggleShuffle;
+  final VoidCallback onCycleRepeat;
   final VoidCallback onShowPlaybackQueue;
   final ValueChanged<double> onPersistVolume;
 
@@ -5993,7 +5994,8 @@ class _BottomPlayerBar extends ConsumerWidget {
                 queue: queue,
                 onPreviousTrack: onPreviousTrack,
                 onNextTrack: onNextTrack,
-                onCyclePlaybackMode: onCyclePlaybackMode,
+                onToggleShuffle: onToggleShuffle,
+                onCycleRepeat: onCycleRepeat,
                 onShowPlaybackQueue: onShowPlaybackQueue,
                 onPersistVolume: onPersistVolume,
               )
@@ -6015,8 +6017,13 @@ class _BottomPlayerBar extends ConsumerWidget {
                         _TransportControls(
                           engine: engine,
                           palette: palette,
+                          shuffle: queue.shuffle,
+                          repeatMode: queue.repeatMode,
+                          enabled: queue.playbackQueue.items.isNotEmpty,
                           onPreviousTrack: onPreviousTrack,
                           onNextTrack: onNextTrack,
+                          onToggleShuffle: onToggleShuffle,
+                          onCycleRepeat: onCycleRepeat,
                         ),
                         const SizedBox(height: 4),
                         PlayerProgressWithTime(
@@ -6037,11 +6044,9 @@ class _BottomPlayerBar extends ConsumerWidget {
                   _UtilityControls(
                     palette: palette,
                     shellTheme: shellTheme,
-                    mode: queue.playbackMode,
                     engine: engine,
                     queue: queue,
                     onShowPlaybackQueue: onShowPlaybackQueue,
-                    onCyclePlaybackMode: onCyclePlaybackMode,
                     onPersistVolume: onPersistVolume,
                   ),
                 ],
@@ -6059,7 +6064,8 @@ class _CompactBottomBar extends StatelessWidget {
     required this.queue,
     required this.onPreviousTrack,
     required this.onNextTrack,
-    required this.onCyclePlaybackMode,
+    required this.onToggleShuffle,
+    required this.onCycleRepeat,
     required this.onShowPlaybackQueue,
     required this.onPersistVolume,
   });
@@ -6071,7 +6077,8 @@ class _CompactBottomBar extends StatelessWidget {
   final PlaybackQueueState queue;
   final VoidCallback onPreviousTrack;
   final VoidCallback onNextTrack;
-  final VoidCallback onCyclePlaybackMode;
+  final VoidCallback onToggleShuffle;
+  final VoidCallback onCycleRepeat;
   final VoidCallback onShowPlaybackQueue;
   final ValueChanged<double> onPersistVolume;
 
@@ -6147,64 +6154,75 @@ class _CompactBottomBar extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: tight ? 8 : 12),
-                if (!tiny)
-                  compactIcon(
-                    tooltip: '上一首',
-                    onPressed: onPreviousTrack,
-                    icon: Icons.skip_previous_rounded,
-                  ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: heniBrandGradient(palette),
-                    boxShadow: [
-                      BoxShadow(
-                        color: palette.seed.withValues(
-                          alpha: isPlaying ? 0.22 : 0.10,
+                HeniPlaybackModeControls(
+                  palette: palette,
+                  shuffle: queue.shuffle,
+                  repeatMode: queue.repeatMode,
+                  enabled: queue.playbackQueue.items.isNotEmpty,
+                  onToggleShuffle: onToggleShuffle,
+                  onCycleRepeat: onCycleRepeat,
+                  size: ultraTiny ? 32 : controlSize,
+                  iconSize: tight ? 18 : 20,
+                  gap: tight ? 0 : 2,
+                  transport: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!tiny)
+                        compactIcon(
+                          tooltip: '上一首',
+                          onPressed: onPreviousTrack,
+                          icon: Icons.skip_previous_rounded,
                         ),
-                        blurRadius: 12,
-                        spreadRadius: isPlaying ? 1 : 0,
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: heniBrandGradient(palette),
+                          boxShadow: [
+                            BoxShadow(
+                              color: palette.seed.withValues(
+                                alpha: isPlaying ? 0.22 : 0.10,
+                              ),
+                              blurRadius: 12,
+                              spreadRadius: isPlaying ? 1 : 0,
+                            ),
+                          ],
+                        ),
+                        child: IconButton.filled(
+                          tooltip: isPlaying ? '暂停' : '播放',
+                          onPressed: () {
+                            if (isPlaying) {
+                              unawaited(engine.pause());
+                            } else {
+                              unawaited(engine.play());
+                            }
+                          },
+                          style: IconButton.styleFrom(
+                            fixedSize: Size.square(playSize),
+                            padding: EdgeInsets.zero,
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: heniReadableForegroundOn(
+                              palette.seed,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          icon: Icon(
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            size: iconSize,
+                          ),
+                        ),
                       ),
+                      if (!tiny)
+                        compactIcon(
+                          tooltip: '下一首',
+                          onPressed: onNextTrack,
+                          icon: Icons.skip_next_rounded,
+                        ),
                     ],
                   ),
-                  child: IconButton.filled(
-                    tooltip: isPlaying ? '暂停' : '播放',
-                    onPressed: () {
-                      if (isPlaying) {
-                        unawaited(engine.pause());
-                      } else {
-                        unawaited(engine.play());
-                      }
-                    },
-                    style: IconButton.styleFrom(
-                      fixedSize: Size.square(playSize),
-                      padding: EdgeInsets.zero,
-                      backgroundColor: Colors.transparent,
-                      foregroundColor: heniReadableForegroundOn(palette.seed),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: Icon(
-                      isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      size: iconSize,
-                    ),
-                  ),
                 ),
-                if (!tiny)
-                  compactIcon(
-                    tooltip: '下一首',
-                    onPressed: onNextTrack,
-                    icon: Icons.skip_next_rounded,
-                  ),
                 SizedBox(width: tight ? 2 : 6),
-                if (!ultraTiny)
-                  _PlaybackModeIconButton(
-                    mode: queue.playbackMode,
-                    onPressed: onCyclePlaybackMode,
-                    size: controlSize,
-                    iconSize: tight ? 18 : 20,
-                  ),
                 if (!veryTight) ...[
                   const SizedBox(width: 4),
                   HeniVolumeControl(
@@ -6865,21 +6883,17 @@ class _UtilityControls extends StatelessWidget {
   const _UtilityControls({
     required this.palette,
     required this.shellTheme,
-    required this.mode,
     required this.engine,
     required this.queue,
     required this.onShowPlaybackQueue,
-    required this.onCyclePlaybackMode,
     required this.onPersistVolume,
   });
 
   final HeniPalette palette;
   final HeniShellTheme shellTheme;
-  final HeniPlaybackMode mode;
   final PlaybackEngine engine;
   final PlaybackQueueState queue;
   final VoidCallback onShowPlaybackQueue;
-  final VoidCallback onCyclePlaybackMode;
   final ValueChanged<double> onPersistVolume;
 
   @override
@@ -6892,8 +6906,6 @@ class _UtilityControls extends StatelessWidget {
           hasCurrent: queue.currentItem != null,
           onPressed: onShowPlaybackQueue,
         ),
-        const SizedBox(width: 4),
-        _PlaybackModeIconButton(mode: mode, onPressed: onCyclePlaybackMode),
         const SizedBox(width: 4),
         HeniVolumeControl(
           engine: engine,
@@ -8146,14 +8158,24 @@ class _TransportControls extends StatelessWidget {
   const _TransportControls({
     required this.engine,
     required this.palette,
+    required this.shuffle,
+    required this.repeatMode,
+    required this.enabled,
     required this.onPreviousTrack,
     required this.onNextTrack,
+    required this.onToggleShuffle,
+    required this.onCycleRepeat,
   });
 
   final PlaybackEngine engine;
   final HeniPalette palette;
+  final bool shuffle;
+  final HeniRepeatMode repeatMode;
+  final bool enabled;
   final VoidCallback onPreviousTrack;
   final VoidCallback onNextTrack;
+  final VoidCallback onToggleShuffle;
+  final VoidCallback onCycleRepeat;
 
   @override
   Widget build(BuildContext context) {
@@ -8163,81 +8185,92 @@ class _TransportControls extends StatelessWidget {
       builder: (context, snapshot) {
         final playing = snapshot.data ?? false;
 
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _TransportButton(
-              tooltip: '上一首',
-              onPressed: onPreviousTrack,
-              icon: Icons.skip_previous_rounded,
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: _PulseRing(
-                color: Theme.of(context).colorScheme.primary,
-                active: playing,
-                child: AnimatedScale(
-                  duration: const Duration(milliseconds: 180),
-                  scale: playing ? 1 : 0.96,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: heniBrandGradient(palette),
-                      boxShadow: [
-                        BoxShadow(
-                          color: palette.seed.withValues(
-                            alpha: playing ? 0.24 : 0.12,
-                          ),
-                          blurRadius: playing ? 18 : 10,
-                          spreadRadius: playing ? 2 : 0,
-                        ),
-                      ],
-                    ),
-                    child: IconButton.filled(
-                      tooltip: playing ? '暂停' : '播放',
-                      onPressed: () {
-                        if (playing) {
-                          engine.pause();
-                        } else {
-                          engine.play();
-                        }
-                      },
-                      style: IconButton.styleFrom(
-                        fixedSize: const Size.square(44),
-                        backgroundColor: Colors.transparent,
-                        foregroundColor: heniReadableForegroundOn(palette.seed),
-                      ),
-                      iconSize: 22,
-                      icon: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 160),
-                        transitionBuilder:
-                            (child, animation) => ScaleTransition(
-                              scale: animation,
-                              child: FadeTransition(
-                                opacity: animation,
-                                child: child,
-                              ),
+        return HeniPlaybackModeControls(
+          palette: palette,
+          shuffle: shuffle,
+          repeatMode: repeatMode,
+          enabled: enabled,
+          onToggleShuffle: onToggleShuffle,
+          onCycleRepeat: onCycleRepeat,
+          gap: 8,
+          transport: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _TransportButton(
+                tooltip: '上一首',
+                onPressed: onPreviousTrack,
+                icon: Icons.skip_previous_rounded,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: _PulseRing(
+                  color: Theme.of(context).colorScheme.primary,
+                  active: playing,
+                  child: AnimatedScale(
+                    duration: const Duration(milliseconds: 180),
+                    scale: playing ? 1 : 0.96,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: heniBrandGradient(palette),
+                        boxShadow: [
+                          BoxShadow(
+                            color: palette.seed.withValues(
+                              alpha: playing ? 0.24 : 0.12,
                             ),
-                        child: Icon(
-                          playing
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                          key: ValueKey(playing),
+                            blurRadius: playing ? 18 : 10,
+                            spreadRadius: playing ? 2 : 0,
+                          ),
+                        ],
+                      ),
+                      child: IconButton.filled(
+                        tooltip: playing ? '暂停' : '播放',
+                        onPressed: () {
+                          if (playing) {
+                            engine.pause();
+                          } else {
+                            engine.play();
+                          }
+                        },
+                        style: IconButton.styleFrom(
+                          fixedSize: const Size.square(44),
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: heniReadableForegroundOn(
+                            palette.seed,
+                          ),
+                        ),
+                        iconSize: 22,
+                        icon: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 160),
+                          transitionBuilder:
+                              (child, animation) => ScaleTransition(
+                                scale: animation,
+                                child: FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                ),
+                              ),
+                          child: Icon(
+                            playing
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            key: ValueKey(playing),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-            _TransportButton(
-              tooltip: '下一首',
-              onPressed: onNextTrack,
-              icon: Icons.skip_next_rounded,
-            ),
-          ],
+              _TransportButton(
+                tooltip: '下一首',
+                onPressed: onNextTrack,
+                icon: Icons.skip_next_rounded,
+              ),
+            ],
+          ),
         );
       },
     );
@@ -8273,69 +8306,6 @@ class _TransportButton extends StatelessWidget {
             foregroundColor: _primaryGlassText(),
           ),
           icon: Icon(icon, size: 22),
-        ),
-      ),
-    );
-  }
-}
-
-class _PlaybackModeIconButton extends StatelessWidget {
-  const _PlaybackModeIconButton({
-    required this.mode,
-    required this.onPressed,
-    this.size = _regularIconButtonSize,
-    this.iconSize = 20,
-  });
-
-  final HeniPlaybackMode mode;
-  final VoidCallback onPressed;
-  final double size;
-  final double iconSize;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final active = mode != HeniPlaybackMode.sequence;
-    final foreground =
-        active
-            ? _stateIconOnGlass(context, active: true)
-            : _secondaryGlassText();
-
-    return Tooltip(
-      message: '播放模式：${mode.label}',
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: _hoverCurve,
-        decoration: BoxDecoration(
-          color:
-              active
-                  ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                  : Colors.white.withValues(alpha: 0.022),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color:
-                active
-                    ? theme.colorScheme.primary.withValues(alpha: 0.16)
-                    : Colors.white.withValues(alpha: 0.04),
-          ),
-        ),
-        child: IconButton(
-          isSelected: active,
-          onPressed: onPressed,
-          style: IconButton.styleFrom(
-            fixedSize: Size.square(size),
-            padding: EdgeInsets.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            foregroundColor: foreground,
-          ),
-          icon: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 160),
-            child: Icon(
-              _playbackModeIcon(mode),
-              key: ValueKey(mode),
-              size: iconSize,
-            ),
-          ),
         ),
       ),
     );
