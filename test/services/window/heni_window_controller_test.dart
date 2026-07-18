@@ -84,4 +84,60 @@ void main() {
 
     expect(closed, isFalse);
   });
+
+  test(
+    'requests a logical client width and decodes the achieved width',
+    () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            if (call.method == 'isMaximized') {
+              return false;
+            }
+            if (call.method == 'ensureClientWidth') {
+              expect(call.arguments, {'logicalWidth': 1140.0});
+              return <String, Object?>{
+                'achievedLogicalWidth': 1140.0,
+                'reachedRequestedWidth': true,
+              };
+            }
+            return null;
+          });
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final controller = container.read(heniWindowControllerProvider.notifier);
+      await Future<void>.delayed(Duration.zero);
+
+      final result = await controller.ensureClientWidth(1140);
+
+      expect(result.achievedLogicalWidth, 1140);
+      expect(result.reachedRequestedWidth, isTrue);
+      expect(calls.last.method, 'ensureClientWidth');
+    },
+  );
+
+  test(
+    'window width request returns failure when the channel rejects it',
+    () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            if (call.method == 'isMaximized') {
+              return false;
+            }
+            if (call.method == 'ensureClientWidth') {
+              throw PlatformException(code: 'resize-failed');
+            }
+            return null;
+          });
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final result = await container
+          .read(heniWindowControllerProvider.notifier)
+          .ensureClientWidth(1140);
+
+      expect(result.achievedLogicalWidth, 0);
+      expect(result.reachedRequestedWidth, isFalse);
+    },
+  );
 }

@@ -56,6 +56,13 @@ class Win32Window {
   RECT GetClientArea();
 
  protected:
+  struct ClientWidthResult {
+    double achieved_logical_width = 0.0;
+    bool reached_requested_width = false;
+  };
+
+  ClientWidthResult EnsureClientWidth(int logical_width);
+
   // Processes and route salient window messages for mouse handling,
   // size change and DPI. Delegates handling of these to member overloads that
   // inheriting classes can handle.

@@ -523,6 +523,70 @@ HWND Win32Window::GetHandle() {
   return window_handle_;
 }
 
+Win32Window::ClientWidthResult Win32Window::EnsureClientWidth(
+    int logical_width) {
+  ClientWidthResult result;
+  if (window_handle_ == nullptr || logical_width <= 0) {
+    return result;
+  }
+
+  const UINT dpi = GetDpiForWindow(window_handle_);
+  const double scale = static_cast<double>(dpi) / 96.0;
+  auto read_result = [&]() {
+    RECT client{};
+    if (!GetClientRect(window_handle_, &client)) {
+      return ClientWidthResult{};
+    }
+    const double achieved =
+        static_cast<double>(client.right - client.left) / scale;
+    return ClientWidthResult{
+        achieved, achieved + 0.5 >= static_cast<double>(logical_width)};
+  };
+
+  ClientWidthResult current = read_result();
+  if (current.reached_requested_width || IsZoomed(window_handle_)) {
+    return current;
+  }
+
+  RECT window_rect{};
+  RECT client_rect{};
+  if (!GetWindowRect(window_handle_, &window_rect) ||
+      !GetClientRect(window_handle_, &client_rect)) {
+    return current;
+  }
+  const HMONITOR monitor =
+      MonitorFromWindow(window_handle_, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO monitor_info{sizeof(MONITORINFO)};
+  if (!GetMonitorInfo(monitor, &monitor_info)) {
+    return current;
+  }
+
+  const int current_window_width = window_rect.right - window_rect.left;
+  const int current_window_height = window_rect.bottom - window_rect.top;
+  const int current_client_width = client_rect.right - client_rect.left;
+  const int non_client_width = current_window_width - current_client_width;
+  const int work_left = static_cast<int>(monitor_info.rcWork.left);
+  const int work_top = static_cast<int>(monitor_info.rcWork.top);
+  const int work_right = static_cast<int>(monitor_info.rcWork.right);
+  const int work_bottom = static_cast<int>(monitor_info.rcWork.bottom);
+  const int work_width = work_right - work_left;
+  const int requested_window_width =
+      Scale(logical_width, scale) + non_client_width;
+  const int target_width = std::min(requested_window_width, work_width);
+  const int latest_left = work_right - target_width;
+  const int target_left =
+      std::clamp(static_cast<int>(window_rect.left), work_left, latest_left);
+  const int work_height = work_bottom - work_top;
+  const int target_height = std::min(current_window_height, work_height);
+  const int latest_top = work_bottom - target_height;
+  const int target_top =
+      std::clamp(static_cast<int>(window_rect.top), work_top, latest_top);
+
+  SetWindowPos(window_handle_, nullptr, target_left, target_top, target_width,
+               target_height, SWP_NOZORDER | SWP_NOACTIVATE);
+  return read_result();
+}
+
 void Win32Window::SetQuitOnClose(bool quit_on_close) {
   quit_on_close_ = quit_on_close;
 }

@@ -1,9 +1,29 @@
 #include "flutter_window.h"
 
 #include <flutter/standard_method_codec.h>
+#include <cstdint>
 #include <optional>
+#include <variant>
 
 #include "flutter/generated_plugin_registrant.h"
+
+namespace {
+
+std::optional<double> EncodableNumber(
+    const flutter::EncodableValue& value) {
+  if (const auto* number = std::get_if<double>(&value)) {
+    return *number;
+  }
+  if (const auto* number = std::get_if<int32_t>(&value)) {
+    return static_cast<double>(*number);
+  }
+  if (const auto* number = std::get_if<int64_t>(&value)) {
+    return static_cast<double>(*number);
+  }
+  return std::nullopt;
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -122,6 +142,35 @@ void FlutterWindow::RegisterWindowChannel() {
         if (method == "isMaximized") {
           result->Success(
               flutter::EncodableValue(IsZoomed(window) != FALSE));
+          return;
+        }
+        if (method == "ensureClientWidth") {
+          const auto* arguments =
+              std::get_if<flutter::EncodableMap>(call.arguments());
+          if (arguments == nullptr) {
+            result->Error("invalid-width", "Missing resize arguments.");
+            return;
+          }
+          const auto width_entry = arguments->find(
+              flutter::EncodableValue("logicalWidth"));
+          if (width_entry == arguments->end()) {
+            result->Error("invalid-width", "Missing logicalWidth.");
+            return;
+          }
+          const auto logical_width = EncodableNumber(width_entry->second);
+          if (!logical_width.has_value() || *logical_width <= 0) {
+            result->Error("invalid-width", "logicalWidth must be positive.");
+            return;
+          }
+
+          const auto resize =
+              EnsureClientWidth(static_cast<int>(*logical_width));
+          flutter::EncodableMap response;
+          response[flutter::EncodableValue("achievedLogicalWidth")] =
+              flutter::EncodableValue(resize.achieved_logical_width);
+          response[flutter::EncodableValue("reachedRequestedWidth")] =
+              flutter::EncodableValue(resize.reached_requested_width);
+          result->Success(flutter::EncodableValue(response));
           return;
         }
 
