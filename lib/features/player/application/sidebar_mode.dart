@@ -53,3 +53,10 @@ bool resolveSidebarWidthForcedCompact({
   }
   return width <= heniSidebarForceCompactWidth;
 }
+
+double resolveSidebarPolicyWidth({
+  required double windowWidth,
+  required double contentWidth,
+}) {
+  return windowWidth > contentWidth ? windowWidth : contentWidth;
+}

@@ -82,5 +82,21 @@ void main() {
         isFalse,
       );
     });
+
+    test('uses client width at the shell inset release boundary', () {
+      final policyWidth = resolveSidebarPolicyWidth(
+        windowWidth: 1140,
+        contentWidth: 1138,
+      );
+
+      expect(policyWidth, 1140);
+      expect(
+        resolveSidebarWidthForcedCompact(
+          width: policyWidth,
+          wasForcedCompact: true,
+        ),
+        isFalse,
+      );
+    });
   });
 }

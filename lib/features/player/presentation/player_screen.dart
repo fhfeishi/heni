@@ -1113,6 +1113,7 @@ class PlayerScreen extends ConsumerWidget {
       sidebarPreferencesRestoredProvider,
     );
     final isMaximized = ref.watch(heniWindowControllerProvider);
+    final windowWidth = MediaQuery.sizeOf(context).width;
 
     void toggleMutedFromKeyboard() {
       final focusedContext = FocusManager.instance.primaryFocus?.context;
@@ -1212,7 +1213,11 @@ class PlayerScreen extends ConsumerWidget {
                                               )
                                               : HeniAdaptiveSidebar(
                                                 availableWidth:
-                                                    constraints.maxWidth,
+                                                    resolveSidebarPolicyWidth(
+                                                      windowWidth: windowWidth,
+                                                      contentWidth:
+                                                          constraints.maxWidth,
+                                                    ),
                                                 preference: sidebarPreference,
                                                 preferencesRestored:
                                                     sidebarPreferencesRestored,
