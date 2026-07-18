@@ -259,6 +259,8 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
         ],
         activePlaylistId: state.activePlaylistId,
         playbackModeName: state.playbackMode.name,
+        repeatModeName: state.repeatMode.name,
+        shuffleEnabled: state.shuffle,
         mediaDurations: _mediaDurationsFromState(),
         recursiveScan: state.recursiveScan,
         includeVideo: state.includeVideo,
@@ -583,18 +585,29 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   }
 
   void toggleShuffle() {
-    setPlaybackMode(
-      state.shuffle ? HeniPlaybackMode.sequence : HeniPlaybackMode.random,
+    final enabled = !state.shuffle;
+    final currentIndex = state.currentIndex < 0 ? 0 : state.currentIndex;
+    state = state.copyWith(
+      shuffle: enabled,
+      order: _buildOrder(
+        state.playbackQueue.items.length,
+        currentIndex,
+        shuffleOverride: enabled,
+      ),
+      statusMessage: enabled ? '随机播放已开启' : '随机播放已关闭',
+      lastError: null,
     );
+    unawaited(_persistState());
   }
 
   void cycleRepeatMode() {
-    setPlaybackMode(
-      HeniPlaybackMode.fromState(
-        repeatMode: state.repeatMode.next,
-        shuffle: false,
-      ),
+    final repeatMode = state.repeatMode.next;
+    state = state.copyWith(
+      repeatMode: repeatMode,
+      statusMessage: '循环模式：${repeatMode.label}',
+      lastError: null,
     );
+    unawaited(_persistState());
   }
 
   void cyclePlaybackMode() {
@@ -683,8 +696,8 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
 
       state = state.copyWith(
         isScanning: config.libraryDirectories.isNotEmpty,
-        repeatMode: config.playbackMode?.repeatMode ?? state.repeatMode,
-        shuffle: config.playbackMode?.shuffle ?? state.shuffle,
+        repeatMode: config.repeatMode,
+        shuffle: config.resolvedShuffle,
         recursiveScan: config.recursiveScan,
         includeVideo: config.includeVideo,
         autoplayOnLoad: config.autoplayOnLoad,
@@ -1119,6 +1132,8 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
       ],
       activePlaylistId: state.activePlaylistId,
       playbackModeName: state.playbackMode.name,
+      repeatModeName: state.repeatMode.name,
+      shuffleEnabled: state.shuffle,
       recursiveScan: state.recursiveScan,
       includeVideo: state.includeVideo,
       autoplayOnLoad: state.autoplayOnLoad,

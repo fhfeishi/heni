@@ -161,6 +161,39 @@ void main() {
       expect(restoredState.repeatMode, HeniRepeatMode.all);
     });
 
+    test(
+      'shuffle and repeat change independently without changing track',
+      () async {
+        final engine = _FakePlaybackEngine();
+        final store = _MemoryLibraryStore();
+        final container = _container(engine, store: store);
+        addTearDown(container.dispose);
+        final controller = container.read(
+          playbackQueueControllerProvider.notifier,
+        );
+        await controller.addItems(_items, playFirst: true);
+        controller.setPlaybackMode(HeniPlaybackMode.listLoop);
+        final currentPath =
+            container.read(playbackQueueControllerProvider).currentItem?.path;
+
+        controller.toggleShuffle();
+
+        var state = container.read(playbackQueueControllerProvider);
+        expect(state.repeatMode, HeniRepeatMode.all);
+        expect(state.shuffle, isTrue);
+        expect(state.currentItem?.path, currentPath);
+
+        controller.cycleRepeatMode();
+
+        state = container.read(playbackQueueControllerProvider);
+        expect(state.repeatMode, HeniRepeatMode.one);
+        expect(state.shuffle, isTrue);
+        expect(state.currentItem?.path, currentPath);
+        expect(store.latest?.repeatModeName, HeniRepeatMode.one.name);
+        expect(store.latest?.shuffleEnabled, isTrue);
+      },
+    );
+
     test('persists volume level across restore', () async {
       final engine = _FakePlaybackEngine();
       final store = _MemoryLibraryStore();

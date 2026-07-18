@@ -27,6 +27,8 @@ class HeniLibraryConfig {
     this.activeUiStyle,
     this.sidebarModeName,
     this.playbackModeName,
+    this.repeatModeName,
+    this.shuffleEnabled,
     this.volumeLevel,
     this.recursiveScan = true,
     this.includeVideo = true,
@@ -47,6 +49,8 @@ class HeniLibraryConfig {
       activeUiStyle: _string(json['activeUiStyle']),
       sidebarModeName: _string(json['sidebarMode']),
       playbackModeName: _string(json['playbackModeName']),
+      repeatModeName: _string(json['repeatModeName']),
+      shuffleEnabled: _bool(json['shuffleEnabled']),
       volumeLevel: _double(json['volumeLevel']),
       recursiveScan: _bool(json['recursiveScan']) ?? true,
       includeVideo: _bool(json['includeVideo']) ?? true,
@@ -64,6 +68,8 @@ class HeniLibraryConfig {
   final String? activeUiStyle;
   final String? sidebarModeName;
   final String? playbackModeName;
+  final String? repeatModeName;
+  final bool? shuffleEnabled;
   final double? volumeLevel;
   final bool recursiveScan;
   final bool includeVideo;
@@ -80,6 +86,19 @@ class HeniLibraryConfig {
     );
   }
 
+  HeniRepeatMode get repeatMode {
+    final modeName = repeatModeName;
+    if (modeName != null) {
+      return HeniRepeatMode.values.firstWhere(
+        (mode) => mode.name == modeName,
+        orElse: () => HeniRepeatMode.none,
+      );
+    }
+    return playbackMode?.repeatMode ?? HeniRepeatMode.none;
+  }
+
+  bool get resolvedShuffle => shuffleEnabled ?? playbackMode?.shuffle ?? false;
+
   bool get isEmpty {
     return libraryDirectories.isEmpty &&
         libraryFiles.isEmpty &&
@@ -91,6 +110,8 @@ class HeniLibraryConfig {
         activeUiStyle == null &&
         sidebarModeName == null &&
         playbackModeName == null &&
+        repeatModeName == null &&
+        shuffleEnabled == null &&
         volumeLevel == null;
   }
 
@@ -107,6 +128,8 @@ class HeniLibraryConfig {
       'activeUiStyle': activeUiStyle,
       'sidebarMode': sidebarModeName,
       'playbackModeName': playbackModeName,
+      'repeatModeName': repeatModeName,
+      'shuffleEnabled': shuffleEnabled,
       'volumeLevel': volumeLevel,
       'recursiveScan': recursiveScan,
       'includeVideo': includeVideo,
