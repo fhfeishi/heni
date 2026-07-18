@@ -114,6 +114,12 @@ class FakePlaybackEngine implements PlaybackEngine {
   double _volume;
 
   @override
+  Duration get currentDuration => Duration.zero;
+
+  @override
+  Duration get currentPosition => Duration.zero;
+
+  @override
   double get currentVolume => _volume;
 
   @override

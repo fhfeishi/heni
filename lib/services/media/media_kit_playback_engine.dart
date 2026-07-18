@@ -32,6 +32,12 @@ class MediaKitPlaybackEngine implements PlaybackEngine {
   Stream<bool> get completed => _player.stream.completed;
 
   @override
+  Duration get currentDuration => _player.state.duration;
+
+  @override
+  Duration get currentPosition => _player.state.position;
+
+  @override
   Stream<Duration> get duration => _player.stream.duration;
 
   @override

@@ -474,6 +474,12 @@ class _FakePlaybackEngine implements PlaybackEngine {
   Stream<bool> get completed => const Stream.empty();
 
   @override
+  Duration get currentDuration => Duration.zero;
+
+  @override
+  Duration get currentPosition => Duration.zero;
+
+  @override
   double get currentVolume => _volume;
 
   @override

@@ -6054,6 +6054,7 @@ class _BottomPlayerBar extends ConsumerWidget {
                         PlayerProgressWithTime(
                           engine: engine,
                           palette: palette,
+                          mediaId: currentMedia?.path ?? 'no-media',
                           fallbackDuration:
                               currentMedia?.duration ??
                               mediaProbe.when(
@@ -6173,6 +6174,7 @@ class _CompactBottomBar extends StatelessWidget {
                       PlayerProgressWithTime(
                         engine: engine,
                         palette: palette,
+                        mediaId: currentMedia?.path ?? 'no-media',
                         fallbackDuration: currentMedia?.duration,
                       ),
                     ],

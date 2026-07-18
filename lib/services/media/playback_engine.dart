@@ -6,6 +6,8 @@ abstract interface class PlaybackEngine {
   Stream<Duration> get position;
   Stream<Duration> get duration;
   Stream<double> get volume;
+  Duration get currentPosition;
+  Duration get currentDuration;
   double get currentVolume;
 
   /// 当前是否正在播放的同步快照，用于界面重建时给 [playing] 流提供
