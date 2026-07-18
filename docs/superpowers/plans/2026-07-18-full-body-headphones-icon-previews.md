@@ -13,7 +13,7 @@
 - Produce exactly six 1024×1024 square preview PNGs.
 - Do not replace any Heni platform icon in this iteration.
 - Use the user's supplied images only to derive written traits; do not pass the animation screenshots directly to image generation.
-- Every preview shows the complete front-facing seated body: two visible ears, two hands resting naturally on the cream belly, two relaxed legs stretched toward the lower corners, and two complete feet with small claws and warm brown pads.
+- Every preview shows the complete front-facing seated body: two visible rounded bear ears, two hands resting naturally on the cream belly, two relaxed legs stretched toward the lower corners, and two complete feet with rounded toe beans and blue-violet sole pads.
 - Every preview shows complete over-ear headphones with a cyan-to-violet glow; the headband must sit behind or above the ears so both ears remain visible.
 - Keep every body part and the headphones inside generous icon-safe padding.
 - Use a dark simple background, no text, no watermark, no other character, no extra or missing limbs, no tail, no hair tuft, no feline whiskers, and no complex scenery.
@@ -39,10 +39,10 @@
 ```text
 Use case: stylized-concept
 Asset type: wholesome exploratory square music app-icon preview.
-Primary request: Create an original enormous, extremely round, sleepy blue-green and warm-cream bear-like fantasy mascot wearing complete over-ear headphones. Show its entire seated body. It sits front-facing with a gigantic round cream belly, both short arms relaxed naturally on top of the belly, and both short legs lazily stretched and splayed toward the lower corners. Show both complete feet with three small cream claws and warm brown oval foot pads facing partly toward the viewer. Its eyes are closed with a tiny peaceful smile. It has two small pointed ears, and both ears must remain fully visible above or inside the headphone arc.
+Primary request: Create an original enormous, extremely round, sleepy dusky-teal and warm-cream bear-like fantasy mascot wearing complete over-ear headphones. Show its entire seated body. It sits front-facing with a gigantic round cream belly, both short arms relaxed naturally on top of the belly, and both short legs lazily stretched and splayed toward the lower corners. Show both complete feet with three rounded toe beans and soft blue-violet oval sole pads facing partly toward the viewer. Its eyes are closed with a tiny peaceful smile. It has two small rounded bear ears, and both ears must remain fully visible above or inside the headphone arc.
 Headphones: one coherent over-ear headset; complete cyan-to-violet glowing ear cups on both sides; a complete headband arcs behind or above the ears; glow softly illuminates cheeks, hands, belly edges, and feet without overexposure.
 Composition: centered symmetrical full-body portrait; the character occupies 78–82% of the square; generous empty padding around the headband, ears, hands, legs, and feet; readable at 64×64.
-Character constraints: deep blue-green outer body; large warm-cream face and belly; extremely round torso; very short limbs; no tail; no hair tuft; no whiskers; no pronounced cat muzzle.
+Character constraints: dusky teal outer body; one simple complete warm-cream oval face patch that does not form a forehead point; large warm-cream oval belly; extremely round torso; very short limbs; rounded bear ears; rounded toe beans; blue-violet sole pads; no claws; no tail; no hair tuft; no whiskers; no cat muzzle.
 Scene: simple dark midnight navy radial background with no floor, furniture, forest, food, or narrative objects.
 Avoid: text, letters, logo, watermark, border, other characters, extra limbs, missing limbs, merged hands, cropped feet, cropped ears, deformed headphones, standing, running, crossed legs, or hugging knees.
 ```
@@ -151,4 +151,3 @@ Run checks that prove: the fragment is under 2 MB; it contains exactly six embed
 - [ ] **Step 4: Present the comparison**
 
 Return `::codex-inline-vis{file="snorlax-headphones-compare.html"}` and ask the user which numbered direction should be refined. Report the six project PNG paths and the built-in image-generation prompt set.
-
