@@ -215,6 +215,32 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
       expect(restoredEngine.currentVolume, 37);
+      expect(
+        restoredContainer
+            .read(playbackQueueControllerProvider)
+            .lastAudibleVolume,
+        37,
+      );
+    });
+
+    test('muting does not overwrite the remembered audible volume', () async {
+      final store = _MemoryLibraryStore();
+      final container = _container(_FakePlaybackEngine(), store: store);
+      addTearDown(container.dispose);
+      final controller = container.read(
+        playbackQueueControllerProvider.notifier,
+      );
+
+      await controller.persistVolume(64);
+      await controller.persistVolume(0);
+      await Future<void>.delayed(const Duration(milliseconds: 260));
+
+      expect(
+        container.read(playbackQueueControllerProvider).lastAudibleVolume,
+        64,
+      );
+      expect(store.latest?.volumeLevel, 0);
+      expect(store.latest?.lastAudibleVolume, 64);
     });
 
     test('persists and restores the sidebar preference', () async {

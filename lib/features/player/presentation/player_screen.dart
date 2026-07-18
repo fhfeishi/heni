@@ -1114,7 +1114,27 @@ class PlayerScreen extends ConsumerWidget {
     );
     final isMaximized = ref.watch(heniWindowControllerProvider);
 
-    return Scaffold(
+    void toggleMutedFromKeyboard() {
+      final focusedContext = FocusManager.instance.primaryFocus?.context;
+      final editingText =
+          focusedContext?.widget is EditableText ||
+          focusedContext?.findAncestorWidgetOfExactType<EditableText>() != null;
+      if (editingText) {
+        return;
+      }
+      final target = resolveMuteTarget(
+        current: engine.currentVolume,
+        lastAudible: queue.lastAudibleVolume,
+      );
+      unawaited(engine.setVolume(target));
+      unawaited(
+        ref
+            .read(playbackQueueControllerProvider.notifier)
+            .persistVolume(target),
+      );
+    }
+
+    final scaffold = Scaffold(
       backgroundColor: Colors.transparent,
       body: HeniPanoramicShellFrame(
         shellTheme: shellTheme,
@@ -1509,6 +1529,11 @@ class PlayerScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+
+    return CallbackShortcuts(
+      bindings: {const CharacterActivator('m'): toggleMutedFromKeyboard},
+      child: Focus(autofocus: true, child: scaffold),
     );
   }
 
@@ -6229,6 +6254,8 @@ class _CompactBottomBar extends StatelessWidget {
                     engine: engine,
                     palette: palette,
                     shellTheme: shellTheme,
+                    lastAudibleVolume: queue.lastAudibleVolume,
+                    compact: true,
                     onVolumeCommitted: onPersistVolume,
                   ),
                 ],
@@ -6911,6 +6938,7 @@ class _UtilityControls extends StatelessWidget {
           engine: engine,
           palette: palette,
           shellTheme: shellTheme,
+          lastAudibleVolume: queue.lastAudibleVolume,
           onVolumeCommitted: onPersistVolume,
         ),
       ],

@@ -1,32 +1,47 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../design/app_theme.dart';
 import '../../../design/heni_shell_theme.dart';
 import '../../../services/media/playback_engine.dart';
+
+double resolveMuteTarget({
+  required double current,
+  required double lastAudible,
+}) {
+  if (current > 0) {
+    return 0;
+  }
+  return lastAudible > 0 ? lastAudible.clamp(1, 100).toDouble() : 60;
+}
 
 class HeniVolumeControl extends StatefulWidget {
   const HeniVolumeControl({
     required this.engine,
     required this.palette,
     required this.shellTheme,
+    required this.lastAudibleVolume,
     required this.onVolumeCommitted,
+    this.compact = false,
     super.key,
   });
 
   final PlaybackEngine engine;
   final HeniPalette palette;
   final HeniShellTheme shellTheme;
+  final double lastAudibleVolume;
   final ValueChanged<double> onVolumeCommitted;
+  final bool compact;
 
   @override
   State<HeniVolumeControl> createState() => _HeniVolumeControlState();
 }
 
 class _HeniVolumeControlState extends State<HeniVolumeControl> {
+  final FocusNode _focusNode = FocusNode(debugLabel: 'HeniVolumeControl');
   StreamSubscription<double>? _subscription;
   late double _volume;
   late double _lastAudibleVolume;
@@ -45,18 +60,30 @@ class _HeniVolumeControlState extends State<HeniVolumeControl> {
       unawaited(_subscription?.cancel());
       _readEngineSnapshot();
       _listenToEngine();
+      return;
+    }
+    if (oldWidget.lastAudibleVolume != widget.lastAudibleVolume &&
+        widget.lastAudibleVolume > 0 &&
+        _volume <= 0) {
+      _lastAudibleVolume = widget.lastAudibleVolume.clamp(1, 100).toDouble();
     }
   }
 
   @override
   void dispose() {
     unawaited(_subscription?.cancel());
+    _focusNode.dispose();
     super.dispose();
   }
 
   void _readEngineSnapshot() {
     _volume = widget.engine.currentVolume.clamp(0, 100).toDouble();
-    _lastAudibleVolume = _volume > 0 ? _volume : 60;
+    _lastAudibleVolume =
+        _volume > 0
+            ? _volume
+            : widget.lastAudibleVolume > 0
+            ? widget.lastAudibleVolume.clamp(1, 100).toDouble()
+            : 60;
   }
 
   void _listenToEngine() {
@@ -92,10 +119,10 @@ class _HeniVolumeControlState extends State<HeniVolumeControl> {
   void _toggleMute() {
     if (_volume > 0) {
       _lastAudibleVolume = _volume;
-      _commit(0);
-    } else {
-      _commit(_lastAudibleVolume <= 0 ? 60 : _lastAudibleVolume);
     }
+    _commit(
+      resolveMuteTarget(current: _volume, lastAudible: _lastAudibleVolume),
+    );
   }
 
   void _handlePointerSignal(PointerSignalEvent event) {
@@ -106,6 +133,22 @@ class _HeniVolumeControlState extends State<HeniVolumeControl> {
     _commit(_volume + delta);
   }
 
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final delta = switch (event.logicalKey) {
+      LogicalKeyboardKey.arrowLeft => -5.0,
+      LogicalKeyboardKey.arrowRight => 5.0,
+      _ => 0.0,
+    };
+    if (delta == 0) {
+      return KeyEventResult.ignored;
+    }
+    _commit(_volume + delta);
+    return KeyEventResult.handled;
+  }
+
   IconData get _volumeIcon => switch (_volume.round()) {
     <= 0 => Icons.volume_off_rounded,
     < 50 => Icons.volume_down_rounded,
@@ -114,118 +157,81 @@ class _HeniVolumeControlState extends State<HeniVolumeControl> {
 
   @override
   Widget build(BuildContext context) {
-    return MenuAnchor(
-      style: const MenuStyle(
-        backgroundColor: WidgetStatePropertyAll(Colors.transparent),
-        elevation: WidgetStatePropertyAll(0),
-        padding: WidgetStatePropertyAll(EdgeInsets.zero),
-        minimumSize: WidgetStatePropertyAll(Size.zero),
-        shadowColor: WidgetStatePropertyAll(Colors.transparent),
-        surfaceTintColor: WidgetStatePropertyAll(Colors.transparent),
-      ),
-      alignmentOffset: const Offset(-204, -76),
-      menuChildren: [
-        Listener(
+    final accent = heniAccentOnGlass(widget.palette.accent);
+    return Tooltip(
+      message: '音量 ${_volume.round()}%',
+      child: Focus(
+        key: const ValueKey('heni-volume-focus'),
+        focusNode: _focusNode,
+        onKeyEvent: _handleKeyEvent,
+        child: Listener(
+          key: const ValueKey('heni-volume-shell'),
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: (_) => _focusNode.requestFocus(),
           onPointerSignal: _handlePointerSignal,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: Container(
-                key: const ValueKey('heni-volume-popover'),
-                width: 250,
-                height: 64,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: widget.shellTheme.dock,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: widget.shellTheme.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.28),
-                      blurRadius: 24,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: _volume > 0 ? '静音' : '恢复音量',
-                      onPressed: _toggleMute,
-                      icon: Icon(_volumeIcon, size: 19),
-                      style: IconButton.styleFrom(
-                        fixedSize: const Size.square(38),
-                        padding: EdgeInsets.zero,
-                        foregroundColor: widget.shellTheme.primaryText,
-                        backgroundColor: widget.shellTheme.hover,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          activeTrackColor: widget.palette.seed,
-                          inactiveTrackColor: Colors.white.withValues(
-                            alpha: 0.12,
-                          ),
-                          thumbColor: widget.palette.accent,
-                          overlayColor: widget.palette.seed.withValues(
-                            alpha: 0.16,
-                          ),
-                          trackHeight: 3,
-                        ),
-                        child: Slider(
-                          value: _volume,
-                          min: 0,
-                          max: 100,
-                          onChanged: _setLive,
-                          onChangeEnd: _commit,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    SizedBox(
-                      width: 38,
-                      child: Text(
-                        '${_volume.round()}%',
-                        textAlign: TextAlign.right,
-                        style: TextStyle(
-                          color: widget.shellTheme.primaryText,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          fontFeatures: const [ui.FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOut,
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: BoxDecoration(
+              color: widget.shellTheme.hover.withValues(alpha: 0.54),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: widget.shellTheme.border.withValues(alpha: 0.72),
               ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: _volume > 0 ? '静音' : '恢复音量',
+                  onPressed: _toggleMute,
+                  icon: Icon(_volumeIcon, size: 19),
+                  style: IconButton.styleFrom(
+                    fixedSize: const Size.square(38),
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    foregroundColor:
+                        _volume > 0
+                            ? widget.shellTheme.primaryText
+                            : widget.shellTheme.secondaryText,
+                    hoverColor: widget.shellTheme.hover,
+                    highlightColor: widget.shellTheme.pressed,
+                  ),
+                ),
+                SizedBox(
+                  width: widget.compact ? 64 : 88,
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: accent,
+                      inactiveTrackColor: Colors.white.withValues(alpha: 0.12),
+                      disabledActiveTrackColor: accent.withValues(alpha: 0.4),
+                      thumbColor: accent,
+                      overlayColor: accent.withValues(alpha: 0.12),
+                      trackHeight: 3,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 4,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 10,
+                      ),
+                    ),
+                    child: Slider(
+                      key: const ValueKey('heni-volume-slider'),
+                      value: _volume,
+                      min: 0,
+                      max: 100,
+                      onChanged: _setLive,
+                      onChangeEnd: _commit,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-      ],
-      builder: (context, controller, child) {
-        return Listener(
-          onPointerSignal: _handlePointerSignal,
-          child: IconButton(
-            tooltip: '音量 ${_volume.round()}%',
-            onPressed: () {
-              if (controller.isOpen) {
-                controller.close();
-              } else {
-                controller.open();
-              }
-            },
-            style: IconButton.styleFrom(
-              foregroundColor: widget.shellTheme.secondaryText,
-              hoverColor: widget.shellTheme.hover,
-              highlightColor: widget.shellTheme.pressed,
-            ),
-            icon: Icon(_volumeIcon),
-          ),
-        );
-      },
+      ),
     );
   }
 }

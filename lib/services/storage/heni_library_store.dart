@@ -30,6 +30,7 @@ class HeniLibraryConfig {
     this.repeatModeName,
     this.shuffleEnabled,
     this.volumeLevel,
+    this.lastAudibleVolume,
     this.recursiveScan = true,
     this.includeVideo = true,
     this.autoplayOnLoad = true,
@@ -52,6 +53,7 @@ class HeniLibraryConfig {
       repeatModeName: _string(json['repeatModeName']),
       shuffleEnabled: _bool(json['shuffleEnabled']),
       volumeLevel: _double(json['volumeLevel']),
+      lastAudibleVolume: _audibleVolume(json['lastAudibleVolume']),
       recursiveScan: _bool(json['recursiveScan']) ?? true,
       includeVideo: _bool(json['includeVideo']) ?? true,
       autoplayOnLoad: _bool(json['autoplayOnLoad']) ?? true,
@@ -71,6 +73,7 @@ class HeniLibraryConfig {
   final String? repeatModeName;
   final bool? shuffleEnabled;
   final double? volumeLevel;
+  final double? lastAudibleVolume;
   final bool recursiveScan;
   final bool includeVideo;
   final bool autoplayOnLoad;
@@ -112,7 +115,8 @@ class HeniLibraryConfig {
         playbackModeName == null &&
         repeatModeName == null &&
         shuffleEnabled == null &&
-        volumeLevel == null;
+        volumeLevel == null &&
+        lastAudibleVolume == null;
   }
 
   Map<String, Object?> toJson() {
@@ -131,6 +135,7 @@ class HeniLibraryConfig {
       'repeatModeName': repeatModeName,
       'shuffleEnabled': shuffleEnabled,
       'volumeLevel': volumeLevel,
+      'lastAudibleVolume': lastAudibleVolume,
       'recursiveScan': recursiveScan,
       'includeVideo': includeVideo,
       'autoplayOnLoad': autoplayOnLoad,
@@ -276,6 +281,14 @@ double? _double(Object? value) {
     final double number => number,
     _ => null,
   };
+}
+
+double? _audibleVolume(Object? value) {
+  final volume = _double(value);
+  if (volume == null || !volume.isFinite || volume <= 0) {
+    return null;
+  }
+  return volume.clamp(1, 100).toDouble();
 }
 
 int? _int(Object? value) {

@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heni/design/app_theme.dart';
 import 'package:heni/design/heni_shell_theme.dart';
@@ -9,7 +11,13 @@ import 'package:heni/features/player/presentation/volume_control.dart';
 import 'package:heni/services/media/playback_engine.dart';
 
 void main() {
-  testWidgets('volume updates live and persists only when interaction ends', (
+  test('mute target uses durable audible memory and a safe fallback', () {
+    expect(resolveMuteTarget(current: 70, lastAudible: 55), 0);
+    expect(resolveMuteTarget(current: 0, lastAudible: 55), 55);
+    expect(resolveMuteTarget(current: 0, lastAudible: 0), 60);
+  });
+
+  testWidgets('inline volume updates live and commits when interaction ends', (
     tester,
   ) async {
     final engine = FakePlaybackEngine(volume: 70);
@@ -22,15 +30,17 @@ void main() {
             engine: engine,
             palette: HeniPalette.nocturne,
             shellTheme: HeniShellTheme.fromPalette(HeniPalette.nocturne),
+            lastAudibleVolume: 64,
             onVolumeCommitted: committed.add,
           ),
         ),
       ),
     );
 
-    await tester.tap(find.byTooltip('音量 70%'));
-    await tester.pumpAndSettle();
-    final slider = tester.widget<Slider>(find.byType(Slider));
+    expect(find.byKey(const ValueKey('heni-volume-slider')), findsOneWidget);
+    final slider = tester.widget<Slider>(
+      find.byKey(const ValueKey('heni-volume-slider')),
+    );
     slider.onChanged!(35);
     await tester.pump();
     expect(engine.currentVolume, 35);
@@ -41,17 +51,59 @@ void main() {
   });
 
   testWidgets('mute restores the last audible volume', (tester) async {
-    final engine = FakePlaybackEngine(volume: 64);
+    final engine = FakePlaybackEngine(volume: 0);
     addTearDown(engine.dispose);
-    await pumpVolumeControl(tester, engine);
-    await tester.tap(find.byTooltip('音量 64%'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('静音'));
-    await tester.pump();
-    expect(engine.currentVolume, 0);
+    final committed = <double>[];
+    await pumpVolumeControl(
+      tester,
+      engine,
+      lastAudibleVolume: 64,
+      onVolumeCommitted: committed.add,
+    );
+
     await tester.tap(find.byTooltip('恢复音量'));
     await tester.pump();
     expect(engine.currentVolume, 64);
+    await tester.tap(find.byTooltip('静音'));
+    await tester.pump();
+    expect(engine.currentVolume, 0);
+    expect(committed, [64, 0]);
+  });
+
+  testWidgets('wheel and arrow keys adjust volume in desktop-sized steps', (
+    tester,
+  ) async {
+    final engine = FakePlaybackEngine(volume: 50);
+    addTearDown(engine.dispose);
+    final committed = <double>[];
+    await pumpVolumeControl(
+      tester,
+      engine,
+      lastAudibleVolume: 50,
+      onVolumeCommitted: committed.add,
+    );
+
+    final shell = find.byKey(const ValueKey('heni-volume-shell'));
+    await tester.sendEventToBinding(
+      PointerScrollEvent(
+        position: tester.getCenter(shell),
+        scrollDelta: const Offset(0, -20),
+      ),
+    );
+    await tester.pump();
+    expect(engine.currentVolume, 52);
+
+    final focus = tester.widget<Focus>(
+      find.byKey(const ValueKey('heni-volume-focus')),
+    );
+    focus.focusNode!.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(engine.currentVolume, 57);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pump();
+    expect(engine.currentVolume, 52);
   });
 }
 
@@ -110,7 +162,12 @@ class FakePlaybackEngine implements PlaybackEngine {
   Future<void> stop() async {}
 }
 
-Future<void> pumpVolumeControl(WidgetTester tester, FakePlaybackEngine engine) {
+Future<void> pumpVolumeControl(
+  WidgetTester tester,
+  FakePlaybackEngine engine, {
+  double lastAudibleVolume = 60,
+  ValueChanged<double>? onVolumeCommitted,
+}) {
   return tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
@@ -118,7 +175,8 @@ Future<void> pumpVolumeControl(WidgetTester tester, FakePlaybackEngine engine) {
           engine: engine,
           palette: HeniPalette.nocturne,
           shellTheme: HeniShellTheme.fromPalette(HeniPalette.nocturne),
-          onVolumeCommitted: (_) {},
+          lastAudibleVolume: lastAudibleVolume,
+          onVolumeCommitted: onVolumeCommitted ?? (_) {},
         ),
       ),
     ),

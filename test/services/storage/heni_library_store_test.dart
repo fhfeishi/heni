@@ -54,4 +54,35 @@ void main() {
       expect(config.resolvedShuffle, isFalse);
     });
   });
+
+  group('HeniLibraryConfig volume memory', () {
+    test('round trips and clamps the last audible volume', () {
+      final config = HeniLibraryConfig.fromJson(const {
+        'lastAudibleVolume': 64,
+      });
+      final loudConfig = HeniLibraryConfig.fromJson(const {
+        'lastAudibleVolume': 140,
+      });
+
+      expect(config.lastAudibleVolume, 64);
+      expect(config.toJson()['lastAudibleVolume'], 64);
+      expect(loudConfig.lastAudibleVolume, 100);
+    });
+
+    test('rejects missing, muted, and malformed audible volume', () {
+      expect(HeniLibraryConfig.fromJson(const {}).lastAudibleVolume, isNull);
+      expect(
+        HeniLibraryConfig.fromJson(const {
+          'lastAudibleVolume': 0,
+        }).lastAudibleVolume,
+        isNull,
+      );
+      expect(
+        HeniLibraryConfig.fromJson(const {
+          'lastAudibleVolume': 'loud',
+        }).lastAudibleVolume,
+        isNull,
+      );
+    });
+  });
 }

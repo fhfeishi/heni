@@ -44,6 +44,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   String? _persistedSidebarModeName;
   List<String> _persistedSceneryImagePaths = const [];
   double? _persistedVolumeLevel;
+  double _persistedLastAudibleVolume = 60;
 
   @override
   PlaybackQueueState build() {
@@ -652,9 +653,18 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   Future<void> persistVolume(double volume) async {
     final normalized = volume.clamp(0, 100).toDouble();
     _persistedVolumeLevel = normalized;
+    if (normalized > 0) {
+      _persistedLastAudibleVolume = normalized;
+      state = state.copyWith(lastAudibleVolume: normalized);
+    }
     _volumePersistTimer?.cancel();
     _volumePersistTimer = Timer(const Duration(milliseconds: 220), () {
-      unawaited(_persistState(volumeLevel: normalized));
+      unawaited(
+        _persistState(
+          volumeLevel: normalized,
+          lastAudibleVolume: _persistedLastAudibleVolume,
+        ),
+      );
     });
   }
 
@@ -694,6 +704,13 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
         return;
       }
 
+      final restoredVolume = config.volumeLevel?.clamp(0, 100).toDouble();
+      final restoredLastAudible =
+          config.lastAudibleVolume ??
+          (restoredVolume != null && restoredVolume > 0
+              ? restoredVolume
+              : 60.0);
+
       state = state.copyWith(
         isScanning: config.libraryDirectories.isNotEmpty,
         repeatMode: config.repeatMode,
@@ -701,6 +718,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
         recursiveScan: config.recursiveScan,
         includeVideo: config.includeVideo,
         autoplayOnLoad: config.autoplayOnLoad,
+        lastAudibleVolume: restoredLastAudible,
         statusMessage:
             config.libraryDirectories.isEmpty ? '正在恢复曲库...' : '正在恢复曲库目录...',
         lastError: null,
@@ -717,7 +735,8 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
       ref
           .read(sidebarModeProvider.notifier)
           .restoreByName(config.sidebarModeName);
-      _persistedVolumeLevel = config.volumeLevel?.clamp(0, 100).toDouble();
+      _persistedVolumeLevel = restoredVolume;
+      _persistedLastAudibleVolume = restoredLastAudible;
       _persistedSceneryImagePaths = List.unmodifiable(config.sceneryImagePaths);
       if (config.sceneryImagePaths.isNotEmpty) {
         ref
@@ -1116,6 +1135,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     String? sidebarModeName,
     List<String>? sceneryImagePaths,
     double? volumeLevel,
+    double? lastAudibleVolume,
   }) async {
     final config = HeniLibraryConfig(
       libraryDirectories: state.libraryDirectories,
@@ -1142,6 +1162,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
       sidebarModeName: sidebarModeName ?? _persistedSidebarModeName,
       sceneryImagePaths: sceneryImagePaths ?? _persistedSceneryImagePaths,
       volumeLevel: volumeLevel ?? _persistedVolumeLevel,
+      lastAudibleVolume: lastAudibleVolume ?? _persistedLastAudibleVolume,
     );
 
     try {
@@ -1189,6 +1210,7 @@ class PlaybackQueueState {
     this.libraryFilePaths = const [],
     this.repeatMode = HeniRepeatMode.none,
     this.shuffle = false,
+    this.lastAudibleVolume = 60,
     this.recursiveScan = true,
     this.includeVideo = true,
     this.autoplayOnLoad = true,
@@ -1208,6 +1230,7 @@ class PlaybackQueueState {
   final List<String> libraryFilePaths;
   final HeniRepeatMode repeatMode;
   final bool shuffle;
+  final double lastAudibleVolume;
   final bool recursiveScan;
   final bool includeVideo;
   final bool autoplayOnLoad;
@@ -1260,6 +1283,7 @@ class PlaybackQueueState {
     List<String>? libraryFilePaths,
     HeniRepeatMode? repeatMode,
     bool? shuffle,
+    double? lastAudibleVolume,
     bool? recursiveScan,
     bool? includeVideo,
     bool? autoplayOnLoad,
@@ -1279,6 +1303,7 @@ class PlaybackQueueState {
       libraryFilePaths: libraryFilePaths ?? this.libraryFilePaths,
       repeatMode: repeatMode ?? this.repeatMode,
       shuffle: shuffle ?? this.shuffle,
+      lastAudibleVolume: lastAudibleVolume ?? this.lastAudibleVolume,
       recursiveScan: recursiveScan ?? this.recursiveScan,
       includeVideo: includeVideo ?? this.includeVideo,
       autoplayOnLoad: autoplayOnLoad ?? this.autoplayOnLoad,
