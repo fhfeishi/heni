@@ -119,7 +119,7 @@ Use FFmpeg Lanczos resizing from the master for `mdpi=48`, `hdpi=72`, `xhdpi=96`
 
 - [ ] **Step 3: Generate iOS icons from `Contents.json`**
 
-For every image entry, compute `pixels = round(pointSize × scale)`, resize the master with Lanczos, and overwrite only the named PNG. Require all 18 declared filenames to be generated.
+For every image entry, compute `pixels = round(pointSize × scale)`, resize the master with Lanczos, and overwrite only the named PNG. The catalog contains 19 declarations that resolve to 15 unique filenames; require all 15 files to be generated and require duplicate declarations to agree on pixel size.
 
 - [ ] **Step 4: Generate macOS icons**
 
