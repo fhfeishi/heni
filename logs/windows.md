@@ -635,3 +635,33 @@ blocked before suite loading by the host loopback failure described below.
 - The broad Flutter widget suite remains blocked before assertions because the
   harness cannot establish its local `127.0.0.1` listener connection (Windows
   error 121). No widget suite is reported as passing.
+
+## 2026-07-18 - Sidebar Safe Expansion And Player Dock QA
+
+- The Windows runner retains a full-client captionless frame and a DPI-aware
+  `900 × 620` logical minimum. `ensureClientWidth` converts a requested logical
+  width with the active window DPI, preserves height, clamps the window to the
+  monitor work area, and reports both achieved width and whether the request
+  was reached.
+- Sidebar expansion requests `1140` logical client pixels. Runtime QA exposed
+  a two-pixel restored-frame inset at the exact release threshold: the native
+  window reached `1140`, while the inner layout reported `1138` and stayed
+  compact. Sidebar policy now uses the authoritative client/MediaQuery width,
+  with a regression case for `window=1140, content=1138`.
+- Isolated Debug checks on the current 192-DPI (200%) monitor:
+  - saved compact preference: `900 × 620`, compact rail, no overflow banner;
+  - saved expanded preference from the same narrow geometry: one growth to
+    `1140 × 620`, then the labeled expanded sidebar;
+  - no saved state: `1280 × 720` with expanded sidebar;
+  - silent 30-second launch media: coherent `00:24 / 00:30` progress and fill.
+- Both `flutter build windows --debug` and
+  `flutter build windows --release` succeeded during final verification; Debug
+  was repeated after the shell-inset correction and succeeded again.
+- Visual evidence:
+  `build/visual-check/player-controls-compact-900x620.png`,
+  `build/visual-check/player-controls-expanded-1140x620.png`,
+  `build/visual-check/player-controls-default-1280x720.png`, and
+  `build/visual-check/player-progress-playing-30s.png`.
+- `flutter analyze` reports no issues. The selected Flutter test suite still
+  stops before assertions at the host loopback listener connection with
+  Windows error 121, so widget/unit assertions are not claimed as executed.

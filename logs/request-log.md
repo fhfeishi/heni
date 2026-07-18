@@ -2293,3 +2293,57 @@ request that changes Heni.
   FFmpeg/media tests) and exits 1, while Git status and whitespace checks stay
   clean outside this record; this is tracked as repository formatting debt,
   not silently reported as a clean whole-repository gate.
+
+## 2026-07-18 - Resizable Sidebar And Player Control Usability
+
+### User Request
+
+- Keep the whole desktop app user-resizable within a practical minimum range,
+  and make the sidebar expandable/collapsible even when the restored window is
+  initially narrow.
+- Improve shuffle, repeat, and volume behavior using mature desktop music
+  player interaction patterns.
+- Correct the playing-track progress bar so its fill, labels, hover preview,
+  drag preview, and final seek all agree.
+
+### Done
+
+- Kept the DPI-aware `900 × 620` minimum and added a native safe-width request:
+  expanding from a narrow window requests `1140` logical client pixels, stays
+  on-screen, and never shrinks the window on collapse.
+- Reconciled the restored sidebar preference after storage hydration. A saved
+  expanded preference now grows a `900 × 620` window once and then renders the
+  full labeled sidebar; a saved compact preference remains compact.
+- Split shuffle and repeat into independent persisted states with backward
+  migration from the former single playback-mode field. The transport order is
+  now shuffle, previous, play/pause, next, repeat, with separate active colour,
+  state dots, glyphs, and tooltips.
+- Replaced the volume popover with an always-visible speaker plus slider. Click
+  mutes/restores, wheel adjusts by 2 points, arrow keys by 5 points, and `M`
+  toggles mute unless an editable field owns focus. The last audible level is
+  persisted separately so saving zero does not lose the restore target.
+- Rebuilt progress around one coherent snapshot sourced from streamed values,
+  synchronous engine state, and metadata fallback in that order. Media changes
+  clear stale progress, unknown durations cannot seek, drag preview ignores
+  conflicting position updates, release seeks once, and `320/220/140` widths
+  select wide/compact/track-only layouts.
+
+### Verification
+
+- Fresh `flutter analyze`: no issues.
+- Windows Debug and Release builds completed successfully before runtime QA;
+  Debug was rebuilt again after the `1140` shell-inset boundary correction.
+- At 200% DPI, isolated Debug runtime checks confirmed compact `900 × 620`,
+  default expanded `1280 × 720`, and restored-expanded `1140 × 620` layouts
+  without a Flutter overflow banner. A 30-second silent WAV showed
+  `00:24 / 00:30` with the fill at approximately 80%, matching the displayed
+  time.
+- DPI-aware screenshots are stored at
+  `build/visual-check/player-controls-compact-900x620.png`,
+  `build/visual-check/player-controls-expanded-1140x620.png`,
+  `build/visual-check/player-controls-default-1280x720.png`, and
+  `build/visual-check/player-progress-playing-30s.png`.
+- The focused Flutter test targets compile, but the host test shell still fails
+  before loading any suite because it cannot connect to its `127.0.0.1`
+  listener (`SocketException`, Windows error 121). No test assertion is
+  reported as passing.
