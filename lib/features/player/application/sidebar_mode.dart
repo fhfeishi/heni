@@ -2,10 +2,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum HeniSidebarMode { expanded, compact }
 
+const heniSidebarForceCompactWidth = 1040.0;
+const heniSidebarInitialCompactWidth = 1080.0;
+const heniSidebarExpandedSafeWidth = 1140.0;
+
 final sidebarModeProvider =
     NotifierProvider<SidebarModeController, HeniSidebarMode>(
       SidebarModeController.new,
     );
+
+final sidebarPreferencesRestoredProvider =
+    NotifierProvider<SidebarPreferencesRestored, bool>(
+      SidebarPreferencesRestored.new,
+    );
+
+class SidebarPreferencesRestored extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void complete() {
+    state = true;
+  }
+}
 
 class SidebarModeController extends Notifier<HeniSidebarMode> {
   @override
@@ -28,10 +46,10 @@ bool resolveSidebarWidthForcedCompact({
   required bool? wasForcedCompact,
 }) {
   if (wasForcedCompact == null) {
-    return width < 1148;
+    return width < heniSidebarInitialCompactWidth;
   }
   if (wasForcedCompact) {
-    return width < 1180;
+    return width < heniSidebarExpandedSafeWidth;
   }
-  return width < 1148;
+  return width <= heniSidebarForceCompactWidth;
 }

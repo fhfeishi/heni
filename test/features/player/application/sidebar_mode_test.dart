@@ -25,6 +25,17 @@ void main() {
 
       expect(container.read(sidebarModeProvider), HeniSidebarMode.expanded);
     });
+
+    test('reports when persisted sidebar preferences finish restoring', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(sidebarPreferencesRestoredProvider), isFalse);
+
+      container.read(sidebarPreferencesRestoredProvider.notifier).complete();
+
+      expect(container.read(sidebarPreferencesRestoredProvider), isTrue);
+    });
   });
 
   group('sidebar width policy', () {
@@ -44,6 +55,10 @@ void main() {
         resolveSidebarWidthForcedCompact(width: 1040, wasForcedCompact: false),
         isTrue,
       );
+      expect(
+        resolveSidebarWidthForcedCompact(width: 1041, wasForcedCompact: false),
+        isFalse,
+      );
     });
 
     test('holds the previous state inside the hysteresis band', () {
@@ -58,6 +73,10 @@ void main() {
     });
 
     test('leaves forced compact at the upper threshold', () {
+      expect(
+        resolveSidebarWidthForcedCompact(width: 1139, wasForcedCompact: true),
+        isTrue,
+      );
       expect(
         resolveSidebarWidthForcedCompact(width: 1140, wasForcedCompact: true),
         isFalse,

@@ -1117,6 +1117,9 @@ class PlayerScreen extends ConsumerWidget {
     final videoController = ref.watch(videoControllerProvider);
     final focusMode = ref.watch(focusModeProvider);
     final sidebarPreference = ref.watch(sidebarModeProvider);
+    final sidebarPreferencesRestored = ref.watch(
+      sidebarPreferencesRestoredProvider,
+    );
     final isMaximized = ref.watch(heniWindowControllerProvider);
 
     return Scaffold(
@@ -1199,10 +1202,43 @@ class PlayerScreen extends ConsumerWidget {
                                                 availableWidth:
                                                     constraints.maxWidth,
                                                 preference: sidebarPreference,
+                                                preferencesRestored:
+                                                    sidebarPreferencesRestored,
+                                                requestExpandedWidth: () async {
+                                                  final result = await ref
+                                                      .read(
+                                                        heniWindowControllerProvider
+                                                            .notifier,
+                                                      )
+                                                      .ensureClientWidth(
+                                                        heniSidebarExpandedSafeWidth,
+                                                      );
+                                                  return result
+                                                      .reachedRequestedWidth;
+                                                },
+                                                onPreferenceChanged: (mode) {
+                                                  ref
+                                                      .read(
+                                                        sidebarModeProvider
+                                                            .notifier,
+                                                      )
+                                                      .select(mode);
+                                                  unawaited(
+                                                    ref
+                                                        .read(
+                                                          playbackQueueControllerProvider
+                                                              .notifier,
+                                                        )
+                                                        .persistShellPreferences(
+                                                          sidebarMode: mode,
+                                                        ),
+                                                  );
+                                                },
                                                 builder: (
                                                   context,
                                                   effectiveMode,
                                                   widthForcedCompact,
+                                                  selectMode,
                                                 ) {
                                                   return _Sidebar(
                                                     palette: palette,
@@ -1212,24 +1248,7 @@ class PlayerScreen extends ConsumerWidget {
                                                     mode: effectiveMode,
                                                     widthForcedCompact:
                                                         widthForcedCompact,
-                                                    onModeChanged: (mode) {
-                                                      ref
-                                                          .read(
-                                                            sidebarModeProvider
-                                                                .notifier,
-                                                          )
-                                                          .select(mode);
-                                                      unawaited(
-                                                        ref
-                                                            .read(
-                                                              playbackQueueControllerProvider
-                                                                  .notifier,
-                                                            )
-                                                            .persistShellPreferences(
-                                                              sidebarMode: mode,
-                                                            ),
-                                                      );
-                                                    },
+                                                    onModeChanged: selectMode,
                                                     onCreatePlaylist:
                                                         () => _createPlaylist(
                                                           context,
@@ -1962,7 +1981,7 @@ class _Sidebar extends StatelessWidget {
   final _ShellLayout layout;
   final HeniSidebarMode mode;
   final bool widthForcedCompact;
-  final ValueChanged<HeniSidebarMode> onModeChanged;
+  final HeniSidebarModeCallback onModeChanged;
   final VoidCallback onCreatePlaylist;
   final ValueChanged<String> onSelectPlaylist;
   final ValueChanged<String> onAddFromLibrary;
@@ -2024,7 +2043,8 @@ class _Sidebar extends StatelessWidget {
                 title: '浏览',
                 action: IconButton(
                   tooltip: '收起侧边栏',
-                  onPressed: () => onModeChanged(HeniSidebarMode.compact),
+                  onPressed:
+                      () => unawaited(onModeChanged(HeniSidebarMode.compact)),
                   icon: const Icon(
                     Icons.keyboard_double_arrow_left_rounded,
                     size: 18,
@@ -2179,7 +2199,7 @@ class _CompactSidebar extends StatelessWidget {
   final PlaybackQueueState queue;
   final _ShellLayout layout;
   final bool widthForcedCompact;
-  final ValueChanged<HeniSidebarMode> onModeChanged;
+  final HeniSidebarModeCallback onModeChanged;
   final VoidCallback onCreatePlaylist;
   final ValueChanged<String> onSelectPlaylist;
 
@@ -2268,11 +2288,9 @@ class _CompactSidebar extends StatelessWidget {
           child: Column(
             children: [
               IconButton(
-                tooltip: widthForcedCompact ? '窗口宽度不足，拉宽后可展开' : '展开侧边栏',
+                tooltip: widthForcedCompact ? '展开侧边栏并调整窗口' : '展开侧边栏',
                 onPressed:
-                    widthForcedCompact
-                        ? null
-                        : () => onModeChanged(HeniSidebarMode.expanded),
+                    () => unawaited(onModeChanged(HeniSidebarMode.expanded)),
                 icon: const Icon(
                   Icons.keyboard_double_arrow_right_rounded,
                   size: 20,
@@ -2280,11 +2298,7 @@ class _CompactSidebar extends StatelessWidget {
                 style: IconButton.styleFrom(
                   fixedSize: const Size.square(42),
                   foregroundColor: _secondaryGlassText(emphasis: 1.04),
-                  disabledForegroundColor: _tertiaryGlassText(),
                   backgroundColor: Colors.white.withValues(alpha: 0.025),
-                  disabledBackgroundColor: Colors.white.withValues(
-                    alpha: 0.012,
-                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(13),
                   ),

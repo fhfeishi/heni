@@ -16,7 +16,10 @@ void main() {
           home: HeniAdaptiveSidebar(
             availableWidth: width,
             preference: preference,
-            builder: (context, effectiveMode, widthForcedCompact) {
+            preferencesRestored: false,
+            requestExpandedWidth: () async => true,
+            onPreferenceChanged: (_) {},
+            builder: (context, effectiveMode, widthForcedCompact, selectMode) {
               return Text(
                 '${effectiveMode.name}:$widthForcedCompact',
                 textDirection: TextDirection.ltr,
@@ -31,13 +34,13 @@ void main() {
     await pump(width: 1280, preference: HeniSidebarMode.expanded);
     expect(find.text('expanded:false'), findsOneWidget);
 
-    await pump(width: 1147, preference: HeniSidebarMode.expanded);
+    await pump(width: 1040, preference: HeniSidebarMode.expanded);
     expect(find.text('compact:true'), findsOneWidget);
 
-    await pump(width: 1179, preference: HeniSidebarMode.expanded);
+    await pump(width: 1139, preference: HeniSidebarMode.expanded);
     expect(find.text('compact:true'), findsOneWidget);
 
-    await pump(width: 1180, preference: HeniSidebarMode.expanded);
+    await pump(width: 1140, preference: HeniSidebarMode.expanded);
     expect(find.text('expanded:false'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -50,7 +53,10 @@ void main() {
         home: HeniAdaptiveSidebar(
           availableWidth: 1280,
           preference: HeniSidebarMode.compact,
-          builder: (context, effectiveMode, widthForcedCompact) {
+          preferencesRestored: false,
+          requestExpandedWidth: () async => true,
+          onPreferenceChanged: (_) {},
+          builder: (context, effectiveMode, widthForcedCompact, selectMode) {
             return Text(
               '${effectiveMode.name}:$widthForcedCompact',
               textDirection: TextDirection.ltr,
@@ -75,7 +81,10 @@ void main() {
           child: HeniAdaptiveSidebar(
             availableWidth: 1280,
             preference: HeniSidebarMode.expanded,
-            builder: (context, mode, forced) => Text(mode.name),
+            preferencesRestored: false,
+            requestExpandedWidth: () async => true,
+            onPreferenceChanged: (_) {},
+            builder: (context, mode, forced, selectMode) => Text(mode.name),
           ),
         ),
       ),
@@ -89,5 +98,72 @@ void main() {
       tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher)).duration,
       Duration.zero,
     );
+  });
+
+  testWidgets('reconciles a restored expanded preference at startup', (
+    tester,
+  ) async {
+    var resizeRequests = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HeniAdaptiveSidebar(
+          availableWidth: 900,
+          preference: HeniSidebarMode.expanded,
+          preferencesRestored: true,
+          requestExpandedWidth: () async {
+            resizeRequests++;
+            return false;
+          },
+          onPreferenceChanged: (_) {},
+          builder: (context, mode, forced, selectMode) {
+            return Text('${mode.name}:$forced');
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(resizeRequests, 1);
+    expect(find.text('expanded:false'), findsOneWidget);
+  });
+
+  testWidgets('narrow compact mode can request explicit expansion', (
+    tester,
+  ) async {
+    var resizeRequests = 0;
+    HeniSidebarMode? selected;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HeniAdaptiveSidebar(
+          availableWidth: 900,
+          preference: HeniSidebarMode.compact,
+          preferencesRestored: true,
+          requestExpandedWidth: () async {
+            resizeRequests++;
+            return false;
+          },
+          onPreferenceChanged: (mode) => selected = mode,
+          builder: (context, mode, forced, selectMode) {
+            return Column(
+              children: [
+                Text('${mode.name}:$forced'),
+                TextButton(
+                  key: const ValueKey('request-sidebar-expansion'),
+                  onPressed: () => selectMode(HeniSidebarMode.expanded),
+                  child: const Text('expand'),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('request-sidebar-expansion')));
+    await tester.pumpAndSettle();
+
+    expect(resizeRequests, 1);
+    expect(selected, HeniSidebarMode.expanded);
+    expect(find.text('expanded:false'), findsOneWidget);
   });
 }

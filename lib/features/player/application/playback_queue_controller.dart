@@ -773,6 +773,9 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
         lastError: error.toString(),
       );
     } finally {
+      if (ref.mounted) {
+        ref.read(sidebarPreferencesRestoredProvider.notifier).complete();
+      }
       await _applyLaunchMediaPathsIfAny();
     }
   }
