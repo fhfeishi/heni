@@ -162,7 +162,7 @@ void main() {
     });
 
     test(
-      'shuffle and repeat change independently without changing track',
+      'three playback modes cycle without changing the current track',
       () async {
         final engine = _FakePlaybackEngine();
         final store = _MemoryLibraryStore();
@@ -176,23 +176,47 @@ void main() {
         final currentPath =
             container.read(playbackQueueControllerProvider).currentItem?.path;
 
-        controller.toggleShuffle();
+        controller.cyclePlaybackMode();
 
         var state = container.read(playbackQueueControllerProvider);
+        expect(state.playbackMode, HeniPlaybackMode.singleLoop);
+        expect(state.repeatMode, HeniRepeatMode.one);
+        expect(state.shuffle, isFalse);
+        expect(state.currentItem?.path, currentPath);
+
+        controller.cyclePlaybackMode();
+
+        state = container.read(playbackQueueControllerProvider);
+        expect(state.playbackMode, HeniPlaybackMode.random);
         expect(state.repeatMode, HeniRepeatMode.all);
         expect(state.shuffle, isTrue);
         expect(state.currentItem?.path, currentPath);
-
-        controller.cycleRepeatMode();
-
-        state = container.read(playbackQueueControllerProvider);
-        expect(state.repeatMode, HeniRepeatMode.one);
-        expect(state.shuffle, isTrue);
-        expect(state.currentItem?.path, currentPath);
-        expect(store.latest?.repeatModeName, HeniRepeatMode.one.name);
+        expect(store.latest?.playbackModeName, HeniPlaybackMode.random.name);
         expect(store.latest?.shuffleEnabled, isTrue);
+
+        controller.cyclePlaybackMode();
+        state = container.read(playbackQueueControllerProvider);
+        expect(state.playbackMode, HeniPlaybackMode.listLoop);
+        expect(state.currentItem?.path, currentPath);
       },
     );
+
+    test('manual next still advances while single loop is active', () async {
+      final container = _container(_FakePlaybackEngine());
+      addTearDown(container.dispose);
+      final controller = container.read(
+        playbackQueueControllerProvider.notifier,
+      );
+      await controller.addItems(_items, playFirst: true);
+      controller.setPlaybackMode(HeniPlaybackMode.singleLoop);
+
+      await controller.playNext();
+      expect(container.read(playbackQueueControllerProvider).currentIndex, 1);
+
+      await controller.playIndex(0);
+      await controller.playNext(advance: PlaybackAdvance.automatic);
+      expect(container.read(playbackQueueControllerProvider).currentIndex, 0);
+    });
 
     test('persists volume level across restore', () async {
       final engine = _FakePlaybackEngine();

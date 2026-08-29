@@ -37,6 +37,7 @@ void main() {
       ),
     );
 
+    expect(find.byKey(const ValueKey('heni-volume-inline')), findsOneWidget);
     expect(find.byKey(const ValueKey('heni-volume-slider')), findsOneWidget);
     final slider = tester.widget<Slider>(
       find.byKey(const ValueKey('heni-volume-slider')),
@@ -104,6 +105,49 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     await tester.pump();
     expect(engine.currentVolume, 52);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+    expect(engine.currentVolume, 57);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyM);
+    await tester.pump();
+    expect(engine.currentVolume, 0);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyM);
+    await tester.pump();
+    expect(engine.currentVolume, 57);
+  });
+
+  testWidgets('collapsed control keeps volume reachable in a compact popover', (
+    tester,
+  ) async {
+    final engine = FakePlaybackEngine(volume: 42);
+    addTearDown(engine.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HeniVolumeControl(
+            engine: engine,
+            palette: HeniPalette.nocturne,
+            shellTheme: HeniShellTheme.fromPalette(HeniPalette.nocturne),
+            lastAudibleVolume: 42,
+            collapsed: true,
+            onVolumeCommitted: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('heni-volume-slider')), findsNothing);
+    expect(find.byTooltip('音量 42%，单击调整，右键静音'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('heni-volume-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('heni-volume-popover')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('heni-volume-slider-popover')),
+      findsOneWidget,
+    );
+    expect(find.text('42%'), findsOneWidget);
   });
 }
 

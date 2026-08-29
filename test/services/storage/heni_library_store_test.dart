@@ -23,13 +23,13 @@ void main() {
   });
 
   group('HeniLibraryConfig playback mode migration', () {
-    test('round trips independent repeat and shuffle fields', () {
+    test('resolves contradictory legacy fields to random playback', () {
       final config = HeniLibraryConfig.fromJson(const {
         'repeatModeName': 'one',
         'shuffleEnabled': true,
       });
 
-      expect(config.repeatMode, HeniRepeatMode.one);
+      expect(config.repeatMode, HeniRepeatMode.all);
       expect(config.resolvedShuffle, isTrue);
       expect(config.toJson()['repeatModeName'], 'one');
       expect(config.toJson()['shuffleEnabled'], isTrue);
@@ -44,14 +44,25 @@ void main() {
       expect(config.resolvedShuffle, isTrue);
     });
 
-    test('invalid modern playback values fall back to sequence', () {
+    test('migrates sequence, off, and invalid values to list loop', () {
       final config = HeniLibraryConfig.fromJson(const {
         'repeatModeName': 'invalid',
         'shuffleEnabled': 'yes',
       });
+      final sequence = HeniLibraryConfig.fromJson(const {
+        'playbackModeName': 'sequence',
+      });
+      final off = HeniLibraryConfig.fromJson(const {
+        'repeatModeName': 'none',
+        'shuffleEnabled': false,
+      });
 
-      expect(config.repeatMode, HeniRepeatMode.none);
+      expect(config.repeatMode, HeniRepeatMode.all);
       expect(config.resolvedShuffle, isFalse);
+      expect(sequence.repeatMode, HeniRepeatMode.all);
+      expect(sequence.resolvedShuffle, isFalse);
+      expect(off.repeatMode, HeniRepeatMode.all);
+      expect(off.resolvedShuffle, isFalse);
     });
   });
 

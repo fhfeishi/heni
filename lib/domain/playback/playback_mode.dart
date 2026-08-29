@@ -21,17 +21,25 @@ enum HeniRepeatMode {
 }
 
 enum HeniPlaybackMode {
+  /// Kept only so preferences written by older builds can still be read.
   sequence,
   listLoop,
   singleLoop,
   random;
+
+  static const selectableValues = [listLoop, singleLoop, random];
+
+  HeniPlaybackMode get normalized => switch (this) {
+    HeniPlaybackMode.sequence => HeniPlaybackMode.listLoop,
+    _ => this,
+  };
 
   HeniPlaybackMode get next {
     return switch (this) {
       HeniPlaybackMode.sequence => HeniPlaybackMode.listLoop,
       HeniPlaybackMode.listLoop => HeniPlaybackMode.singleLoop,
       HeniPlaybackMode.singleLoop => HeniPlaybackMode.random,
-      HeniPlaybackMode.random => HeniPlaybackMode.sequence,
+      HeniPlaybackMode.random => HeniPlaybackMode.listLoop,
     };
   }
 
@@ -64,7 +72,7 @@ enum HeniPlaybackMode {
     }
 
     return switch (repeatMode) {
-      HeniRepeatMode.none => HeniPlaybackMode.sequence,
+      HeniRepeatMode.none => HeniPlaybackMode.listLoop,
       HeniRepeatMode.all => HeniPlaybackMode.listLoop,
       HeniRepeatMode.one => HeniPlaybackMode.singleLoop,
     };

@@ -80,11 +80,16 @@ void main() {
   });
 
   group('HeniPlaybackMode', () {
-    test('cycles through player-facing modes', () {
+    test('cycles through the three player-facing modes', () {
       expect(HeniPlaybackMode.sequence.next, HeniPlaybackMode.listLoop);
       expect(HeniPlaybackMode.listLoop.next, HeniPlaybackMode.singleLoop);
       expect(HeniPlaybackMode.singleLoop.next, HeniPlaybackMode.random);
-      expect(HeniPlaybackMode.random.next, HeniPlaybackMode.sequence);
+      expect(HeniPlaybackMode.random.next, HeniPlaybackMode.listLoop);
+      expect(HeniPlaybackMode.selectableValues, [
+        HeniPlaybackMode.listLoop,
+        HeniPlaybackMode.singleLoop,
+        HeniPlaybackMode.random,
+      ]);
     });
 
     test('maps random playback to shuffled list looping', () {

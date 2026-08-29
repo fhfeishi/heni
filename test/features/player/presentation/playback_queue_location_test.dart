@@ -38,6 +38,29 @@ void main() {
     );
   });
 
+  test('prefers the real queue occurrence for duplicate media identities', () {
+    final duplicates = [items.first, items.last, items.first];
+
+    expect(
+      currentTrackIndexInItems(
+        items: duplicates,
+        currentItem: items.first,
+        preferredIndex: 2,
+      ),
+      2,
+    );
+  });
+
+  test('finds a current item by stable normalized path', () {
+    const current = MediaItem(
+      path: 'd:/MUSIC/alpha.mp3',
+      title: 'Renamed title',
+      kind: MediaKind.audio,
+    );
+
+    expect(currentTrackIndexInItems(items: items, currentItem: current), 0);
+  });
+
   test('queue dialog content uses the available short-window height', () {
     expect(playbackQueueDialogContentHeight(380), 380);
   });

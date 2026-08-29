@@ -83,24 +83,38 @@ class HeniLibraryConfig {
     if (modeName == null) {
       return null;
     }
-    return HeniPlaybackMode.values.firstWhere(
-      (mode) => mode.name == modeName,
-      orElse: () => HeniPlaybackMode.sequence,
-    );
+    return HeniPlaybackMode.values
+        .firstWhere(
+          (mode) => mode.name == modeName,
+          orElse: () => HeniPlaybackMode.listLoop,
+        )
+        .normalized;
   }
 
   HeniRepeatMode get repeatMode {
+    if (shuffleEnabled == true) {
+      return HeniRepeatMode.all;
+    }
     final modeName = repeatModeName;
     if (modeName != null) {
-      return HeniRepeatMode.values.firstWhere(
+      final restored = HeniRepeatMode.values.firstWhere(
         (mode) => mode.name == modeName,
-        orElse: () => HeniRepeatMode.none,
+        orElse: () => HeniRepeatMode.all,
       );
+      return restored == HeniRepeatMode.none ? HeniRepeatMode.all : restored;
     }
-    return playbackMode?.repeatMode ?? HeniRepeatMode.none;
+    return playbackMode?.repeatMode ?? HeniRepeatMode.all;
   }
 
-  bool get resolvedShuffle => shuffleEnabled ?? playbackMode?.shuffle ?? false;
+  bool get resolvedShuffle {
+    if (shuffleEnabled == true) {
+      return true;
+    }
+    if (repeatModeName != null) {
+      return false;
+    }
+    return playbackMode?.shuffle ?? false;
+  }
 
   bool get isEmpty {
     return libraryDirectories.isEmpty &&

@@ -7,11 +7,10 @@ class HeniPlaybackModeControls extends StatelessWidget {
   const HeniPlaybackModeControls({
     super.key,
     required this.palette,
-    required this.shuffle,
-    required this.repeatMode,
+    required this.mode,
     required this.enabled,
-    required this.onToggleShuffle,
-    required this.onCycleRepeat,
+    required this.onCycleMode,
+    required this.onModeSelected,
     this.transport,
     this.size = 38,
     this.iconSize = 19,
@@ -19,11 +18,10 @@ class HeniPlaybackModeControls extends StatelessWidget {
   });
 
   final HeniPalette palette;
-  final bool shuffle;
-  final HeniRepeatMode repeatMode;
+  final HeniPlaybackMode mode;
   final bool enabled;
-  final VoidCallback onToggleShuffle;
-  final VoidCallback onCycleRepeat;
+  final VoidCallback onCycleMode;
+  final ValueChanged<HeniPlaybackMode> onModeSelected;
   final Widget? transport;
   final double size;
   final double iconSize;
@@ -34,21 +32,13 @@ class HeniPlaybackModeControls extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        HeniShuffleModeButton(
-          palette: palette,
-          active: shuffle,
-          enabled: enabled,
-          onPressed: onToggleShuffle,
-          size: size,
-          iconSize: iconSize,
-        ),
-        SizedBox(width: gap),
         if (transport case final Widget child) ...[child, SizedBox(width: gap)],
-        HeniRepeatModeButton(
+        HeniPlaybackModeButton(
           palette: palette,
-          repeatMode: repeatMode,
+          mode: mode.normalized,
           enabled: enabled,
-          onPressed: onCycleRepeat,
+          onCycleMode: onCycleMode,
+          onModeSelected: onModeSelected,
           size: size,
           iconSize: iconSize,
         ),
@@ -57,187 +47,147 @@ class HeniPlaybackModeControls extends StatelessWidget {
   }
 }
 
-class HeniShuffleModeButton extends StatelessWidget {
-  const HeniShuffleModeButton({
+class HeniPlaybackModeButton extends StatelessWidget {
+  const HeniPlaybackModeButton({
     super.key,
     required this.palette,
-    required this.active,
+    required this.mode,
     required this.enabled,
-    required this.onPressed,
+    required this.onCycleMode,
+    required this.onModeSelected,
     this.size = 38,
     this.iconSize = 19,
   });
 
   final HeniPalette palette;
-  final bool active;
+  final HeniPlaybackMode mode;
   final bool enabled;
-  final VoidCallback onPressed;
+  final VoidCallback onCycleMode;
+  final ValueChanged<HeniPlaybackMode> onModeSelected;
   final double size;
   final double iconSize;
 
-  @override
-  Widget build(BuildContext context) {
-    return _ModeButton(
-      palette: palette,
-      tooltip: active ? '随机播放：已开启' : '随机播放：已关闭',
-      icon: Icons.shuffle_rounded,
-      iconKey: ValueKey(active),
-      stateDotKey: const ValueKey('shuffle-mode-state-dot'),
-      active: active,
-      enabled: enabled,
-      onPressed: onPressed,
-      size: size,
-      iconSize: iconSize,
+  IconData _iconFor(HeniPlaybackMode value) => switch (value.normalized) {
+    HeniPlaybackMode.listLoop => Icons.repeat_rounded,
+    HeniPlaybackMode.singleLoop => Icons.repeat_one_rounded,
+    HeniPlaybackMode.random => Icons.shuffle_rounded,
+    HeniPlaybackMode.sequence => Icons.repeat_rounded,
+  };
+
+  Future<void> _showModeMenu(
+    BuildContext context,
+    Offset globalPosition,
+  ) async {
+    if (!enabled) {
+      return;
+    }
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final selected = await showMenu<HeniPlaybackMode>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        for (final candidate in HeniPlaybackMode.selectableValues)
+          PopupMenuItem<HeniPlaybackMode>(
+            value: candidate,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 24,
+                  child:
+                      candidate == mode
+                          ? const Icon(
+                            Icons.check_rounded,
+                            key: ValueKey('selected-playback-mode'),
+                            size: 18,
+                          )
+                          : const SizedBox.shrink(),
+                ),
+                const SizedBox(width: 8),
+                Icon(_iconFor(candidate), size: 18),
+                const SizedBox(width: 10),
+                Text(candidate.label),
+              ],
+            ),
+          ),
+      ],
     );
+    if (context.mounted && selected != null && selected != mode) {
+      onModeSelected(selected);
+    }
   }
-}
-
-class HeniRepeatModeButton extends StatelessWidget {
-  const HeniRepeatModeButton({
-    super.key,
-    required this.palette,
-    required this.repeatMode,
-    required this.enabled,
-    required this.onPressed,
-    this.size = 38,
-    this.iconSize = 19,
-  });
-
-  final HeniPalette palette;
-  final HeniRepeatMode repeatMode;
-  final bool enabled;
-  final VoidCallback onPressed;
-  final double size;
-  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
-    final (tooltip, icon) = switch (repeatMode) {
-      HeniRepeatMode.none => ('循环：关闭', Icons.repeat_rounded),
-      HeniRepeatMode.all => ('循环：列表', Icons.repeat_rounded),
-      HeniRepeatMode.one => ('循环：单曲', Icons.repeat_one_rounded),
-    };
-
-    return _ModeButton(
-      palette: palette,
-      tooltip: tooltip,
-      icon: icon,
-      iconKey: ValueKey(repeatMode),
-      stateDotKey: const ValueKey('repeat-mode-state-dot'),
-      active: repeatMode != HeniRepeatMode.none,
-      enabled: enabled,
-      onPressed: onPressed,
-      size: size,
-      iconSize: iconSize,
-    );
-  }
-}
-
-class _ModeButton extends StatelessWidget {
-  const _ModeButton({
-    required this.palette,
-    required this.tooltip,
-    required this.icon,
-    required this.iconKey,
-    required this.stateDotKey,
-    required this.active,
-    required this.enabled,
-    required this.onPressed,
-    required this.size,
-    required this.iconSize,
-  });
-
-  final HeniPalette palette;
-  final String tooltip;
-  final IconData icon;
-  final Key iconKey;
-  final Key stateDotKey;
-  final bool active;
-  final bool enabled;
-  final VoidCallback onPressed;
-  final double size;
-  final double iconSize;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final normalizedMode = mode.normalized;
     final activeColor = heniAccentOnGlass(palette.accent);
-    final inactiveColor = theme.colorScheme.onSurfaceVariant.withValues(
-      alpha: 0.72,
-    );
+    final inactiveColor = Theme.of(
+      context,
+    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.72);
+    final tooltip =
+        enabled ? '播放模式：${normalizedMode.label}（单击切换，右键选择）' : '播放模式不可用';
 
-    return Tooltip(
-      message: tooltip,
-      child: SizedBox.square(
-        dimension: size,
-        child: Stack(
-          alignment: Alignment.center,
-          clipBehavior: Clip.none,
-          children: [
-            IconButton(
-              onPressed: enabled ? onPressed : null,
-              style: ButtonStyle(
-                fixedSize: WidgetStatePropertyAll(Size.square(size)),
-                padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                foregroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.disabled)) {
-                    return inactiveColor.withValues(alpha: 0.34);
-                  }
-                  return active ? activeColor : inactiveColor;
-                }),
-                backgroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.pressed)) {
-                    return Colors.white.withValues(alpha: 0.10);
-                  }
-                  if (states.contains(WidgetState.hovered) ||
-                      states.contains(WidgetState.focused)) {
-                    return Colors.white.withValues(alpha: 0.065);
-                  }
-                  return Colors.transparent;
-                }),
-                overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-              ),
-              icon: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 140),
-                switchInCurve: Curves.easeOut,
-                switchOutCurve: Curves.easeOut,
-                transitionBuilder:
-                    (child, animation) => FadeTransition(
-                      opacity: animation,
-                      child: ScaleTransition(scale: animation, child: child),
-                    ),
-                child: Icon(icon, key: iconKey, size: iconSize),
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: '播放模式：${normalizedMode.label}',
+      hint: enabled ? '单击切换，右键或长按直接选择' : null,
+      child: Tooltip(
+        message: tooltip,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onSecondaryTapDown:
+              enabled
+                  ? (details) => _showModeMenu(context, details.globalPosition)
+                  : null,
+          onLongPressStart:
+              enabled
+                  ? (details) => _showModeMenu(context, details.globalPosition)
+                  : null,
+          child: IconButton(
+            key: const ValueKey('playback-mode-button'),
+            onPressed: enabled ? onCycleMode : null,
+            style: ButtonStyle(
+              fixedSize: WidgetStatePropertyAll(Size.square(size)),
+              padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              foregroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.disabled)) {
+                  return inactiveColor.withValues(alpha: 0.34);
+                }
+                return activeColor;
+              }),
+              backgroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.pressed)) {
+                  return Colors.white.withValues(alpha: 0.10);
+                }
+                if (states.contains(WidgetState.hovered) ||
+                    states.contains(WidgetState.focused)) {
+                  return Colors.white.withValues(alpha: 0.065);
+                }
+                return Colors.transparent;
+              }),
+              overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+            ),
+            icon: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 160),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeOut,
+              transitionBuilder:
+                  (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(scale: animation, child: child),
+                  ),
+              child: Icon(
+                _iconFor(normalizedMode),
+                key: ValueKey(normalizedMode),
+                size: iconSize,
               ),
             ),
-            Positioned(
-              bottom: 2,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 140),
-                switchInCurve: Curves.easeOut,
-                switchOutCurve: Curves.easeOut,
-                child:
-                    active
-                        ? Container(
-                          key: stateDotKey,
-                          width: 3,
-                          height: 3,
-                          decoration: BoxDecoration(
-                            color:
-                                enabled
-                                    ? activeColor
-                                    : activeColor.withValues(alpha: 0.34),
-                            shape: BoxShape.circle,
-                          ),
-                        )
-                        : const SizedBox(
-                          key: ValueKey('inactive-mode-state-dot'),
-                          width: 3,
-                          height: 3,
-                        ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

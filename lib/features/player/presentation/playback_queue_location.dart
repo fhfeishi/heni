@@ -9,6 +9,32 @@ double playbackQueueDialogContentHeight(double availableHeight) {
 
 enum CurrentTrackLocateState { visible, hiddenByFilter, unavailable }
 
+bool mediaItemMatchesQuery(MediaItem item, String query) {
+  final normalized = query.trim().toLowerCase();
+  return normalized.isEmpty ||
+      item.title.toLowerCase().contains(normalized) ||
+      item.path.toLowerCase().contains(normalized);
+}
+
+int? currentTrackIndexInItems({
+  required List<MediaItem> items,
+  required MediaItem? currentItem,
+  int? preferredIndex,
+}) {
+  if (currentItem == null) {
+    return null;
+  }
+  final identity = _mediaIdentity(currentItem);
+  if (preferredIndex != null &&
+      preferredIndex >= 0 &&
+      preferredIndex < items.length &&
+      _mediaIdentity(items[preferredIndex]) == identity) {
+    return preferredIndex;
+  }
+  final index = items.indexWhere((item) => _mediaIdentity(item) == identity);
+  return index < 0 ? null : index;
+}
+
 CurrentTrackLocateState currentTrackLocateState({
   required List<MediaItem> items,
   required int currentIndex,
@@ -18,16 +44,11 @@ CurrentTrackLocateState currentTrackLocateState({
     return CurrentTrackLocateState.unavailable;
   }
 
-  final normalized = query.trim().toLowerCase();
-  if (normalized.isEmpty) {
-    return CurrentTrackLocateState.visible;
-  }
-
   final current = items[currentIndex];
-  final matches =
-      current.title.toLowerCase().contains(normalized) ||
-      current.path.toLowerCase().contains(normalized);
-  return matches
+  return mediaItemMatchesQuery(current, query)
       ? CurrentTrackLocateState.visible
       : CurrentTrackLocateState.hiddenByFilter;
 }
+
+String _mediaIdentity(MediaItem item) =>
+    item.path.trim().replaceAll('\\', '/').toLowerCase();

@@ -1494,19 +1494,19 @@ class PlayerScreen extends ConsumerWidget {
                                     .playNext(),
                               );
                             },
-                            onToggleShuffle: () {
+                            onCyclePlaybackMode: () {
                               ref
                                   .read(
                                     playbackQueueControllerProvider.notifier,
                                   )
-                                  .toggleShuffle();
+                                  .cyclePlaybackMode();
                             },
-                            onCycleRepeat: () {
+                            onSelectPlaybackMode: (mode) {
                               ref
                                   .read(
                                     playbackQueueControllerProvider.notifier,
                                   )
-                                  .cycleRepeatMode();
+                                  .setPlaybackMode(mode);
                             },
                             onShowPlaybackQueue: () {
                               _showPlaybackQueue(context, ref);
@@ -4449,8 +4449,28 @@ class _LibraryContent extends ConsumerStatefulWidget {
 
 class _LibraryContentState extends ConsumerState<_LibraryContent> {
   final Set<String> _selectedPaths = <String>{};
+  final ScrollController _listController = ScrollController();
+  final GlobalKey _currentLibraryRowKey = GlobalKey();
+  Timer? _locateHighlightTimer;
   var _selectionMode = false;
   var _sortMode = _SongsSortMode.queue;
+  int? _locateHighlightedIndex;
+
+  @override
+  void didUpdateWidget(covariant _LibraryContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.queue.activePlaylistId != widget.queue.activePlaylistId) {
+      _locateHighlightTimer?.cancel();
+      _locateHighlightedIndex = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _locateHighlightTimer?.cancel();
+    _listController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -4460,13 +4480,21 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
     final browsingLibrary = activePlaylist.id == widget.queue.library.id;
     final browsingPlaybackQueue = activePlaylist.id == heniPlaybackQueueId;
     final canMultiSelect = !browsingLibrary && !browsingPlaybackQueue;
-    var filteredEntries = [
-      for (var i = 0; i < items.length; i += 1)
-        if (_matchesQuery(items[i], query)) MapEntry(i, items[i]),
-    ];
-    if (_sortMode != _SongsSortMode.queue && !browsingPlaybackQueue) {
-      filteredEntries.sort((a, b) => _compareEntries(a, b, _sortMode));
-    }
+    final filteredEntries = _visibleEntries(
+      activePlaylist,
+      query,
+      browsingPlaybackQueue: browsingPlaybackQueue,
+    );
+    final preferredCurrentIndex =
+        browsingPlaybackQueue ||
+                activePlaylist.id == widget.queue.playbackSourceId
+            ? widget.queue.currentIndex
+            : null;
+    final currentTrackIndex = currentTrackIndexInItems(
+      items: items,
+      currentItem: widget.queue.currentItem,
+      preferredIndex: preferredCurrentIndex,
+    );
     final selectedCount =
         filteredEntries
             .where((entry) => _selectedPaths.contains(entry.value.path))
@@ -4637,6 +4665,31 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                                 ),
                               ]
                               : <Widget>[
+                                IconButton(
+                                  key: const ValueKey(
+                                    'locate-current-track-button',
+                                  ),
+                                  tooltip:
+                                      widget.queue.currentItem == null
+                                          ? '当前没有正在播放的歌曲'
+                                          : '定位到当前播放歌曲',
+                                  onPressed:
+                                      widget.queue.currentItem == null
+                                          ? null
+                                          : () =>
+                                              unawaited(_locateCurrentTrack()),
+                                  icon: Icon(
+                                    Icons.my_location_rounded,
+                                    size: 19,
+                                    color: _secondaryGlassText(emphasis: 0.96),
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 34,
+                                    minHeight: 34,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                ),
                                 PopupMenuButton<_SongsSortMode>(
                                   tooltip: '排序 · ${_sortMode.label}',
                                   icon: Icon(
@@ -4806,51 +4859,63 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                             ),
                           )
                           : ListView.builder(
+                            controller: _listController,
                             itemCount: filteredEntries.length,
                             itemBuilder: (context, index) {
                               final entry = filteredEntries[index];
                               final itemIndex = entry.key;
                               final item = entry.value;
                               final selected = widget.queue.isCurrentItem(item);
-                              return _LibraryRow(
-                                item: item,
-                                index: itemIndex,
-                                selected: selected,
-                                browsingLibrary: browsingLibrary,
-                                browsingPlaybackQueue: browsingPlaybackQueue,
-                                playlists: widget.queue.playlists,
-                                currentPlaylistId: activePlaylist.id,
-                                selectionMode: _selectionMode,
-                                checked: _selectedPaths.contains(item.path),
-                                onPlay:
-                                    () =>
-                                        _selectionMode
-                                            ? _toggleItem(item)
-                                            : widget.onPlayIndex(itemIndex),
-                                onAddToPlaylist:
-                                    (playlistId) => widget.onAddToPlaylist(
-                                      playlistId,
-                                      item,
-                                    ),
-                                onRemoveFromPlaylist:
-                                    () =>
-                                        browsingPlaybackQueue
-                                            ? widget.onRemoveFromPlaybackQueue(
-                                              itemIndex,
-                                            )
-                                            : widget.onRemoveFromPlaylist(
-                                              activePlaylist.id,
-                                              item,
-                                            ),
-                                onPlayNext:
-                                    browsingPlaybackQueue
-                                        ? null
-                                        : () => widget.onPlayNext(item),
-                                onEnqueue:
-                                    browsingPlaybackQueue
-                                        ? null
-                                        : () => widget.onEnqueue(item),
-                                onToggleSelect: () => _toggleItem(item),
+                              return KeyedSubtree(
+                                key:
+                                    itemIndex == currentTrackIndex
+                                        ? _currentLibraryRowKey
+                                        : ValueKey(
+                                          'library-row-${activePlaylist.id}-$itemIndex',
+                                        ),
+                                child: _LibraryRow(
+                                  item: item,
+                                  index: itemIndex,
+                                  selected: selected,
+                                  locateHighlighted:
+                                      itemIndex == _locateHighlightedIndex,
+                                  browsingLibrary: browsingLibrary,
+                                  browsingPlaybackQueue: browsingPlaybackQueue,
+                                  playlists: widget.queue.playlists,
+                                  currentPlaylistId: activePlaylist.id,
+                                  selectionMode: _selectionMode,
+                                  checked: _selectedPaths.contains(item.path),
+                                  onPlay:
+                                      () =>
+                                          _selectionMode
+                                              ? _toggleItem(item)
+                                              : widget.onPlayIndex(itemIndex),
+                                  onAddToPlaylist:
+                                      (playlistId) => widget.onAddToPlaylist(
+                                        playlistId,
+                                        item,
+                                      ),
+                                  onRemoveFromPlaylist:
+                                      () =>
+                                          browsingPlaybackQueue
+                                              ? widget
+                                                  .onRemoveFromPlaybackQueue(
+                                                    itemIndex,
+                                                  )
+                                              : widget.onRemoveFromPlaylist(
+                                                activePlaylist.id,
+                                                item,
+                                              ),
+                                  onPlayNext:
+                                      browsingPlaybackQueue
+                                          ? null
+                                          : () => widget.onPlayNext(item),
+                                  onEnqueue:
+                                      browsingPlaybackQueue
+                                          ? null
+                                          : () => widget.onEnqueue(item),
+                                  onToggleSelect: () => _toggleItem(item),
+                                ),
                               );
                             },
                           ),
@@ -4861,6 +4926,132 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
         ),
       ],
     );
+  }
+
+  List<MapEntry<int, MediaItem>> _visibleEntries(
+    HeniPlaylist playlist,
+    String query, {
+    required bool browsingPlaybackQueue,
+  }) {
+    final entries = [
+      for (var i = 0; i < playlist.items.length; i += 1)
+        if (_matchesQuery(playlist.items[i], query))
+          MapEntry(i, playlist.items[i]),
+    ];
+    if (_sortMode != _SongsSortMode.queue && !browsingPlaybackQueue) {
+      entries.sort((a, b) => _compareEntries(a, b, _sortMode));
+    }
+    return entries;
+  }
+
+  Future<void> _locateCurrentTrack() async {
+    final queue = widget.queue;
+    final playlist = queue.activePlaylist;
+    final current = queue.currentItem;
+    if (current == null) {
+      ref
+          .read(playbackQueueControllerProvider.notifier)
+          .reportStatus('当前没有正在播放的歌曲');
+      return;
+    }
+
+    final browsingPlaybackQueue = playlist.id == heniPlaybackQueueId;
+    final preferredIndex =
+        browsingPlaybackQueue || playlist.id == queue.playbackSourceId
+            ? queue.currentIndex
+            : null;
+    final targetIndex = currentTrackIndexInItems(
+      items: playlist.items,
+      currentItem: current,
+      preferredIndex: preferredIndex,
+    );
+    if (targetIndex == null) {
+      ref
+          .read(playbackQueueControllerProvider.notifier)
+          .reportStatus('当前歌曲不在此歌单中');
+      return;
+    }
+
+    final query = ref.read(librarySearchQueryProvider);
+    final locateState = currentTrackLocateState(
+      items: playlist.items,
+      currentIndex: targetIndex,
+      query: query,
+    );
+    if (locateState == CurrentTrackLocateState.hiddenByFilter) {
+      ref
+          .read(playbackQueueControllerProvider.notifier)
+          .reportStatus('当前歌曲被筛选条件隐藏');
+      return;
+    }
+
+    final visibleEntries = _visibleEntries(
+      playlist,
+      query,
+      browsingPlaybackQueue: browsingPlaybackQueue,
+    );
+    final visibleIndex = visibleEntries.indexWhere(
+      (entry) => entry.key == targetIndex,
+    );
+    if (visibleIndex < 0) {
+      return;
+    }
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) {
+      return;
+    }
+    if (_currentLibraryRowKey.currentContext == null &&
+        _listController.hasClients) {
+      final lastIndex = math.max(1, visibleEntries.length - 1);
+      final fraction = visibleIndex / lastIndex;
+      await _listController.animateTo(
+        _listController.position.maxScrollExtent * fraction,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) {
+        return;
+      }
+    }
+
+    final rowContext = _currentLibraryRowKey.currentContext;
+    if (rowContext != null && rowContext.mounted) {
+      await Scrollable.ensureVisible(
+        rowContext,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final latestQueue = widget.queue;
+    final latestPlaylist = latestQueue.activePlaylist;
+    final latestPreferredIndex =
+        latestPlaylist.id == heniPlaybackQueueId ||
+                latestPlaylist.id == latestQueue.playbackSourceId
+            ? latestQueue.currentIndex
+            : null;
+    final latestTargetIndex = currentTrackIndexInItems(
+      items: latestPlaylist.items,
+      currentItem: latestQueue.currentItem,
+      preferredIndex: latestPreferredIndex,
+    );
+    if (latestPlaylist.id != playlist.id || latestTargetIndex != targetIndex) {
+      return;
+    }
+
+    _locateHighlightTimer?.cancel();
+    setState(() => _locateHighlightedIndex = targetIndex);
+    _locateHighlightTimer = Timer(const Duration(milliseconds: 1050), () {
+      if (mounted) {
+        setState(() => _locateHighlightedIndex = null);
+      }
+    });
   }
 
   void _enterSelectionMode() {
@@ -4944,6 +5135,7 @@ class _LibraryRow extends ConsumerStatefulWidget {
     required this.item,
     required this.index,
     required this.selected,
+    required this.locateHighlighted,
     required this.browsingLibrary,
     required this.browsingPlaybackQueue,
     required this.playlists,
@@ -4961,6 +5153,7 @@ class _LibraryRow extends ConsumerStatefulWidget {
   final MediaItem item;
   final int index;
   final bool selected;
+  final bool locateHighlighted;
   final bool browsingLibrary;
   final bool browsingPlaybackQueue;
   final List<HeniPlaylist> playlists;
@@ -4988,10 +5181,13 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
     final theme = Theme.of(context);
     final playing = widget.selected;
     final checked = widget.checked;
-    final hoverOrSelected = playing || _hovered || checked;
+    final locateHighlighted = widget.locateHighlighted;
+    final hoverOrSelected = playing || _hovered || checked || locateHighlighted;
     final evenRow = widget.index.isEven;
     final rowColor =
-        playing
+        locateHighlighted
+            ? theme.colorScheme.primary.withValues(alpha: 0.17)
+            : playing
             ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.085)
             : checked
             ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.05)
@@ -4999,7 +5195,9 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
             ? Colors.white.withValues(alpha: 0.034)
             : Colors.white.withValues(alpha: evenRow ? 0.010 : 0.003);
     final borderColor =
-        playing
+        locateHighlighted
+            ? theme.colorScheme.primary.withValues(alpha: 0.38)
+            : playing
             ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.17)
             : checked
             ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.11)
@@ -5019,7 +5217,7 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
       child: AnimatedScale(
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOutCubic,
-        scale: 1,
+        scale: locateHighlighted ? 1.006 : 1,
         child: AnimatedSlide(
           duration: _hoverDuration,
           curve: _hoverCurve,
@@ -5038,12 +5236,14 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
               children: [
                 Positioned(
                   left: 0,
-                  top: playing ? 6 : 10,
-                  bottom: playing ? 6 : 10,
+                  top: playing || locateHighlighted ? 6 : 10,
+                  bottom: playing || locateHighlighted ? 6 : 10,
                   child: AnimatedContainer(
                     duration: _hoverDuration,
                     width:
-                        playing
+                        locateHighlighted
+                            ? 3
+                            : playing
                             ? 3
                             : checked
                             ? 2
@@ -5053,11 +5253,11 @@ class _LibraryRowState extends ConsumerState<_LibraryRow> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(999),
                       color:
-                          playing || checked
+                          playing || checked || locateHighlighted
                               ? Theme.of(context).colorScheme.primary
                               : Colors.white.withValues(alpha: 0.22),
                       boxShadow: [
-                        if (playing)
+                        if (playing || locateHighlighted)
                           BoxShadow(
                             color: Theme.of(
                               context,
@@ -5962,8 +6162,8 @@ class _BottomPlayerBar extends ConsumerWidget {
     required this.layout,
     required this.onPreviousTrack,
     required this.onNextTrack,
-    required this.onToggleShuffle,
-    required this.onCycleRepeat,
+    required this.onCyclePlaybackMode,
+    required this.onSelectPlaybackMode,
     required this.onShowPlaybackQueue,
     required this.onPersistVolume,
   });
@@ -5977,8 +6177,8 @@ class _BottomPlayerBar extends ConsumerWidget {
   final _ShellLayout layout;
   final VoidCallback onPreviousTrack;
   final VoidCallback onNextTrack;
-  final VoidCallback onToggleShuffle;
-  final VoidCallback onCycleRepeat;
+  final VoidCallback onCyclePlaybackMode;
+  final ValueChanged<HeniPlaybackMode> onSelectPlaybackMode;
   final VoidCallback onShowPlaybackQueue;
   final ValueChanged<double> onPersistVolume;
 
@@ -6024,8 +6224,8 @@ class _BottomPlayerBar extends ConsumerWidget {
                 queue: queue,
                 onPreviousTrack: onPreviousTrack,
                 onNextTrack: onNextTrack,
-                onToggleShuffle: onToggleShuffle,
-                onCycleRepeat: onCycleRepeat,
+                onCyclePlaybackMode: onCyclePlaybackMode,
+                onSelectPlaybackMode: onSelectPlaybackMode,
                 onShowPlaybackQueue: onShowPlaybackQueue,
                 onPersistVolume: onPersistVolume,
               )
@@ -6047,13 +6247,12 @@ class _BottomPlayerBar extends ConsumerWidget {
                         _TransportControls(
                           engine: engine,
                           palette: palette,
-                          shuffle: queue.shuffle,
-                          repeatMode: queue.repeatMode,
+                          mode: queue.playbackMode,
                           enabled: queue.playbackQueue.items.isNotEmpty,
                           onPreviousTrack: onPreviousTrack,
                           onNextTrack: onNextTrack,
-                          onToggleShuffle: onToggleShuffle,
-                          onCycleRepeat: onCycleRepeat,
+                          onCyclePlaybackMode: onCyclePlaybackMode,
+                          onSelectPlaybackMode: onSelectPlaybackMode,
                         ),
                         const SizedBox(height: 4),
                         PlayerProgressWithTime(
@@ -6095,8 +6294,8 @@ class _CompactBottomBar extends StatelessWidget {
     required this.queue,
     required this.onPreviousTrack,
     required this.onNextTrack,
-    required this.onToggleShuffle,
-    required this.onCycleRepeat,
+    required this.onCyclePlaybackMode,
+    required this.onSelectPlaybackMode,
     required this.onShowPlaybackQueue,
     required this.onPersistVolume,
   });
@@ -6108,8 +6307,8 @@ class _CompactBottomBar extends StatelessWidget {
   final PlaybackQueueState queue;
   final VoidCallback onPreviousTrack;
   final VoidCallback onNextTrack;
-  final VoidCallback onToggleShuffle;
-  final VoidCallback onCycleRepeat;
+  final VoidCallback onCyclePlaybackMode;
+  final ValueChanged<HeniPlaybackMode> onSelectPlaybackMode;
   final VoidCallback onShowPlaybackQueue;
   final ValueChanged<double> onPersistVolume;
 
@@ -6188,11 +6387,10 @@ class _CompactBottomBar extends StatelessWidget {
                 SizedBox(width: tight ? 8 : 12),
                 HeniPlaybackModeControls(
                   palette: palette,
-                  shuffle: queue.shuffle,
-                  repeatMode: queue.repeatMode,
+                  mode: queue.playbackMode,
                   enabled: queue.playbackQueue.items.isNotEmpty,
-                  onToggleShuffle: onToggleShuffle,
-                  onCycleRepeat: onCycleRepeat,
+                  onCycleMode: onCyclePlaybackMode,
+                  onModeSelected: onSelectPlaybackMode,
                   size: ultraTiny ? 32 : controlSize,
                   iconSize: tight ? 18 : 20,
                   gap: tight ? 0 : 2,
@@ -6254,24 +6452,22 @@ class _CompactBottomBar extends StatelessWidget {
                     ],
                   ),
                 ),
-                SizedBox(width: tight ? 2 : 6),
-                if (!veryTight) ...[
-                  const SizedBox(width: 4),
-                  HeniVolumeControl(
-                    engine: engine,
-                    palette: palette,
-                    shellTheme: shellTheme,
-                    lastAudibleVolume: queue.lastAudibleVolume,
-                    compact: true,
-                    onVolumeCommitted: onPersistVolume,
-                  ),
-                ],
                 if (!tiny)
                   compactIcon(
                     tooltip: '播放队列',
                     onPressed: onShowPlaybackQueue,
                     icon: Icons.queue_music_rounded,
                   ),
+                SizedBox(width: tight ? 2 : 6),
+                HeniVolumeControl(
+                  engine: engine,
+                  palette: palette,
+                  shellTheme: shellTheme,
+                  lastAudibleVolume: queue.lastAudibleVolume,
+                  compact: true,
+                  collapsed: veryTight,
+                  onVolumeCommitted: onPersistVolume,
+                ),
               ],
             );
           },
@@ -7352,10 +7548,7 @@ class _PlaybackQueueDialogState extends ConsumerState<_PlaybackQueueDialog> {
   }
 
   bool _matchesQueueQuery(MediaItem item, String query) {
-    final normalized = query.trim().toLowerCase();
-    return normalized.isEmpty ||
-        item.title.toLowerCase().contains(normalized) ||
-        item.path.toLowerCase().contains(normalized);
+    return mediaItemMatchesQuery(item, query);
   }
 
   @override
@@ -8193,24 +8386,22 @@ class _TransportControls extends StatelessWidget {
   const _TransportControls({
     required this.engine,
     required this.palette,
-    required this.shuffle,
-    required this.repeatMode,
+    required this.mode,
     required this.enabled,
     required this.onPreviousTrack,
     required this.onNextTrack,
-    required this.onToggleShuffle,
-    required this.onCycleRepeat,
+    required this.onCyclePlaybackMode,
+    required this.onSelectPlaybackMode,
   });
 
   final PlaybackEngine engine;
   final HeniPalette palette;
-  final bool shuffle;
-  final HeniRepeatMode repeatMode;
+  final HeniPlaybackMode mode;
   final bool enabled;
   final VoidCallback onPreviousTrack;
   final VoidCallback onNextTrack;
-  final VoidCallback onToggleShuffle;
-  final VoidCallback onCycleRepeat;
+  final VoidCallback onCyclePlaybackMode;
+  final ValueChanged<HeniPlaybackMode> onSelectPlaybackMode;
 
   @override
   Widget build(BuildContext context) {
@@ -8222,11 +8413,10 @@ class _TransportControls extends StatelessWidget {
 
         return HeniPlaybackModeControls(
           palette: palette,
-          shuffle: shuffle,
-          repeatMode: repeatMode,
+          mode: mode,
           enabled: enabled,
-          onToggleShuffle: onToggleShuffle,
-          onCycleRepeat: onCycleRepeat,
+          onCycleMode: onCyclePlaybackMode,
+          onModeSelected: onSelectPlaybackMode,
           gap: 8,
           transport: Row(
             mainAxisSize: MainAxisSize.min,

@@ -324,7 +324,12 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   Future<void> playNext({
     PlaybackAdvance advance = PlaybackAdvance.user,
   }) async {
-    final move = state.order.next(state.repeatMode);
+    final effectiveRepeatMode =
+        advance == PlaybackAdvance.user &&
+                state.repeatMode == HeniRepeatMode.one
+            ? HeniRepeatMode.all
+            : state.repeatMode;
+    final move = state.order.next(effectiveRepeatMode);
     if (!move.shouldPlay || move.index == null || move.order == null) {
       if (advance == PlaybackAdvance.automatic) {
         await ref.read(playbackEngineProvider).stop();
@@ -336,7 +341,11 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   }
 
   Future<void> playPrevious() async {
-    final move = state.order.previous(state.repeatMode);
+    final effectiveRepeatMode =
+        state.repeatMode == HeniRepeatMode.one
+            ? HeniRepeatMode.all
+            : state.repeatMode;
+    final move = state.order.previous(effectiveRepeatMode);
     if (!move.shouldPlay || move.index == null || move.order == null) {
       return;
     }
@@ -585,32 +594,6 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     );
   }
 
-  void toggleShuffle() {
-    final enabled = !state.shuffle;
-    final currentIndex = state.currentIndex < 0 ? 0 : state.currentIndex;
-    state = state.copyWith(
-      shuffle: enabled,
-      order: _buildOrder(
-        state.playbackQueue.items.length,
-        currentIndex,
-        shuffleOverride: enabled,
-      ),
-      statusMessage: enabled ? '随机播放已开启' : '随机播放已关闭',
-      lastError: null,
-    );
-    unawaited(_persistState());
-  }
-
-  void cycleRepeatMode() {
-    final repeatMode = state.repeatMode.next;
-    state = state.copyWith(
-      repeatMode: repeatMode,
-      statusMessage: '循环模式：${repeatMode.label}',
-      lastError: null,
-    );
-    unawaited(_persistState());
-  }
-
   void cyclePlaybackMode() {
     setPlaybackMode(state.playbackMode.next);
   }
@@ -620,16 +603,17 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   }
 
   void setPlaybackMode(HeniPlaybackMode mode) {
+    final normalizedMode = mode.normalized;
     final currentIndex = state.currentIndex < 0 ? 0 : state.currentIndex;
     state = state.copyWith(
-      repeatMode: mode.repeatMode,
-      shuffle: mode.shuffle,
+      repeatMode: normalizedMode.repeatMode,
+      shuffle: normalizedMode.shuffle,
       order: _buildOrder(
         state.playbackQueue.items.length,
         currentIndex,
-        shuffleOverride: mode.shuffle,
+        shuffleOverride: normalizedMode.shuffle,
       ),
-      statusMessage: '播放模式：${mode.label}',
+      statusMessage: '已切换为${normalizedMode.label}',
       lastError: null,
     );
     unawaited(_persistState());
@@ -1208,7 +1192,7 @@ class PlaybackQueueState {
     required this.order,
     this.libraryDirectories = const [],
     this.libraryFilePaths = const [],
-    this.repeatMode = HeniRepeatMode.none,
+    this.repeatMode = HeniRepeatMode.all,
     this.shuffle = false,
     this.lastAudibleVolume = 60,
     this.recursiveScan = true,

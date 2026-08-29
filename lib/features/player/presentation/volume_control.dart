@@ -26,6 +26,7 @@ class HeniVolumeControl extends StatefulWidget {
     required this.lastAudibleVolume,
     required this.onVolumeCommitted,
     this.compact = false,
+    this.collapsed = false,
     super.key,
   });
 
@@ -35,6 +36,7 @@ class HeniVolumeControl extends StatefulWidget {
   final double lastAudibleVolume;
   final ValueChanged<double> onVolumeCommitted;
   final bool compact;
+  final bool collapsed;
 
   @override
   State<HeniVolumeControl> createState() => _HeniVolumeControlState();
@@ -45,12 +47,18 @@ class _HeniVolumeControlState extends State<HeniVolumeControl> {
   StreamSubscription<double>? _subscription;
   late double _volume;
   late double _lastAudibleVolume;
+  var _hovering = false;
+  var _dragging = false;
+  var _focused = false;
+
+  bool get _showThumb => _hovering || _dragging || _focused;
 
   @override
   void initState() {
     super.initState();
     _readEngineSnapshot();
     _listenToEngine();
+    _focusNode.addListener(_handleFocusChange);
   }
 
   @override
@@ -72,8 +80,16 @@ class _HeniVolumeControlState extends State<HeniVolumeControl> {
   @override
   void dispose() {
     unawaited(_subscription?.cancel());
-    _focusNode.dispose();
+    _focusNode
+      ..removeListener(_handleFocusChange)
+      ..dispose();
     super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (mounted) {
+      setState(() => _focused = _focusNode.hasFocus);
+    }
   }
 
   void _readEngineSnapshot() {
@@ -137,9 +153,13 @@ class _HeniVolumeControlState extends State<HeniVolumeControl> {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
+    if (event.logicalKey == LogicalKeyboardKey.keyM) {
+      _toggleMute();
+      return KeyEventResult.handled;
+    }
     final delta = switch (event.logicalKey) {
-      LogicalKeyboardKey.arrowLeft => -5.0,
-      LogicalKeyboardKey.arrowRight => 5.0,
+      LogicalKeyboardKey.arrowLeft || LogicalKeyboardKey.arrowDown => -5.0,
+      LogicalKeyboardKey.arrowRight || LogicalKeyboardKey.arrowUp => 5.0,
       _ => 0.0,
     };
     if (delta == 0) {
@@ -155,11 +175,130 @@ class _HeniVolumeControlState extends State<HeniVolumeControl> {
     _ => Icons.volume_up_rounded,
   };
 
+  Widget _buildSlider({required Key key, required double width}) {
+    final accent = heniAccentOnGlass(widget.palette.accent);
+    return SizedBox(
+      width: width,
+      child: SliderTheme(
+        data: SliderTheme.of(context).copyWith(
+          activeTrackColor: accent,
+          inactiveTrackColor: Colors.white.withValues(alpha: 0.14),
+          disabledActiveTrackColor: accent.withValues(alpha: 0.4),
+          thumbColor: accent,
+          overlayColor: accent.withValues(alpha: 0.10),
+          trackHeight: 2.5,
+          thumbShape: RoundSliderThumbShape(
+            enabledThumbRadius: _showThumb ? 4.5 : 2,
+          ),
+          overlayShape: const RoundSliderOverlayShape(overlayRadius: 9),
+        ),
+        child: Slider(
+          key: key,
+          value: _volume,
+          min: 0,
+          max: 100,
+          onChangeStart: (_) => setState(() => _dragging = true),
+          onChanged: _setLive,
+          onChangeEnd: (value) {
+            setState(() => _dragging = false);
+            _commit(value);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVolumeButton({required VoidCallback onPressed}) {
+    return IconButton(
+      key: const ValueKey('heni-volume-button'),
+      tooltip:
+          widget.collapsed
+              ? '音量 ${_volume.round()}%，单击调整，右键静音'
+              : _volume > 0
+              ? '静音'
+              : '恢复音量',
+      onPressed: onPressed,
+      icon: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 140),
+        child: Icon(_volumeIcon, key: ValueKey(_volumeIcon), size: 19),
+      ),
+      style: IconButton.styleFrom(
+        fixedSize: const Size.square(38),
+        padding: EdgeInsets.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        foregroundColor:
+            _volume > 0
+                ? widget.shellTheme.primaryText
+                : widget.shellTheme.secondaryText,
+        hoverColor: widget.shellTheme.hover.withValues(alpha: 0.72),
+        highlightColor: widget.shellTheme.pressed,
+      ),
+    );
+  }
+
+  Widget _buildCollapsedControl() {
+    return MenuAnchor(
+      alignmentOffset: const Offset(-126, -8),
+      style: MenuStyle(
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        ),
+        backgroundColor: WidgetStatePropertyAll(widget.shellTheme.dock),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        elevation: const WidgetStatePropertyAll(5),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(
+              color: widget.shellTheme.border.withValues(alpha: 0.75),
+            ),
+          ),
+        ),
+      ),
+      menuChildren: [
+        SizedBox(
+          key: const ValueKey('heni-volume-popover'),
+          width: 166,
+          height: 42,
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildSlider(
+                  key: const ValueKey('heni-volume-slider-popover'),
+                  width: 118,
+                ),
+              ),
+              SizedBox(
+                width: 34,
+                child: Text(
+                  '${_volume.round()}%',
+                  textAlign: TextAlign.end,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: widget.shellTheme.secondaryText,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      builder: (context, controller, child) {
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onSecondaryTap: _toggleMute,
+          child: _buildVolumeButton(
+            onPressed: controller.isOpen ? controller.close : controller.open,
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final accent = heniAccentOnGlass(widget.palette.accent);
-    return Tooltip(
-      message: '音量 ${_volume.round()}%',
+    return Semantics(
+      label: '音量 ${_volume.round()}%',
       child: Focus(
         key: const ValueKey('heni-volume-focus'),
         focusNode: _focusNode,
@@ -169,66 +308,26 @@ class _HeniVolumeControlState extends State<HeniVolumeControl> {
           behavior: HitTestBehavior.opaque,
           onPointerDown: (_) => _focusNode.requestFocus(),
           onPointerSignal: _handlePointerSignal,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            curve: Curves.easeOut,
-            height: 40,
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            decoration: BoxDecoration(
-              color: widget.shellTheme.hover.withValues(alpha: 0.54),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: widget.shellTheme.border.withValues(alpha: 0.72),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: _volume > 0 ? '静音' : '恢复音量',
-                  onPressed: _toggleMute,
-                  icon: Icon(_volumeIcon, size: 19),
-                  style: IconButton.styleFrom(
-                    fixedSize: const Size.square(38),
-                    padding: EdgeInsets.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    foregroundColor:
-                        _volume > 0
-                            ? widget.shellTheme.primaryText
-                            : widget.shellTheme.secondaryText,
-                    hoverColor: widget.shellTheme.hover,
-                    highlightColor: widget.shellTheme.pressed,
-                  ),
-                ),
-                SizedBox(
-                  width: widget.compact ? 64 : 88,
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      activeTrackColor: accent,
-                      inactiveTrackColor: Colors.white.withValues(alpha: 0.12),
-                      disabledActiveTrackColor: accent.withValues(alpha: 0.4),
-                      thumbColor: accent,
-                      overlayColor: accent.withValues(alpha: 0.12),
-                      trackHeight: 3,
-                      thumbShape: const RoundSliderThumbShape(
-                        enabledThumbRadius: 4,
-                      ),
-                      overlayShape: const RoundSliderOverlayShape(
-                        overlayRadius: 10,
+          child: MouseRegion(
+            onEnter: (_) => setState(() => _hovering = true),
+            onExit: (_) => setState(() => _hovering = false),
+            child:
+                widget.collapsed
+                    ? _buildCollapsedControl()
+                    : SizedBox(
+                      key: const ValueKey('heni-volume-inline'),
+                      height: 38,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildVolumeButton(onPressed: _toggleMute),
+                          _buildSlider(
+                            key: const ValueKey('heni-volume-slider'),
+                            width: widget.compact ? 64 : 84,
+                          ),
+                        ],
                       ),
                     ),
-                    child: Slider(
-                      key: const ValueKey('heni-volume-slider'),
-                      value: _volume,
-                      min: 0,
-                      max: 100,
-                      onChanged: _setLive,
-                      onChangeEnd: _commit,
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),
