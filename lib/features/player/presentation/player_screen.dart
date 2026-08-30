@@ -509,7 +509,6 @@ class _ShellLayout {
           : quiet
           ? 90
           : bottomHeight + 12;
-  bool get showSidebarStatus => !quiet;
   bool get useDenseHeader => compact;
   bool get showSceneryOrb => !quiet;
   bool get showNowPlayingDetails => !quiet;
@@ -2024,7 +2023,6 @@ class _Sidebar extends StatelessWidget {
       );
     }
 
-    final theme = Theme.of(context);
     final playbackQueuePlaylist = HeniPlaylist(
       id: heniPlaybackQueueId,
       name: '当前播放列表',
@@ -2081,19 +2079,22 @@ class _Sidebar extends StatelessWidget {
               _PlaylistTile(
                 palette: palette,
                 playlist: queue.library,
+                leadingIcon: Icons.library_music_outlined,
                 selected: queue.activePlaylistId == queue.library.id,
-                isPlayingHere: queue.currentItem != null,
+                isPlayingHere:
+                    queue.currentItem != null &&
+                    queue.playbackSourceId == queue.library.id,
                 onTap: () => onSelectPlaylist(queue.library.id),
               ),
               const SizedBox(height: 4),
               _PlaylistTile(
                 palette: palette,
                 playlist: playbackQueuePlaylist,
+                leadingIcon: Icons.queue_music_rounded,
                 selected: queue.activePlaylistId == heniPlaybackQueueId,
-                isPlayingHere: queue.currentItem != null,
                 onTap: () => onSelectPlaylist(heniPlaybackQueueId),
               ),
-              SizedBox(height: layout.quiet ? 16 : 22),
+              SizedBox(height: layout.quiet ? 12 : 16),
               _SidebarSectionHeader(
                 title: '我的歌单',
                 action: IconButton(
@@ -2108,15 +2109,11 @@ class _Sidebar extends StatelessWidget {
                   visualDensity: VisualDensity.compact,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Expanded(
-                flex: 2,
                 child:
                     queue.playlists.isEmpty
-                        ? _SidebarEmptyState(
-                          palette: palette,
-                          message: '从曲库或其他歌单挑歌，慢慢搭起自己的收藏。',
-                        )
+                        ? _SidebarEmptyState(onCreatePlaylist: onCreatePlaylist)
                         : ListView(
                           key: const PageStorageKey(
                             'expanded-sidebar-playlists',
@@ -2126,13 +2123,11 @@ class _Sidebar extends StatelessWidget {
                               _PlaylistTile(
                                 palette: palette,
                                 playlist: playlist,
+                                leadingIcon: Icons.playlist_play_rounded,
                                 selected: playlist.id == queue.activePlaylistId,
                                 isPlayingHere:
                                     queue.currentItem != null &&
-                                    playlist.items.any(
-                                      (it) =>
-                                          it.path == queue.currentItem!.path,
-                                    ),
+                                    queue.playbackSourceId == playlist.id,
                                 onTap: () => onSelectPlaylist(playlist.id),
                                 onAddSongs: () => onAddSongs(playlist.id),
                                 onRename: () => onRenamePlaylist(playlist),
@@ -2143,56 +2138,6 @@ class _Sidebar extends StatelessWidget {
                           ],
                         ),
               ),
-              SizedBox(height: layout.quiet ? 12 : 16),
-              const Spacer(),
-              if (layout.showSidebarStatus &&
-                  (queue.statusMessage != null || queue.lastError != null))
-                Container(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.024),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.04),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '当前状态',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: _tertiaryGlassText(),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      if (queue.statusMessage != null) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          queue.statusMessage!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: _secondaryGlassText(emphasis: 0.96),
-                            height: 1.38,
-                          ),
-                        ),
-                      ],
-                      if (queue.lastError != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          queue.lastError!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.error,
-                            height: 1.38,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
             ],
           ),
         ),
@@ -2442,6 +2387,7 @@ class _PlaylistTile extends ConsumerStatefulWidget {
   const _PlaylistTile({
     required this.palette,
     required this.playlist,
+    required this.leadingIcon,
     required this.selected,
     required this.onTap,
     this.isPlayingHere = false,
@@ -2453,6 +2399,7 @@ class _PlaylistTile extends ConsumerStatefulWidget {
 
   final HeniPalette palette;
   final HeniPlaylist playlist;
+  final IconData leadingIcon;
   final bool selected;
   final bool isPlayingHere;
   final VoidCallback onTap;
@@ -2472,232 +2419,231 @@ class _PlaylistTileState extends ConsumerState<_PlaylistTile> {
   Widget build(BuildContext context) {
     final tint = widget.palette.seed;
     final active = widget.selected || _hovered;
+    final showActions = _hovered || widget.selected;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedScale(
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOutCubic,
-        scale: widget.selected ? 1.0 : (_hovered ? 1.004 : 1.0),
-        child: AnimatedSlide(
-          duration: _hoverDuration,
-          curve: _hoverCurve,
-          offset:
-              _hovered && !widget.selected
-                  ? const Offset(0.006, 0)
-                  : Offset.zero,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 5),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOutCubic,
-              height: 40,
-              decoration: BoxDecoration(
-                gradient:
-                    widget.selected
-                        ? heniBrandWash(widget.palette, opacity: 0.18)
-                        : null,
-                color:
-                    widget.selected
-                        ? null
-                        : tint.withValues(alpha: _hovered ? 0.038 : 0.0),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color:
-                      widget.selected
-                          ? tint.withValues(alpha: 0.16)
-                          : Colors.white.withValues(
-                            alpha: _hovered ? 0.06 : 0.0,
-                          ),
-                ),
-                boxShadow: [
-                  if (_hovered || widget.selected)
-                    BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: widget.selected ? 0.12 : 0.06,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          height: 40,
+          decoration: BoxDecoration(
+            gradient:
+                widget.selected
+                    ? heniBrandWash(widget.palette, opacity: 0.16)
+                    : null,
+            color:
+                widget.selected
+                    ? null
+                    : Colors.white.withValues(alpha: _hovered ? 0.035 : 0),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color:
+                  widget.selected
+                      ? tint.withValues(alpha: 0.16)
+                      : Colors.white.withValues(alpha: _hovered ? 0.055 : 0),
+            ),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              hoverColor: tint.withValues(alpha: 0.035),
+              splashColor: tint.withValues(alpha: 0.09),
+              onTap: widget.onTap,
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: 0,
+                    top: 10,
+                    bottom: 10,
+                    child: AnimatedContainer(
+                      duration: _hoverDuration,
+                      width: widget.selected ? 2.5 : 0,
+                      decoration: BoxDecoration(
+                        color: tint,
+                        borderRadius: BorderRadius.circular(999),
                       ),
-                      blurRadius: widget.selected ? 14 : 10,
-                      offset: const Offset(0, 4),
                     ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  hoverColor: tint.withValues(alpha: 0.04),
-                  splashColor: tint.withValues(alpha: 0.10),
-                  highlightColor: tint.withValues(alpha: 0.06),
-                  onTap: widget.onTap,
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        left: 0,
-                        top: 8,
-                        bottom: 8,
-                        child: AnimatedContainer(
-                          duration: _hoverDuration,
-                          curve: _hoverCurve,
-                          width: widget.selected ? 2.5 : (_hovered ? 1.5 : 0),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(999),
-                            color:
-                                widget.selected
-                                    ? tint
-                                    : Colors.white.withValues(alpha: 0.18),
-                            boxShadow: [
-                              if (widget.selected)
-                                BoxShadow(
-                                  color: tint.withValues(alpha: 0.34),
-                                  blurRadius: 6,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(10, 0, 4, 0),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              AnimatedContainer(
-                                duration: _hoverDuration,
-                                width: 25,
-                                height: 25,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  gradient:
-                                      widget.selected
-                                          ? heniBrandGradient(
-                                            widget.palette,
-                                            opacity: 0.34,
-                                          )
-                                          : null,
-                                  color:
-                                      widget.selected
-                                          ? null
-                                          : tint.withValues(
-                                            alpha: active ? 0.18 : 0.07,
-                                          ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  widget.onDelete == null
-                                      ? Icons.library_music_outlined
-                                      : Icons.queue_music_rounded,
-                                  size: 12.5,
-                                  color: _primaryGlassText(
-                                    emphasis: active ? 1.0 : 0.9,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  widget.playlist.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12.4,
-                                    height: 1.15,
-                                    fontWeight:
-                                        widget.selected
-                                            ? FontWeight.w700
-                                            : FontWeight.w600,
-                                    color: _primaryGlassText(
-                                      emphasis: widget.selected ? 0.98 : 0.88,
-                                    ),
-                                    letterSpacing: 0.08,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              if (widget.isPlayingHere)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 6),
-                                  child: StreamBuilder<bool>(
-                                    stream:
-                                        ref
-                                            .read(playbackEngineProvider)
-                                            .playing,
-                                    initialData:
-                                        ref
-                                            .read(playbackEngineProvider)
-                                            .currentPlaying,
-                                    builder: (context, snap) {
-                                      return _NowPlayingWave(
-                                        color: widget.palette.seed,
-                                        active: snap.data ?? false,
-                                      );
-                                    },
-                                  ),
-                                ),
-                              _CountBadge(count: widget.playlist.items.length),
-                              if (widget.onDelete != null)
-                                AnimatedOpacity(
-                                  duration: _hoverDuration,
-                                  opacity: _hovered ? 1 : 0,
-                                  child: SizedBox(
-                                    width: _hovered ? 24 : 0,
-                                    height: 24,
-                                    child: PopupMenuButton<_PlaylistAction>(
-                                      tooltip: '歌单选项',
-                                      padding: EdgeInsets.zero,
-                                      icon: const Icon(
-                                        Icons.more_horiz,
-                                        size: 16,
-                                      ),
-                                      iconSize: 16,
-                                      onSelected: (action) {
-                                        switch (action) {
-                                          case _PlaylistAction.addSongs:
-                                            widget.onAddSongs?.call();
-                                          case _PlaylistAction.rename:
-                                            widget.onRename?.call();
-                                          case _PlaylistAction.description:
-                                            widget.onEditDescription?.call();
-                                          case _PlaylistAction.delete:
-                                            widget.onDelete?.call();
-                                        }
-                                      },
-                                      itemBuilder:
-                                          (context) => const [
-                                            PopupMenuItem<_PlaylistAction>(
-                                              value: _PlaylistAction.addSongs,
-                                              child: Text('添加歌曲'),
-                                            ),
-                                            PopupMenuItem<_PlaylistAction>(
-                                              value: _PlaylistAction.rename,
-                                              child: Text('重命名'),
-                                            ),
-                                            PopupMenuItem<_PlaylistAction>(
-                                              value:
-                                                  _PlaylistAction.description,
-                                              child: Text('编辑说明'),
-                                            ),
-                                            PopupMenuDivider(),
-                                            PopupMenuItem<_PlaylistAction>(
-                                              value: _PlaylistAction.delete,
-                                              child: Text('删除'),
-                                            ),
-                                          ],
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
-                ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 0, 3, 0),
+                    child: Row(
+                      children: [
+                        AnimatedContainer(
+                          duration: _hoverDuration,
+                          width: 25,
+                          height: 25,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: tint.withValues(
+                              alpha:
+                                  widget.selected
+                                      ? 0.20
+                                      : active
+                                      ? 0.12
+                                      : 0.065,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            widget.leadingIcon,
+                            size: 13,
+                            color: _primaryGlassText(
+                              emphasis: active ? 1.0 : 0.86,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            widget.playlist.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.4,
+                              height: 1.15,
+                              fontWeight:
+                                  widget.selected
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                              color: _primaryGlassText(
+                                emphasis: widget.selected ? 0.98 : 0.86,
+                              ),
+                              letterSpacing: 0.06,
+                            ),
+                          ),
+                        ),
+                        if (widget.isPlayingHere)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: StreamBuilder<bool>(
+                              stream: ref.read(playbackEngineProvider).playing,
+                              initialData:
+                                  ref
+                                      .read(playbackEngineProvider)
+                                      .currentPlaying,
+                              builder: (context, snap) {
+                                return Tooltip(
+                                  message: '当前播放来源',
+                                  child: _NowPlayingWave(
+                                    color: widget.palette.seed,
+                                    active: snap.data ?? false,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        const SizedBox(width: 6),
+                        _CountBadge(count: widget.playlist.items.length),
+                        if (widget.onDelete != null) ...[
+                          const SizedBox(width: 2),
+                          IgnorePointer(
+                            ignoring: !showActions,
+                            child: AnimatedOpacity(
+                              duration: const Duration(milliseconds: 140),
+                              opacity: showActions ? 1 : 0,
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: PopupMenuButton<_PlaylistAction>(
+                                  tooltip: '歌单选项',
+                                  padding: EdgeInsets.zero,
+                                  icon: const Icon(
+                                    Icons.more_horiz_rounded,
+                                    size: 16,
+                                  ),
+                                  iconSize: 16,
+                                  onSelected: (action) {
+                                    switch (action) {
+                                      case _PlaylistAction.addSongs:
+                                        widget.onAddSongs?.call();
+                                      case _PlaylistAction.rename:
+                                        widget.onRename?.call();
+                                      case _PlaylistAction.description:
+                                        widget.onEditDescription?.call();
+                                      case _PlaylistAction.delete:
+                                        widget.onDelete?.call();
+                                    }
+                                  },
+                                  itemBuilder:
+                                      (context) => const [
+                                        PopupMenuItem<_PlaylistAction>(
+                                          value: _PlaylistAction.addSongs,
+                                          height: 42,
+                                          child: _SidebarMenuItem(
+                                            icon: Icons.playlist_add_rounded,
+                                            label: '添加歌曲',
+                                          ),
+                                        ),
+                                        PopupMenuItem<_PlaylistAction>(
+                                          value: _PlaylistAction.rename,
+                                          height: 42,
+                                          child: _SidebarMenuItem(
+                                            icon: Icons.edit_outlined,
+                                            label: '重命名',
+                                          ),
+                                        ),
+                                        PopupMenuItem<_PlaylistAction>(
+                                          value: _PlaylistAction.description,
+                                          height: 42,
+                                          child: _SidebarMenuItem(
+                                            icon: Icons.notes_rounded,
+                                            label: '编辑说明',
+                                          ),
+                                        ),
+                                        PopupMenuDivider(),
+                                        PopupMenuItem<_PlaylistAction>(
+                                          value: _PlaylistAction.delete,
+                                          height: 42,
+                                          child: _SidebarMenuItem(
+                                            icon: Icons.delete_outline_rounded,
+                                            label: '删除歌单',
+                                            danger: true,
+                                          ),
+                                        ),
+                                      ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SidebarMenuItem extends StatelessWidget {
+  const _SidebarMenuItem({
+    required this.icon,
+    required this.label,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = danger ? const Color(0xFFFF7A7A) : null;
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 11),
+        Text(label, style: TextStyle(color: color)),
+      ],
     );
   }
 }
@@ -2809,20 +2755,15 @@ class _CountBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 22),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(999),
-      ),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 20),
       child: Text(
         '$count',
         textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: 10,
-          color: _secondaryGlassText(emphasis: 0.88),
-          fontWeight: FontWeight.w800,
+          color: _secondaryGlassText(emphasis: 0.68),
+          fontWeight: FontWeight.w700,
           letterSpacing: 0.2,
           fontFeatures: const [ui.FontFeature.tabularFigures()],
         ),
@@ -2832,61 +2773,79 @@ class _CountBadge extends StatelessWidget {
 }
 
 class _SidebarEmptyState extends StatelessWidget {
-  const _SidebarEmptyState({required this.palette, required this.message});
+  const _SidebarEmptyState({required this.onCreatePlaylist});
 
-  final HeniPalette palette;
-  final String message;
+  final VoidCallback onCreatePlaylist;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color.alphaBlend(
-              palette.seed.withValues(alpha: 0.10),
-              palette.surfaceAlt,
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onCreatePlaylist,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.022),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Icon(
+                      Icons.add_rounded,
+                      size: 17,
+                      color: _secondaryGlassText(emphasis: 0.9),
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '创建第一个歌单',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: _primaryGlassText(emphasis: 0.9),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '把喜欢的歌曲收在一起',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 10.5,
+                            color: _secondaryGlassText(emphasis: 0.58),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            Color.alphaBlend(
-              palette.seed.withValues(alpha: 0.04),
-              palette.surface,
-            ),
-          ],
+          ),
         ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.10),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '还没有歌单',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: _primaryGlassText(),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            message,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: _secondaryGlassText(emphasis: 0.8),
-            ),
-          ),
-        ],
       ),
     );
   }
