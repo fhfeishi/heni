@@ -23,6 +23,7 @@ class HeniLibraryConfig {
     this.playlists = const [],
     this.activePlaylistId,
     this.sceneryImagePaths = const [],
+    this.sceneryImageOpacity = 1,
     this.activePaletteName,
     this.activeUiStyle,
     this.sidebarModeName,
@@ -46,6 +47,8 @@ class HeniLibraryConfig {
       ).map(HeniPlaylistConfig.fromJson).toList(growable: false),
       activePlaylistId: _string(json['activePlaylistId']),
       sceneryImagePaths: _stringList(json['sceneryImagePaths']),
+      sceneryImageOpacity:
+          (_double(json['sceneryImageOpacity']) ?? 1).clamp(0, 1).toDouble(),
       activePaletteName: _string(json['activePaletteName']),
       activeUiStyle: _string(json['activeUiStyle']),
       sidebarModeName: _string(json['sidebarMode']),
@@ -66,6 +69,7 @@ class HeniLibraryConfig {
   final List<HeniPlaylistConfig> playlists;
   final String? activePlaylistId;
   final List<String> sceneryImagePaths;
+  final double sceneryImageOpacity;
   final String? activePaletteName;
   final String? activeUiStyle;
   final String? sidebarModeName;
@@ -123,6 +127,7 @@ class HeniLibraryConfig {
         playlists.isEmpty &&
         activePlaylistId == null &&
         sceneryImagePaths.isEmpty &&
+        sceneryImageOpacity == 1 &&
         activePaletteName == null &&
         activeUiStyle == null &&
         sidebarModeName == null &&
@@ -142,6 +147,7 @@ class HeniLibraryConfig {
       'playlists': playlists.map((playlist) => playlist.toJson()).toList(),
       'activePlaylistId': activePlaylistId,
       'sceneryImagePaths': sceneryImagePaths,
+      'sceneryImageOpacity': sceneryImageOpacity,
       'activePaletteName': activePaletteName,
       'activeUiStyle': activeUiStyle,
       'sidebarMode': sidebarModeName,

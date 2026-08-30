@@ -43,6 +43,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
   String? _persistedUiStyleName;
   String? _persistedSidebarModeName;
   List<String> _persistedSceneryImagePaths = const [];
+  double _persistedSceneryImageOpacity = 1;
   double? _persistedVolumeLevel;
   double _persistedLastAudibleVolume = 60;
 
@@ -657,6 +658,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     HeniUiStyle? uiStyle,
     HeniSidebarMode? sidebarMode,
     List<String>? sceneryImagePaths,
+    double? sceneryImageOpacity,
   }) async {
     if (palette != null) {
       _persistedPaletteName = palette.name;
@@ -670,11 +672,16 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     if (sceneryImagePaths != null) {
       _persistedSceneryImagePaths = List.unmodifiable(sceneryImagePaths);
     }
+    if (sceneryImageOpacity != null) {
+      _persistedSceneryImageOpacity =
+          sceneryImageOpacity.clamp(0, 1).toDouble();
+    }
     await _persistState(
       paletteName: _persistedPaletteName,
       uiStyleName: _persistedUiStyleName,
       sidebarModeName: _persistedSidebarModeName,
       sceneryImagePaths: _persistedSceneryImagePaths,
+      sceneryImageOpacity: _persistedSceneryImageOpacity,
     );
   }
 
@@ -722,6 +729,10 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
       _persistedVolumeLevel = restoredVolume;
       _persistedLastAudibleVolume = restoredLastAudible;
       _persistedSceneryImagePaths = List.unmodifiable(config.sceneryImagePaths);
+      _persistedSceneryImageOpacity = config.sceneryImageOpacity;
+      ref
+          .read(sceneryImageOpacityProvider.notifier)
+          .setOpacity(config.sceneryImageOpacity);
       if (config.sceneryImagePaths.isNotEmpty) {
         ref
             .read(sceneryImagePathsProvider.notifier)
@@ -1118,6 +1129,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     String? uiStyleName,
     String? sidebarModeName,
     List<String>? sceneryImagePaths,
+    double? sceneryImageOpacity,
     double? volumeLevel,
     double? lastAudibleVolume,
   }) async {
@@ -1145,6 +1157,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
       activeUiStyle: uiStyleName ?? _persistedUiStyleName,
       sidebarModeName: sidebarModeName ?? _persistedSidebarModeName,
       sceneryImagePaths: sceneryImagePaths ?? _persistedSceneryImagePaths,
+      sceneryImageOpacity: sceneryImageOpacity ?? _persistedSceneryImageOpacity,
       volumeLevel: volumeLevel ?? _persistedVolumeLevel,
       lastAudibleVolume: lastAudibleVolume ?? _persistedLastAudibleVolume,
     );

@@ -32,6 +32,12 @@ void main() {
     );
   });
 
+  test('scenery image opacity is normalized to a safe range', () {
+    expect(heniBackdropImageOpacity(0.42), 0.42);
+    expect(heniBackdropImageOpacity(-1), 0);
+    expect(heniBackdropImageOpacity(4), 1);
+  });
+
   testWidgets('uses palette fallback when no scenery path exists', (
     tester,
   ) async {

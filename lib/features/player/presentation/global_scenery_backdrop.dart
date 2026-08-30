@@ -48,12 +48,16 @@ class HeniBackdropTreatment {
 Duration heniBackdropTransitionDuration({required bool disableAnimations}) =>
     disableAnimations ? Duration.zero : const Duration(milliseconds: 820);
 
+double heniBackdropImageOpacity(double opacity) =>
+    opacity.clamp(0, 1).toDouble();
+
 class GlobalSceneryBackdrop extends StatefulWidget {
   const GlobalSceneryBackdrop({
     required this.imagePaths,
     required this.palette,
     required this.shellTheme,
     required this.mode,
+    this.imageOpacity = 1,
     super.key,
   });
 
@@ -61,6 +65,7 @@ class GlobalSceneryBackdrop extends StatefulWidget {
   final HeniPalette palette;
   final HeniShellTheme shellTheme;
   final HeniBackdropMode mode;
+  final double imageOpacity;
 
   @override
   State<GlobalSceneryBackdrop> createState() => _GlobalSceneryBackdropState();
@@ -111,23 +116,31 @@ class _GlobalSceneryBackdropState extends State<GlobalSceneryBackdrop> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (paths.isEmpty)
-              _PaletteBackdrop(
-                key: const ValueKey('global-scenery-fallback'),
-                palette: widget.palette,
-              )
-            else
-              AnimatedSwitcher(
-                duration: heniBackdropTransitionDuration(
-                  disableAnimations: disableAnimations,
-                ),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInOutCubic,
-                child: _SceneryImage(
-                  key: ValueKey(paths[_index % paths.length]),
-                  path: paths[_index % paths.length],
-                  palette: widget.palette,
-                  treatment: treatment,
+            _PaletteBackdrop(
+              key: const ValueKey('global-scenery-fallback'),
+              palette: widget.palette,
+            ),
+            if (paths.isNotEmpty)
+              AnimatedOpacity(
+                key: const ValueKey('global-scenery-image-opacity'),
+                opacity: heniBackdropImageOpacity(widget.imageOpacity),
+                duration:
+                    disableAnimations
+                        ? Duration.zero
+                        : const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                child: AnimatedSwitcher(
+                  duration: heniBackdropTransitionDuration(
+                    disableAnimations: disableAnimations,
+                  ),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInOutCubic,
+                  child: _SceneryImage(
+                    key: ValueKey(paths[_index % paths.length]),
+                    path: paths[_index % paths.length],
+                    palette: widget.palette,
+                    treatment: treatment,
+                  ),
                 ),
               ),
             AnimatedContainer(

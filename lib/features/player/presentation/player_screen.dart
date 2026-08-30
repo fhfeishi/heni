@@ -1103,6 +1103,7 @@ class PlayerScreen extends ConsumerWidget {
     final shellTheme = HeniShellTheme.fromPalette(palette);
     final uiStyle = ref.watch(activeUiStyleProvider);
     final sceneryImages = ref.watch(sceneryImagePathsProvider);
+    final sceneryImageOpacity = ref.watch(sceneryImageOpacityProvider);
     final queue = ref.watch(playbackQueueControllerProvider);
     final currentMedia = queue.currentItem ?? ref.watch(currentMediaProvider);
     final mediaProbe = ref.watch(currentMediaProbeProvider);
@@ -1158,6 +1159,7 @@ class PlayerScreen extends ConsumerWidget {
                 imagePaths: sceneryImages,
                 palette: palette,
                 shellTheme: shellTheme,
+                imageOpacity: sceneryImageOpacity,
                 mode:
                     uiStyle == HeniUiStyle.scenery
                         ? HeniBackdropMode.playback
@@ -1195,10 +1197,11 @@ class PlayerScreen extends ConsumerWidget {
                                         : _TopNavigation(
                                           palette: palette,
                                           shellTheme: shellTheme,
-                                          queue: queue,
                                           layout: layout,
                                           uiStyle: uiStyle,
                                           onSelectUiStyle: selectUiStyle,
+                                          onPickScenery:
+                                              () => _pickScenery(ref),
                                         ),
                               ),
                               Expanded(
@@ -1347,7 +1350,6 @@ class PlayerScreen extends ConsumerWidget {
                                         engine: engine,
                                         videoController: videoController,
                                         layout: layout,
-                                        onPickScenery: () => _pickScenery(ref),
                                         onPickMedia: () => _pickMedia(ref),
                                         onPickFolder: () => _pickFolder(ref),
                                         onShowPlaybackQueue:
@@ -1796,18 +1798,18 @@ class _TopNavigation extends ConsumerWidget {
   const _TopNavigation({
     required this.palette,
     required this.shellTheme,
-    required this.queue,
     required this.layout,
     required this.uiStyle,
     required this.onSelectUiStyle,
+    required this.onPickScenery,
   });
 
   final HeniPalette palette;
   final HeniShellTheme shellTheme;
-  final PlaybackQueueState queue;
   final _ShellLayout layout;
   final HeniUiStyle uiStyle;
   final ValueChanged<HeniUiStyle> onSelectUiStyle;
+  final VoidCallback onPickScenery;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1846,9 +1848,7 @@ class _TopNavigation extends ConsumerWidget {
               ),
             ),
           ),
-          _CompactPaletteButton(active: palette),
-          SizedBox(width: layout.quiet ? 6 : 8),
-          _SettingsMenu(queue: queue),
+          _SettingsMenu(onPickScenery: onPickScenery),
           SizedBox(width: layout.quiet ? 6 : 8),
           Container(
             width: 1,
@@ -2982,7 +2982,6 @@ class _ContentArea extends ConsumerWidget {
     required this.engine,
     required this.videoController,
     required this.layout,
-    required this.onPickScenery,
     required this.onPickMedia,
     required this.onPickFolder,
     required this.onShowPlaybackQueue,
@@ -3007,7 +3006,6 @@ class _ContentArea extends ConsumerWidget {
   final PlaybackEngine engine;
   final VideoController videoController;
   final _ShellLayout layout;
-  final VoidCallback onPickScenery;
   final VoidCallback onPickMedia;
   final VoidCallback onPickFolder;
   final VoidCallback onShowPlaybackQueue;
@@ -3058,7 +3056,6 @@ class _ContentArea extends ConsumerWidget {
                 uiStyle: uiStyle,
                 queue: queue,
                 layout: layout,
-                onPickScenery: onPickScenery,
                 onPickMedia: onPickMedia,
                 onPickFolder: onPickFolder,
                 onRefreshLibrary: onRefreshLibrary,
@@ -3119,7 +3116,6 @@ class _ContentHeader extends StatelessWidget {
     required this.uiStyle,
     required this.queue,
     required this.layout,
-    required this.onPickScenery,
     required this.onPickMedia,
     required this.onPickFolder,
     required this.onRefreshLibrary,
@@ -3131,7 +3127,6 @@ class _ContentHeader extends StatelessWidget {
   final HeniUiStyle uiStyle;
   final PlaybackQueueState queue;
   final _ShellLayout layout;
-  final VoidCallback onPickScenery;
   final VoidCallback onPickMedia;
   final VoidCallback onPickFolder;
   final VoidCallback onRefreshLibrary;
@@ -3154,11 +3149,7 @@ class _ContentHeader extends StatelessWidget {
     };
 
     if (uiStyle == HeniUiStyle.scenery) {
-      return _StageHeaderDock(
-        palette: palette,
-        headingLabel: headingLabel,
-        onPickScenery: onPickScenery,
-      );
+      return _StageHeaderDock(palette: palette, headingLabel: headingLabel);
     }
 
     final actionButtons =
@@ -3333,15 +3324,10 @@ class _ContentHeader extends StatelessWidget {
 }
 
 class _StageHeaderDock extends StatelessWidget {
-  const _StageHeaderDock({
-    required this.palette,
-    required this.headingLabel,
-    required this.onPickScenery,
-  });
+  const _StageHeaderDock({required this.palette, required this.headingLabel});
 
   final HeniPalette palette;
   final String headingLabel;
-  final VoidCallback onPickScenery;
 
   @override
   Widget build(BuildContext context) {
@@ -3410,31 +3396,6 @@ class _StageHeaderDock extends StatelessWidget {
                     color: heniAccentOnGlass(palette.seed),
                   ),
                 ),
-              const Spacer(),
-              Tooltip(
-                message: '更换背景',
-                child: AnimatedContainer(
-                  duration: _hoverDuration,
-                  curve: _hoverCurve,
-                  decoration: BoxDecoration(
-                    color: palette.accent.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: palette.accent.withValues(alpha: 0.22),
-                    ),
-                  ),
-                  child: IconButton(
-                    onPressed: onPickScenery,
-                    style: IconButton.styleFrom(
-                      fixedSize: Size.square(tight ? 34 : 36),
-                      padding: EdgeInsets.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      foregroundColor: heniAccentOnGlass(palette.accent),
-                    ),
-                    icon: const Icon(Icons.image_outlined, size: 18),
-                  ),
-                ),
-              ),
             ],
           ),
         );
@@ -7175,21 +7136,21 @@ class _CurrentQueueButton extends StatelessWidget {
 }
 
 class _SettingsMenu extends ConsumerWidget {
-  const _SettingsMenu({required this.queue});
+  const _SettingsMenu({required this.onPickScenery});
 
-  final PlaybackQueueState queue;
+  final VoidCallback onPickScenery;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return IconButton(
-      tooltip: '基础设置',
+      tooltip: '设置',
       onPressed: () {
         showDialog<void>(
           context: context,
-          builder: (context) => _SettingsDialog(queue: queue),
+          builder: (context) => _SettingsDialog(onPickScenery: onPickScenery),
         );
       },
-      icon: const Icon(Icons.tune_outlined),
+      icon: const Icon(Icons.settings_outlined),
     );
   }
 }
@@ -7896,74 +7857,307 @@ class _PlaybackQueueRowState extends ConsumerState<_PlaybackQueueRow> {
 }
 
 class _SettingsDialog extends ConsumerWidget {
-  const _SettingsDialog({required this.queue});
+  const _SettingsDialog({required this.onPickScenery});
 
-  final PlaybackQueueState queue;
+  final VoidCallback onPickScenery;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final queue = ref.watch(playbackQueueControllerProvider);
+    final palette = ref.watch(activePaletteProvider);
+    final sceneryImages = ref.watch(sceneryImagePathsProvider);
+    final sceneryImageOpacity = ref.watch(sceneryImageOpacityProvider);
     final controller = ref.read(playbackQueueControllerProvider.notifier);
     final theme = Theme.of(context);
+    final opacityPercent = (sceneryImageOpacity * 100).round();
+
+    void selectPalette(HeniPalette next) {
+      ref.read(activePaletteProvider.notifier).select(next);
+      unawaited(controller.persistShellPreferences(palette: next));
+    }
+
+    void clearScenery() {
+      ref.read(sceneryImagePathsProvider.notifier).replaceAll(const []);
+      unawaited(
+        controller.persistShellPreferences(sceneryImagePaths: const []),
+      );
+    }
 
     return _HeniDialog(
-      title: const Text('基础设置'),
+      title: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.settings_outlined, size: 19),
+          SizedBox(width: 9),
+          Text('设置'),
+        ],
+      ),
       content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _SettingsTile(
-              title: '递归扫描文件夹',
-              subtitle: '导入目录时自动向下读取子目录中的媒体文件。',
-              value: queue.recursiveScan,
-              onChanged: (value) => controller.setRecursiveScan(value),
-            ),
-            const SizedBox(height: 10),
-            _SettingsTile(
-              title: '包含视频文件',
-              subtitle: '在曲库与歌单里一起管理本地视频内容。',
-              value: queue.includeVideo,
-              onChanged: (value) => controller.setIncludeVideo(value),
-            ),
-            const SizedBox(height: 10),
-            _SettingsTile(
-              title: '加载后自动播放',
-              subtitle: '导入完成后，自动开始播放当前队列中的内容。',
-              value: queue.autoplayOnLoad,
-              onChanged: (value) => controller.setAutoplayOnLoad(value),
-            ),
-            const SizedBox(height: 14),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed:
-                    queue.isScanning
-                        ? null
-                        : () {
-                          Navigator.of(context).pop();
-                          unawaited(controller.refreshLibrary());
-                        },
-                icon: const Icon(Icons.refresh, size: 16),
-                label: Text(queue.isScanning ? '刷新中' : '立即刷新曲库'),
+        width: 520,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _SettingsSectionTitle(
+                icon: Icons.palette_outlined,
+                title: '外观与背景',
+                subtitle: '颜色与背景在所有播放页面同步生效',
               ),
-            ),
-            const SizedBox(height: 14),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '当前曲库目录 ${queue.libraryDirectories.length} 个，曲库内容 ${queue.library.items.length} 首。',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.48),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.035),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.065),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          '主题颜色',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          palette.name,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.52),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final option in HeniPalette.all)
+                          Tooltip(
+                            message: option.name,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(999),
+                              onTap: () => selectPalette(option),
+                              child: _PaletteSwatch(
+                                palette: option,
+                                selected: identical(palette, option),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Divider(color: Colors.white.withValues(alpha: 0.07)),
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: palette.seed.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.image_outlined,
+                            size: 19,
+                            color: heniAccentOnGlass(palette.seed),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '背景图片',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                sceneryImages.isEmpty
+                                    ? '当前使用主题渐变背景'
+                                    : '已选择 ${sceneryImages.length} 张，每 11 秒自动轮播',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        OutlinedButton.icon(
+                          onPressed: onPickScenery,
+                          icon: const Icon(Icons.folder_open_rounded, size: 16),
+                          label: Text(sceneryImages.isEmpty ? '选择图片' : '更换'),
+                        ),
+                        if (sceneryImages.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          IconButton(
+                            tooltip: '移除背景图片',
+                            onPressed: clearScenery,
+                            icon: const Icon(Icons.delete_outline_rounded),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Text(
+                          '图片不透明度',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '$opacityPercent%',
+                          key: const ValueKey('scenery-opacity-value'),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: heniAccentOnGlass(palette.accent),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      key: const ValueKey('scenery-opacity-slider'),
+                      value: sceneryImageOpacity,
+                      divisions: 20,
+                      label: '$opacityPercent%',
+                      onChanged: (value) {
+                        ref
+                            .read(sceneryImageOpacityProvider.notifier)
+                            .setOpacity(value);
+                      },
+                      onChangeEnd: (value) {
+                        unawaited(
+                          controller.persistShellPreferences(
+                            sceneryImageOpacity: value,
+                          ),
+                        );
+                      },
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('透明', style: theme.textTheme.labelSmall),
+                        Text('清晰', style: theme.textTheme.labelSmall),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              const _SettingsSectionTitle(
+                icon: Icons.library_music_outlined,
+                title: '曲库与导入',
+                subtitle: '控制本地媒体的扫描与加载方式',
+              ),
+              const SizedBox(height: 10),
+              _SettingsTile(
+                title: '递归扫描文件夹',
+                subtitle: '导入目录时自动读取子目录。',
+                value: queue.recursiveScan,
+                onChanged: controller.setRecursiveScan,
+              ),
+              const SizedBox(height: 8),
+              _SettingsTile(
+                title: '包含视频文件',
+                subtitle: '在曲库与歌单中一起管理本地视频。',
+                value: queue.includeVideo,
+                onChanged: controller.setIncludeVideo,
+              ),
+              const SizedBox(height: 8),
+              _SettingsTile(
+                title: '加载后自动播放',
+                subtitle: '导入完成后自动播放当前队列。',
+                value: queue.autoplayOnLoad,
+                onChanged: controller.setAutoplayOnLoad,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed:
+                        queue.isScanning
+                            ? null
+                            : () => unawaited(controller.refreshLibrary()),
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: Text(queue.isScanning ? '刷新中' : '立即刷新曲库'),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${queue.libraryDirectories.length} 个目录 · ${queue.library.items.length} 首内容',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.48),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
         FilledButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('完成'),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsSectionTitle extends StatelessWidget {
+  const _SettingsSectionTitle({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Colors.white.withValues(alpha: 0.68)),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.46),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -8485,132 +8679,6 @@ class _TransportButton extends StatelessWidget {
           ),
           icon: Icon(icon, size: 22),
         ),
-      ),
-    );
-  }
-}
-
-class _CompactPaletteButton extends ConsumerStatefulWidget {
-  const _CompactPaletteButton({required this.active});
-
-  final HeniPalette active;
-
-  @override
-  ConsumerState<_CompactPaletteButton> createState() =>
-      _CompactPaletteButtonState();
-}
-
-class _CompactPaletteButtonState extends ConsumerState<_CompactPaletteButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = widget.active;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: MenuAnchor(
-        style: const MenuStyle(
-          backgroundColor: WidgetStatePropertyAll(Colors.transparent),
-          elevation: WidgetStatePropertyAll(0),
-          padding: WidgetStatePropertyAll(EdgeInsets.zero),
-          shadowColor: WidgetStatePropertyAll(Colors.transparent),
-          surfaceTintColor: WidgetStatePropertyAll(Colors.transparent),
-        ),
-        alignmentOffset: const Offset(-8, 8),
-        menuChildren: [
-          _GlassPanel(
-            radius: 22,
-            fillColor: _shellGlassFill(palette, emphasis: 1.1),
-            borderColor: _shellGlassBorder(palette, emphasis: 1.1),
-            padding: const EdgeInsets.all(14),
-            child: SizedBox(
-              width: 228,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '外观颜色',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.46),
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 9,
-                    runSpacing: 9,
-                    children: [
-                      for (final p in HeniPalette.all)
-                        Tooltip(
-                          message: p.name,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(999),
-                            onTap: () {
-                              ref
-                                  .read(activePaletteProvider.notifier)
-                                  .select(p);
-                              unawaited(
-                                ref
-                                    .read(
-                                      playbackQueueControllerProvider.notifier,
-                                    )
-                                    .persistShellPreferences(palette: p),
-                              );
-                            },
-                            child: _PaletteSwatch(
-                              palette: p,
-                              selected: identical(widget.active, p),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-        builder: (context, controller, _) {
-          return Tooltip(
-            message: '外观：${palette.name}',
-            child: GestureDetector(
-              onTap: () {
-                if (controller.isOpen) {
-                  controller.close();
-                } else {
-                  controller.open();
-                }
-              },
-              child: AnimatedContainer(
-                duration: _hoverDuration,
-                curve: _hoverCurve,
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: palette.seed,
-                  border: Border.all(
-                    color: Colors.white.withValues(
-                      alpha: _hovered || controller.isOpen ? 0.42 : 0.22,
-                    ),
-                    width: _hovered || controller.isOpen ? 2.5 : 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: palette.seed.withValues(
-                        alpha: _hovered || controller.isOpen ? 0.52 : 0.32,
-                      ),
-                      blurRadius: _hovered || controller.isOpen ? 14 : 8,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
       ),
     );
   }

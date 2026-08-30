@@ -11,6 +11,9 @@ final currentMediaProvider = NotifierProvider<CurrentMedia, MediaItem?>(
 final sceneryImagePathsProvider =
     NotifierProvider<SceneryImagePaths, List<String>>(SceneryImagePaths.new);
 
+final sceneryImageOpacityProvider =
+    NotifierProvider<SceneryImageOpacity, double>(SceneryImageOpacity.new);
+
 final currentMediaProbeProvider =
     NotifierProvider<CurrentMediaProbe, AsyncValue<MediaProbe?>>(
       CurrentMediaProbe.new,
@@ -31,6 +34,15 @@ class SceneryImagePaths extends Notifier<List<String>> {
 
   void replaceAll(List<String> paths) {
     state = List.unmodifiable(paths);
+  }
+}
+
+class SceneryImageOpacity extends Notifier<double> {
+  @override
+  double build() => 1;
+
+  void setOpacity(double opacity) {
+    state = opacity.clamp(0, 1).toDouble();
   }
 }
 

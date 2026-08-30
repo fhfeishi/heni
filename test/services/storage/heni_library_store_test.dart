@@ -96,4 +96,40 @@ void main() {
       );
     });
   });
+
+  group('HeniLibraryConfig scenery opacity', () {
+    test('defaults to opaque and round trips a custom value', () {
+      final defaults = HeniLibraryConfig.fromJson(const {});
+      final custom = HeniLibraryConfig.fromJson(const {
+        'sceneryImageOpacity': 0.42,
+      });
+
+      expect(defaults.sceneryImageOpacity, 1);
+      expect(defaults.isEmpty, isTrue);
+      expect(custom.sceneryImageOpacity, 0.42);
+      expect(custom.toJson()['sceneryImageOpacity'], 0.42);
+      expect(custom.isEmpty, isFalse);
+    });
+
+    test('clamps malformed and out-of-range values', () {
+      expect(
+        HeniLibraryConfig.fromJson(const {
+          'sceneryImageOpacity': -1,
+        }).sceneryImageOpacity,
+        0,
+      );
+      expect(
+        HeniLibraryConfig.fromJson(const {
+          'sceneryImageOpacity': 4,
+        }).sceneryImageOpacity,
+        1,
+      );
+      expect(
+        HeniLibraryConfig.fromJson(const {
+          'sceneryImageOpacity': 'clear',
+        }).sceneryImageOpacity,
+        1,
+      );
+    });
+  });
 }
