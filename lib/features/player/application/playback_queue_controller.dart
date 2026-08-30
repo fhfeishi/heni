@@ -116,7 +116,7 @@ class PlaybackQueueController extends Notifier<PlaybackQueueState> {
     state = state.copyWith(
       playlists: [...state.playlists, playlist],
       activePlaylistId: playlist.id,
-      statusMessage: '已创建“$trimmed”，可从曲库加入歌曲',
+      statusMessage: '已创建“$trimmed”，可从曲库或其他歌单加入歌曲',
       lastError: null,
     );
     unawaited(_persistState());

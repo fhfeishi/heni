@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path/path.dart' as p;
@@ -25,6 +26,7 @@ import '../application/playback_queue_controller.dart';
 import '../application/player_state.dart';
 import '../application/sidebar_mode.dart';
 import 'adaptive_sidebar.dart';
+import 'desktop_multi_selection.dart';
 import 'global_scenery_backdrop.dart';
 import 'listening_console.dart';
 import 'playback_mode_controls.dart';
@@ -1299,10 +1301,8 @@ class PlayerScreen extends ConsumerWidget {
                                                             playlistId,
                                                           );
                                                     },
-                                                    onAddFromLibrary: (
-                                                      playlistId,
-                                                    ) {
-                                                      _addFromLibrary(
+                                                    onAddSongs: (playlistId) {
+                                                      _addSongs(
                                                         context,
                                                         ref,
                                                         playlistId,
@@ -1397,12 +1397,8 @@ class PlayerScreen extends ConsumerWidget {
                                                 item,
                                               );
                                         },
-                                        onAddFromLibrary: (playlistId) {
-                                          _addFromLibrary(
-                                            context,
-                                            ref,
-                                            playlistId,
-                                          );
+                                        onAddSongs: (playlistId) {
+                                          _addSongs(context, ref, playlistId);
                                         },
                                         onManagePlaylist: (playlist) {
                                           _managePlaylistItems(
@@ -1627,16 +1623,18 @@ class PlayerScreen extends ConsumerWidget {
     });
   }
 
-  Future<void> _addFromLibrary(
+  Future<void> _addSongs(
     BuildContext context,
     WidgetRef ref,
     String playlistId,
   ) async {
-    await _runModalAction(ref, 'add-from-library', () async {
+    await _runModalAction(ref, 'add-songs', () async {
       final queue = ref.read(playbackQueueControllerProvider);
       final items = await showDialog<List<MediaItem>>(
         context: context,
-        builder: (context) => _AddFromLibraryDialog(queue: queue),
+        builder:
+            (context) =>
+                _AddSongsDialog(queue: queue, targetPlaylistId: playlistId),
       );
       if (items == null || items.isEmpty) {
         return;
@@ -1991,7 +1989,7 @@ class _Sidebar extends StatelessWidget {
     required this.onModeChanged,
     required this.onCreatePlaylist,
     required this.onSelectPlaylist,
-    required this.onAddFromLibrary,
+    required this.onAddSongs,
     required this.onRenamePlaylist,
     required this.onEditDescription,
     required this.onDeletePlaylist,
@@ -2006,7 +2004,7 @@ class _Sidebar extends StatelessWidget {
   final HeniSidebarModeCallback onModeChanged;
   final VoidCallback onCreatePlaylist;
   final ValueChanged<String> onSelectPlaylist;
-  final ValueChanged<String> onAddFromLibrary;
+  final ValueChanged<String> onAddSongs;
   final ValueChanged<HeniPlaylist> onRenamePlaylist;
   final ValueChanged<HeniPlaylist> onEditDescription;
   final ValueChanged<HeniPlaylist> onDeletePlaylist;
@@ -2117,7 +2115,7 @@ class _Sidebar extends StatelessWidget {
                     queue.playlists.isEmpty
                         ? _SidebarEmptyState(
                           palette: palette,
-                          message: '从曲库挑歌加入歌单，慢慢搭起自己的收藏。',
+                          message: '从曲库或其他歌单挑歌，慢慢搭起自己的收藏。',
                         )
                         : ListView(
                           key: const PageStorageKey(
@@ -2136,8 +2134,7 @@ class _Sidebar extends StatelessWidget {
                                           it.path == queue.currentItem!.path,
                                     ),
                                 onTap: () => onSelectPlaylist(playlist.id),
-                                onAddFromLibrary:
-                                    () => onAddFromLibrary(playlist.id),
+                                onAddSongs: () => onAddSongs(playlist.id),
                                 onRename: () => onRenamePlaylist(playlist),
                                 onEditDescription:
                                     () => onEditDescription(playlist),
@@ -2448,7 +2445,7 @@ class _PlaylistTile extends ConsumerStatefulWidget {
     required this.selected,
     required this.onTap,
     this.isPlayingHere = false,
-    this.onAddFromLibrary,
+    this.onAddSongs,
     this.onRename,
     this.onEditDescription,
     this.onDelete,
@@ -2459,7 +2456,7 @@ class _PlaylistTile extends ConsumerStatefulWidget {
   final bool selected;
   final bool isPlayingHere;
   final VoidCallback onTap;
-  final VoidCallback? onAddFromLibrary;
+  final VoidCallback? onAddSongs;
   final VoidCallback? onRename;
   final VoidCallback? onEditDescription;
   final VoidCallback? onDelete;
@@ -2655,8 +2652,8 @@ class _PlaylistTileState extends ConsumerState<_PlaylistTile> {
                                       iconSize: 16,
                                       onSelected: (action) {
                                         switch (action) {
-                                          case _PlaylistAction.addFromLibrary:
-                                            widget.onAddFromLibrary?.call();
+                                          case _PlaylistAction.addSongs:
+                                            widget.onAddSongs?.call();
                                           case _PlaylistAction.rename:
                                             widget.onRename?.call();
                                           case _PlaylistAction.description:
@@ -2668,9 +2665,7 @@ class _PlaylistTileState extends ConsumerState<_PlaylistTile> {
                                       itemBuilder:
                                           (context) => const [
                                             PopupMenuItem<_PlaylistAction>(
-                                              value:
-                                                  _PlaylistAction
-                                                      .addFromLibrary,
+                                              value: _PlaylistAction.addSongs,
                                               child: Text('添加歌曲'),
                                             ),
                                             PopupMenuItem<_PlaylistAction>(
@@ -2969,7 +2964,7 @@ class _SongsEmptyState extends StatelessWidget {
   }
 }
 
-enum _PlaylistAction { addFromLibrary, rename, description, delete }
+enum _PlaylistAction { addSongs, rename, description, delete }
 
 class _ContentArea extends ConsumerWidget {
   const _ContentArea({
@@ -2989,7 +2984,7 @@ class _ContentArea extends ConsumerWidget {
     required this.onRefreshLibrary,
     required this.onPlayIndex,
     required this.onAddToPlaylist,
-    required this.onAddFromLibrary,
+    required this.onAddSongs,
     required this.onManagePlaylist,
     required this.onRemoveFromPlaylist,
     required this.onRemoveFromPlaybackQueue,
@@ -3013,7 +3008,7 @@ class _ContentArea extends ConsumerWidget {
   final VoidCallback onRefreshLibrary;
   final ValueChanged<int> onPlayIndex;
   final void Function(String playlistId, MediaItem item) onAddToPlaylist;
-  final ValueChanged<String> onAddFromLibrary;
+  final ValueChanged<String> onAddSongs;
   final ValueChanged<HeniPlaylist> onManagePlaylist;
   final void Function(String playlistId, MediaItem item) onRemoveFromPlaylist;
   final ValueChanged<int> onRemoveFromPlaybackQueue;
@@ -3059,7 +3054,7 @@ class _ContentArea extends ConsumerWidget {
                 onPickMedia: onPickMedia,
                 onPickFolder: onPickFolder,
                 onRefreshLibrary: onRefreshLibrary,
-                onAddFromLibrary: onAddFromLibrary,
+                onAddSongs: onAddSongs,
                 onManagePlaylist: onManagePlaylist,
               ),
             ),
@@ -3084,7 +3079,7 @@ class _ContentArea extends ConsumerWidget {
                   onPickFolder: onPickFolder,
                   onPickMedia: onPickMedia,
                   onRefreshLibrary: onRefreshLibrary,
-                  onAddFromLibrary: onAddFromLibrary,
+                  onAddSongs: onAddSongs,
                   onManagePlaylist: onManagePlaylist,
                 ),
                 _SceneryContent(
@@ -3119,7 +3114,7 @@ class _ContentHeader extends StatelessWidget {
     required this.onPickMedia,
     required this.onPickFolder,
     required this.onRefreshLibrary,
-    required this.onAddFromLibrary,
+    required this.onAddSongs,
     required this.onManagePlaylist,
   });
 
@@ -3130,7 +3125,7 @@ class _ContentHeader extends StatelessWidget {
   final VoidCallback onPickMedia;
   final VoidCallback onPickFolder;
   final VoidCallback onRefreshLibrary;
-  final ValueChanged<String> onAddFromLibrary;
+  final ValueChanged<String> onAddSongs;
   final ValueChanged<HeniPlaylist> onManagePlaylist;
 
   @override
@@ -3173,7 +3168,7 @@ class _ContentHeader extends StatelessWidget {
                 child: const Text('管理歌曲'),
               ),
               FilledButton(
-                onPressed: () => onAddFromLibrary(playlist.id),
+                onPressed: () => onAddSongs(playlist.id),
                 child: const Text('添加歌曲'),
               ),
             ];
@@ -4328,7 +4323,7 @@ class _LibraryContent extends ConsumerStatefulWidget {
     required this.onPickFolder,
     required this.onPickMedia,
     required this.onRefreshLibrary,
-    required this.onAddFromLibrary,
+    required this.onAddSongs,
     required this.onManagePlaylist,
   });
 
@@ -4345,7 +4340,7 @@ class _LibraryContent extends ConsumerStatefulWidget {
   final VoidCallback onPickFolder;
   final VoidCallback onPickMedia;
   final VoidCallback onRefreshLibrary;
-  final ValueChanged<String> onAddFromLibrary;
+  final ValueChanged<String> onAddSongs;
   final ValueChanged<HeniPlaylist> onManagePlaylist;
 
   @override
@@ -4466,17 +4461,6 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                 padding: EdgeInsets.zero,
                 style: IconButton.styleFrom(
                   foregroundColor: _secondaryGlassText(emphasis: 1.08),
-                ),
-              ),
-              IconButton.filled(
-                tooltip: '从曲库添加',
-                onPressed: () => widget.onAddFromLibrary(activePlaylist.id),
-                icon: const Icon(Icons.add_rounded, size: 20),
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(36, 36),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  padding: EdgeInsets.zero,
-                  foregroundColor: _accentControlForeground(context),
                 ),
               ),
             ];
@@ -4623,6 +4607,28 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                                     ),
                                     padding: EdgeInsets.zero,
                                   ),
+                                if (canMultiSelect)
+                                  IconButton.filled(
+                                    key: const ValueKey('add-songs-button'),
+                                    tooltip: '添加歌曲',
+                                    onPressed:
+                                        () => widget.onAddSongs(
+                                          activePlaylist.id,
+                                        ),
+                                    icon: const Icon(
+                                      Icons.playlist_add_rounded,
+                                      size: 20,
+                                    ),
+                                    style: IconButton.styleFrom(
+                                      minimumSize: const Size(34, 34),
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      padding: EdgeInsets.zero,
+                                      foregroundColor: _accentControlForeground(
+                                        context,
+                                      ),
+                                    ),
+                                  ),
                               ];
 
                       if (narrowToolbar) {
@@ -4742,7 +4748,7 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
                                           ? '添加文件或导入文件夹，把本地音频视频整理进来。'
                                           : browsingPlaybackQueue
                                           ? '开始播放后，这里会显示当前这轮待播内容。'
-                                          : '回到曲库挑几首喜欢的内容，慢慢把它养成自己的歌单。')
+                                          : '从曲库或其他歌单挑几首喜欢的内容，慢慢把它养成自己的歌单。')
                                       : '换个关键词试试，或者清空搜索继续浏览。',
                             ),
                           )
@@ -5878,19 +5884,27 @@ class _InlineActionButtonState extends State<_InlineActionButton> {
   }
 }
 
-class _AddFromLibraryDialog extends StatefulWidget {
-  const _AddFromLibraryDialog({required this.queue});
+class _AddSongsDialog extends StatefulWidget {
+  const _AddSongsDialog({required this.queue, required this.targetPlaylistId});
 
   final PlaybackQueueState queue;
+  final String targetPlaylistId;
 
   @override
-  State<_AddFromLibraryDialog> createState() => _AddFromLibraryDialogState();
+  State<_AddSongsDialog> createState() => _AddSongsDialogState();
 }
 
-class _AddFromLibraryDialogState extends State<_AddFromLibraryDialog> {
+class _AddSongsDialogState extends State<_AddSongsDialog> {
   final _queryController = TextEditingController();
-  final _selectedPaths = <String>{};
+  var _selection = const DesktopMultiSelection();
   var _query = '';
+  late String _sourceId;
+
+  @override
+  void initState() {
+    super.initState();
+    _sourceId = widget.queue.library.id;
+  }
 
   @override
   void dispose() {
@@ -5898,84 +5912,338 @@ class _AddFromLibraryDialogState extends State<_AddFromLibraryDialog> {
     super.dispose();
   }
 
+  String _songKey(String path) {
+    return path.trim().replaceAll('\\', '/').toLowerCase();
+  }
+
+  List<HeniPlaylist> get _sources {
+    final sources = <HeniPlaylist>[];
+    final seenIds = <String>{};
+    for (final playlist in [widget.queue.library, ...widget.queue.playlists]) {
+      if (playlist.id != widget.targetPlaylistId && seenIds.add(playlist.id)) {
+        sources.add(playlist);
+      }
+    }
+    return sources;
+  }
+
+  HeniPlaylist get _target {
+    return widget.queue.playlistById(widget.targetPlaylistId);
+  }
+
+  HeniPlaylist get _source {
+    return _sources.firstWhere(
+      (playlist) => playlist.id == _sourceId,
+      orElse: () => widget.queue.library,
+    );
+  }
+
+  Set<String> get _targetKeys {
+    return _target.items.map((item) => _songKey(item.path)).toSet();
+  }
+
+  Map<String, MediaItem> get _availableItemsByKey {
+    final items = <String, MediaItem>{};
+    final excluded = _targetKeys;
+    for (final playlist in _sources) {
+      for (final item in playlist.items) {
+        final key = _songKey(item.path);
+        if (!excluded.contains(key)) {
+          items.putIfAbsent(key, () => item);
+        }
+      }
+    }
+    return items;
+  }
+
+  List<MediaItem> get _candidates {
+    final normalizedQuery = _query.trim().toLowerCase();
+    return _source.items.where((item) {
+      if (_targetKeys.contains(_songKey(item.path))) {
+        return false;
+      }
+      if (normalizedQuery.isEmpty) {
+        return true;
+      }
+      return item.title.toLowerCase().contains(normalizedQuery) ||
+          item.path.toLowerCase().contains(normalizedQuery);
+    }).toList();
+  }
+
+  DesktopSelectionIntent _keyboardIntent() {
+    final keyboard = HardwareKeyboard.instance;
+    final additive =
+        keyboard.isAltPressed ||
+        keyboard.isControlPressed ||
+        keyboard.isMetaPressed;
+    if (keyboard.isShiftPressed) {
+      return additive
+          ? DesktopSelectionIntent.additiveRange
+          : DesktopSelectionIntent.range;
+    }
+    return additive
+        ? DesktopSelectionIntent.toggle
+        : DesktopSelectionIntent.replace;
+  }
+
+  void _selectCandidate(
+    int index,
+    List<String> orderedKeys,
+    DesktopSelectionIntent intent,
+  ) {
+    setState(() {
+      _selection = _selection.select(
+        orderedKeys: orderedKeys,
+        index: index,
+        intent: intent,
+      );
+    });
+  }
+
+  void _selectAllVisible(List<String> orderedKeys) {
+    setState(() {
+      _selection = _selection.replaceWith({
+        ..._selection.selectedKeys,
+        ...orderedKeys,
+      });
+    });
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _selection = const DesktopMultiSelection();
+    });
+  }
+
+  void _submit() {
+    final available = _availableItemsByKey;
+    final selected = [
+      for (final entry in available.entries)
+        if (_selection.selectedKeys.contains(entry.key)) entry.value,
+    ];
+    Navigator.of(context).pop(selected);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final target = widget.queue.activePlaylist;
-    final existingPaths =
-        target.items.map((item) => item.path.toLowerCase()).toSet();
-    final query = _query.trim().toLowerCase();
-    final candidates =
-        widget.queue.library.items.where((item) {
-          if (existingPaths.contains(item.path.toLowerCase())) {
-            return false;
-          }
-          if (query.isEmpty) {
-            return true;
-          }
-          return item.title.toLowerCase().contains(query) ||
-              item.path.toLowerCase().contains(query);
-        }).toList();
+    final theme = Theme.of(context);
+    final candidates = _candidates;
+    final orderedKeys = [for (final item in candidates) _songKey(item.path)];
+    final selectedCount = _selection.selectedKeys.length;
 
     return _HeniDialog(
-      title: Text('从曲库添加到“${target.name}”'),
+      title: Row(
+        children: [
+          Icon(
+            Icons.playlist_add_rounded,
+            size: 21,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text('添加歌曲到“${_target.name}”')),
+        ],
+      ),
       content: SizedBox(
-        width: 720,
+        width: 572,
         height: 520,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Container(
+              height: 50,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.045),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.library_music_outlined,
+                    size: 19,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '来源',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.62),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _sourceId,
+                        isExpanded: true,
+                        borderRadius: BorderRadius.circular(14),
+                        dropdownColor: const Color(0xFF171A21),
+                        items: [
+                          for (final source in _sources)
+                            DropdownMenuItem(
+                              value: source.id,
+                              child: Text(
+                                '${source.name} · ${source.items.length} 首',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null || value == _sourceId) {
+                            return;
+                          }
+                          setState(() {
+                            _sourceId = value;
+                            _query = '';
+                            _queryController.clear();
+                            _selection = _selection.resetAnchor();
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
             TextField(
               controller: _queryController,
-              decoration: const InputDecoration(
-                hintText: '搜索曲库',
-                prefixIcon: Icon(Icons.search),
+              decoration: InputDecoration(
+                hintText: '搜索“${_source.name}”',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon:
+                    _query.isEmpty
+                        ? null
+                        : IconButton(
+                          tooltip: '清除搜索',
+                          onPressed: () {
+                            _queryController.clear();
+                            setState(() {
+                              _query = '';
+                              _selection = _selection.resetAnchor();
+                            });
+                          },
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                        ),
               ),
               onChanged: (value) {
                 setState(() {
                   _query = value;
+                  _selection = _selection.resetAnchor();
                 });
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    selectedCount == 0
+                        ? '单击单选 · Alt/Ctrl + 单击逐项选择 · Shift + 单击范围选择'
+                        : '已选择 $selectedCount 首 · 切换来源不会丢失选择',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      height: 1.25,
+                      fontSize: 11.5,
+                      color: Colors.white.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed:
+                      candidates.isEmpty
+                          ? null
+                          : () => _selectAllVisible(orderedKeys),
+                  child: const Text('全选结果'),
+                ),
+                if (selectedCount > 0)
+                  IconButton(
+                    tooltip: '清空选择',
+                    onPressed: _clearSelection,
+                    icon: const Icon(Icons.deselect_rounded, size: 19),
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
             Expanded(
               child:
                   candidates.isEmpty
-                      ? const Center(child: Text('没有可添加的歌曲'))
+                      ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.playlist_add_check_circle_outlined,
+                              size: 40,
+                              color: Colors.white.withValues(alpha: 0.28),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              _query.trim().isEmpty
+                                  ? '这个来源没有可添加的歌曲'
+                                  : '没有匹配的歌曲',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.55),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
                       : ListView.builder(
                         itemCount: candidates.length,
                         itemBuilder: (context, index) {
                           final item = candidates[index];
-                          final selected = _selectedPaths.contains(item.path);
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
+                          final key = orderedKeys[index];
+                          final selected = _selection.selectedKeys.contains(
+                            key,
+                          );
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 140),
+                            margin: const EdgeInsets.only(bottom: 7),
                             decoration: BoxDecoration(
                               color:
                                   selected
-                                      ? Theme.of(context).colorScheme.primary
-                                          .withValues(alpha: 0.12)
+                                      ? theme.colorScheme.primary.withValues(
+                                        alpha: 0.13,
+                                      )
                                       : Colors.white.withValues(alpha: 0.03),
-                              borderRadius: BorderRadius.circular(18),
+                              borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color:
                                     selected
-                                        ? Theme.of(context).colorScheme.primary
-                                            .withValues(alpha: 0.26)
+                                        ? theme.colorScheme.primary.withValues(
+                                          alpha: 0.34,
+                                        )
                                         : Colors.white.withValues(alpha: 0.06),
                               ),
                             ),
-                            child: CheckboxListTile(
-                              value: selected,
+                            child: ListTile(
+                              minTileHeight: 66,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              onChanged: (value) {
-                                setState(() {
-                                  if (value ?? false) {
-                                    _selectedPaths.add(item.path);
-                                  } else {
-                                    _selectedPaths.remove(item.path);
-                                  }
-                                });
-                              },
+                              selected: selected,
+                              onTap:
+                                  () => _selectCandidate(
+                                    index,
+                                    orderedKeys,
+                                    _keyboardIntent(),
+                                  ),
+                              leading: Checkbox(
+                                value: selected,
+                                onChanged:
+                                    (_) => _selectCandidate(
+                                      index,
+                                      orderedKeys,
+                                      DesktopSelectionIntent.toggle,
+                                    ),
+                              ),
                               title: Text(
                                 item.title,
                                 maxLines: 1,
@@ -5986,7 +6254,7 @@ class _AddFromLibraryDialogState extends State<_AddFromLibraryDialog> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              secondary: _InfoPill(
+                              trailing: _InfoPill(
                                 icon:
                                     item.kind == MediaKind.video
                                         ? Icons.movie_outlined
@@ -5994,7 +6262,6 @@ class _AddFromLibraryDialogState extends State<_AddFromLibraryDialog> {
                                 label:
                                     item.kind == MediaKind.video ? '视频' : '音频',
                               ),
-                              controlAffinity: ListTileControlAffinity.leading,
                             ),
                           );
                         },
@@ -6005,34 +6272,13 @@ class _AddFromLibraryDialogState extends State<_AddFromLibraryDialog> {
       ),
       actions: [
         TextButton(
-          onPressed:
-              candidates.isEmpty
-                  ? null
-                  : () {
-                    setState(() {
-                      _selectedPaths
-                        ..clear()
-                        ..addAll(candidates.map((item) => item.path));
-                    });
-                  },
-          child: const Text('全选当前列表'),
-        ),
-        TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
-        FilledButton(
-          onPressed:
-              _selectedPaths.isEmpty
-                  ? null
-                  : () {
-                    final selectedItems = [
-                      for (final item in widget.queue.library.items)
-                        if (_selectedPaths.contains(item.path)) item,
-                    ];
-                    Navigator.of(context).pop(selectedItems);
-                  },
-          child: Text('添加 ${_selectedPaths.length} 首'),
+        FilledButton.icon(
+          onPressed: selectedCount == 0 ? null : _submit,
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: Text('添加 $selectedCount 首'),
         ),
       ],
     );
@@ -8251,7 +8497,7 @@ class _CreatePlaylistDialogState extends State<_CreatePlaylistDialog> {
           autofocus: true,
           decoration: const InputDecoration(
             hintText: '歌单名称',
-            helperText: '创建后可从曲库加入歌曲，不复制源文件',
+            helperText: '创建后可从曲库或其他歌单加入歌曲，不复制源文件',
           ),
           onSubmitted: _submit,
         ),
