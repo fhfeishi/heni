@@ -123,6 +123,65 @@ void main() {
     await tester.pump();
     expect(engine.seeks, [const Duration(minutes: 2)]);
   });
+
+  testWidgets('global-key reparent keeps stream binding and drag preview', (
+    tester,
+  ) async {
+    final engine = _FakePlaybackEngine();
+    addTearDown(engine.dispose);
+    final progressKey = GlobalKey();
+
+    Future<void> pump({required bool compact}) {
+      final progress = PlayerProgressWithTime(
+        key: progressKey,
+        engine: engine,
+        palette: HeniPalette.cobalt,
+        mediaId: 'track-a',
+        fallbackDuration: const Duration(minutes: 4),
+      );
+      return tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 320,
+                child:
+                    compact
+                        ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [progress],
+                        )
+                        : Row(children: [Expanded(child: progress)]),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    await pump(compact: false);
+    expect(engine.positionListenCount, 1);
+    expect(engine.positionCancelCount, 0);
+
+    final track = tester.getRect(
+      find.byKey(const ValueKey('player-progress-track')),
+    );
+    final gesture = await tester.startGesture(
+      Offset(track.left + track.width * 0.25, track.center.dy),
+    );
+    await gesture.moveTo(Offset(track.center.dx, track.center.dy));
+    await tester.pump();
+    expect(find.text('02:00'), findsWidgets);
+
+    await pump(compact: true);
+    expect(engine.positionListenCount, 1);
+    expect(engine.positionCancelCount, 0);
+    expect(find.text('02:00'), findsWidgets);
+
+    await gesture.up();
+    await tester.pump();
+    expect(engine.seeks, [const Duration(minutes: 2)]);
+  });
 }
 
 Future<void> _pumpProgress(
@@ -152,9 +211,19 @@ Future<void> _pumpProgress(
 }
 
 class _FakePlaybackEngine implements PlaybackEngine {
-  final _positionController = StreamController<Duration>.broadcast();
-  final _durationController = StreamController<Duration>.broadcast();
+  _FakePlaybackEngine() {
+    _positionController = StreamController<Duration>.broadcast(
+      onListen: () => positionListenCount++,
+      onCancel: () => positionCancelCount++,
+    );
+    _durationController = StreamController<Duration>.broadcast();
+  }
+
+  late final StreamController<Duration> _positionController;
+  late final StreamController<Duration> _durationController;
   final seeks = <Duration>[];
+  int positionListenCount = 0;
+  int positionCancelCount = 0;
 
   Duration currentPositionValue = const Duration(seconds: 30);
   Duration currentDurationValue = const Duration(minutes: 4);

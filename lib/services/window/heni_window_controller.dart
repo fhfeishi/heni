@@ -23,6 +23,7 @@ final heniWindowControllerProvider =
 
 class HeniWindowController extends Notifier<bool> {
   static const MethodChannel _channel = MethodChannel('heni/window');
+  int _maximizedRevision = 0;
 
   @override
   bool build() {
@@ -70,8 +71,13 @@ class HeniWindowController extends Notifier<bool> {
   }
 
   Future<void> _readMaximized() async {
+    final revision = _maximizedRevision;
     try {
-      state = await _channel.invokeMethod<bool>('isMaximized') ?? false;
+      final maximized =
+          await _channel.invokeMethod<bool>('isMaximized') ?? false;
+      if (revision == _maximizedRevision) {
+        state = maximized;
+      }
     } on PlatformException catch (error) {
       debugPrint('Heni window state unavailable: $error');
     } on MissingPluginException catch (error) {
@@ -94,6 +100,7 @@ class HeniWindowController extends Notifier<bool> {
 
   Future<void> _handleNativeCall(MethodCall call) async {
     if (call.method == 'maximizedChanged') {
+      _maximizedRevision += 1;
       state = call.arguments == true;
     }
   }

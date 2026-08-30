@@ -176,7 +176,14 @@ Widget _host({required double width, required Widget child}) {
     home: Scaffold(
       body: Align(
         alignment: Alignment.topLeft,
-        child: SizedBox(width: width, height: 560, child: child),
+        child: OverflowBox(
+          alignment: Alignment.topLeft,
+          minWidth: width,
+          maxWidth: width,
+          minHeight: 560,
+          maxHeight: 560,
+          child: child,
+        ),
       ),
     ),
   );

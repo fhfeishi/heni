@@ -35,13 +35,33 @@ public static class HeniMinimumWindowProbe {
 
   [DllImport("user32.dll")]
   public static extern bool ShowWindow(IntPtr hWnd, int command);
+
+  [DllImport("user32.dll")]
+  public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+
+  [DllImport("user32.dll")]
+  public static extern uint GetDpiForWindow(IntPtr window);
 }
 '@
 
+[HeniMinimumWindowProbe]::SetProcessDpiAwarenessContext(
+  [IntPtr]::new(-4)
+) | Out-Null
+
 $resolvedExecutable = (Resolve-Path -LiteralPath $Executable).Path
-$process = Start-Process `
-  -FilePath $resolvedExecutable `
-  -PassThru
+$probeAppData = Join-Path (
+  [IO.Path]::GetTempPath()
+) "heni-minimum-probe-$([Guid]::NewGuid().ToString('N'))"
+[IO.Directory]::CreateDirectory($probeAppData) | Out-Null
+$previousAppData = $env:APPDATA
+try {
+  $env:APPDATA = $probeAppData
+  $process = Start-Process `
+    -FilePath $resolvedExecutable `
+    -PassThru
+} finally {
+  $env:APPDATA = $previousAppData
+}
 
 try {
   $handle = [IntPtr]::Zero
@@ -62,13 +82,17 @@ try {
   }
 
   [HeniMinimumWindowProbe]::ShowWindow($handle, 5) | Out-Null
+  $dpi = [HeniMinimumWindowProbe]::GetDpiForWindow($handle)
+  $scale = $dpi / 96.0
+  $expectedWidth = [Math]::Round(900 * $scale)
+  $expectedHeight = [Math]::Round(620 * $scale)
   [HeniMinimumWindowProbe]::SetWindowPos(
     $handle,
     [IntPtr]::Zero,
     40,
     40,
-    220,
-    300,
+    [Math]::Round(220 * $scale),
+    [Math]::Round(300 * $scale),
     0x0040
   ) | Out-Null
   Start-Sleep -Milliseconds 600
@@ -80,13 +104,27 @@ try {
 
   $width = $rect.Right - $rect.Left
   $height = $rect.Bottom - $rect.Top
-  Write-Output "Heni minimum resize result: ${width}x${height}"
+  Write-Output (
+    "Heni minimum resize result: ${width}x${height} " +
+    "at ${dpi}dpi (expected at least ${expectedWidth}x${expectedHeight})"
+  )
 
-  if ($width -lt 900 -or $height -lt 620) {
-    throw "Window shrank below the 900x620 logical minimum: ${width}x${height}."
+  if ($width -lt $expectedWidth -or $height -lt $expectedHeight) {
+    throw (
+      "Window shrank below the 900x620 logical minimum: " +
+      "${width}x${height} at ${dpi}dpi."
+    )
   }
 } finally {
   if (-not $process.HasExited) {
     Stop-Process -Id $process.Id
+  }
+  $resolvedProbeAppData = [IO.Path]::GetFullPath($probeAppData)
+  $resolvedTemp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+  if ($resolvedProbeAppData.StartsWith(
+    $resolvedTemp,
+    [StringComparison]::OrdinalIgnoreCase
+  )) {
+    Remove-Item -LiteralPath $resolvedProbeAppData -Recurse -Force
   }
 }

@@ -26,9 +26,16 @@ namespace {
 #define DWMWA_BORDER_COLOR 34
 #endif
 
+#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
+#define DWMWA_WINDOW_CORNER_PREFERENCE 33
+#endif
+
 #ifndef DWMWA_COLOR_NONE
 #define DWMWA_COLOR_NONE 0xFFFFFFFE
 #endif
+
+constexpr DWORD kDwmWindowCornerPreferenceRound = 2;
+constexpr COLORREF kHeniWindowBackground = RGB(18, 15, 25);
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 constexpr int kMinimumLogicalClientWidth = 900;
@@ -56,6 +63,7 @@ struct PersistedWindowState {
   int top = 10;
   int width = 1280;
   int height = 720;
+  UINT dpi = 0;
   bool maximized = false;
 };
 
@@ -118,6 +126,8 @@ std::optional<PersistedWindowState> LoadWindowState() {
         state.width = std::stoi(value);
       } else if (key == "height") {
         state.height = std::stoi(value);
+      } else if (key == "dpi") {
+        state.dpi = static_cast<UINT>(std::stoul(value));
       } else if (key == "maximized") {
         state.maximized = value == "1";
       }
@@ -126,13 +136,8 @@ std::optional<PersistedWindowState> LoadWindowState() {
     return std::nullopt;
   }
 
-  if (state.width < 720 || state.height < 480) {
-    return std::nullopt;
-  }
-
-  RECT rect = {state.left, state.top, state.left + state.width,
-               state.top + state.height};
-  if (MonitorFromRect(&rect, MONITOR_DEFAULTTONULL) == nullptr) {
+  if (state.width <= 0 || state.height <= 0 ||
+      (state.dpi != 0 && (state.dpi < 48 || state.dpi > 960))) {
     return std::nullopt;
   }
 
@@ -168,6 +173,7 @@ void SaveWindowState(HWND hwnd) {
   stream << "top=" << rect.top << '\n';
   stream << "width=" << (rect.right - rect.left) << '\n';
   stream << "height=" << (rect.bottom - rect.top) << '\n';
+  stream << "dpi=" << GetDpiForWindow(hwnd) << '\n';
   stream << "maximized="
          << (placement.showCmd == SW_SHOWMAXIMIZED ? 1 : 0) << '\n';
 }
@@ -182,25 +188,59 @@ void EnsureMinimumClientSize(HWND window) {
     return;
   }
 
-  const int minimum_width =
-      Scale(kMinimumLogicalClientWidth, static_cast<double>(dpi) / 96.0);
-  const int minimum_height =
-      Scale(kMinimumLogicalClientHeight, static_cast<double>(dpi) / 96.0);
-  RECT client_rect;
-  if (!GetClientRect(window, &client_rect)) {
+  RECT client_rect{};
+  RECT window_rect{};
+  if (!GetClientRect(window, &client_rect) ||
+      !GetWindowRect(window, &window_rect)) {
     return;
   }
 
   const int client_width = client_rect.right - client_rect.left;
   const int client_height = client_rect.bottom - client_rect.top;
-  if (client_width >= minimum_width && client_height >= minimum_height) {
+  const int window_width = window_rect.right - window_rect.left;
+  const int window_height = window_rect.bottom - window_rect.top;
+  const int non_client_width = window_width - client_width;
+  const int non_client_height = window_height - client_height;
+
+  const HMONITOR monitor =
+      MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO monitor_info{sizeof(MONITORINFO)};
+  if (!GetMonitorInfo(monitor, &monitor_info)) {
     return;
   }
 
-  SetWindowPos(window, nullptr, 0, 0,
-               std::max(client_width, minimum_width),
-               std::max(client_height, minimum_height),
-               SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+  const int work_width =
+      monitor_info.rcWork.right - monitor_info.rcWork.left;
+  const int work_height =
+      monitor_info.rcWork.bottom - monitor_info.rcWork.top;
+  const int minimum_width = std::min(
+      Scale(kMinimumLogicalClientWidth, static_cast<double>(dpi) / 96.0) +
+          non_client_width,
+      work_width);
+  const int minimum_height = std::min(
+      Scale(kMinimumLogicalClientHeight, static_cast<double>(dpi) / 96.0) +
+          non_client_height,
+      work_height);
+  const int target_width =
+      std::clamp(window_width, minimum_width, work_width);
+  const int target_height =
+      std::clamp(window_height, minimum_height, work_height);
+  const int target_left =
+      std::clamp(static_cast<int>(window_rect.left),
+                 static_cast<int>(monitor_info.rcWork.left),
+                 static_cast<int>(monitor_info.rcWork.right) - target_width);
+  const int target_top =
+      std::clamp(static_cast<int>(window_rect.top),
+                 static_cast<int>(monitor_info.rcWork.top),
+                 static_cast<int>(monitor_info.rcWork.bottom) - target_height);
+
+  if (target_left == window_rect.left && target_top == window_rect.top &&
+      target_width == window_width && target_height == window_height) {
+    return;
+  }
+
+  SetWindowPos(window, nullptr, target_left, target_top, target_width,
+               target_height, SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 }  // namespace
@@ -247,7 +287,9 @@ const wchar_t* WindowClassRegistrar::GetWindowClass() {
     window_class.hInstance = GetModuleHandle(nullptr);
     window_class.hIcon =
         LoadIcon(window_class.hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
-    window_class.hbrBackground = 0;
+    // Paint a deterministic dark fallback while Flutter is attaching or
+    // resizing instead of leaving uninitialized host pixels at the corners.
+    window_class.hbrBackground = CreateSolidBrush(kHeniWindowBackground);
     window_class.lpszMenuName = nullptr;
     window_class.lpfnWndProc = Win32Window::WndProc;
     RegisterClass(&window_class);
@@ -283,32 +325,65 @@ bool Win32Window::Create(const std::wstring& title,
   int top = origin.y;
   int width = size.width;
   int height = size.height;
+  HMONITOR monitor = nullptr;
+  bool restored_monitor_missing = false;
 
   if (restored_state.has_value()) {
     left = restored_state->left;
     top = restored_state->top;
-    width = restored_state->width;
-    height = restored_state->height;
-    const RECT restored_rect = {left, top, left + width, top + height};
-    const HMONITOR monitor =
-        MonitorFromRect(&restored_rect, MONITOR_DEFAULTTONEAREST);
-    const UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
-    const double scale_factor = dpi / 96.0;
-    width = std::max(width, Scale(kMinimumLogicalClientWidth, scale_factor));
-    height = std::max(height, Scale(kMinimumLogicalClientHeight, scale_factor));
+    const RECT restored_rect = {
+        left, top, left + restored_state->width,
+        top + restored_state->height};
+    monitor = MonitorFromRect(&restored_rect, MONITOR_DEFAULTTONULL);
+    if (monitor == nullptr) {
+      restored_monitor_missing = true;
+      monitor = MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
+    }
+    const UINT target_dpi = FlutterDesktopGetDpiForMonitor(monitor);
+    const UINT source_dpi =
+        restored_state->dpi == 0 ? target_dpi : restored_state->dpi;
+    width = MulDiv(restored_state->width, target_dpi, source_dpi);
+    height = MulDiv(restored_state->height, target_dpi, source_dpi);
     initial_show_command_ =
         restored_state->maximized ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL;
   } else {
     const POINT target_point = {static_cast<LONG>(origin.x),
                                 static_cast<LONG>(origin.y)};
-    HMONITOR monitor = MonitorFromPoint(target_point, MONITOR_DEFAULTTONEAREST);
-    UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
-    double scale_factor = dpi / 96.0;
+    monitor = MonitorFromPoint(target_point, MONITOR_DEFAULTTONEAREST);
+    const UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
+    const double scale_factor = dpi / 96.0;
     left = Scale(origin.x, scale_factor);
     top = Scale(origin.y, scale_factor);
     width = Scale(size.width, scale_factor);
     height = Scale(size.height, scale_factor);
     initial_show_command_ = SW_SHOWNORMAL;
+  }
+
+  MONITORINFO monitor_info{sizeof(MONITORINFO)};
+  if (monitor != nullptr && GetMonitorInfo(monitor, &monitor_info)) {
+    const UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
+    const int work_width =
+        monitor_info.rcWork.right - monitor_info.rcWork.left;
+    const int work_height =
+        monitor_info.rcWork.bottom - monitor_info.rcWork.top;
+    const int minimum_width = std::min(
+        Scale(kMinimumLogicalClientWidth, static_cast<double>(dpi) / 96.0),
+        work_width);
+    const int minimum_height = std::min(
+        Scale(kMinimumLogicalClientHeight, static_cast<double>(dpi) / 96.0),
+        work_height);
+    width = std::clamp(width, minimum_width, work_width);
+    height = std::clamp(height, minimum_height, work_height);
+
+    if (restored_monitor_missing) {
+      left = monitor_info.rcWork.left + (work_width - width) / 2;
+      top = monitor_info.rcWork.top + (work_height - height) / 2;
+    } else {
+      left = std::clamp(left, static_cast<int>(monitor_info.rcWork.left),
+                        static_cast<int>(monitor_info.rcWork.right) - width);
+      top = std::clamp(top, static_cast<int>(monitor_info.rcWork.top),
+                       static_cast<int>(monitor_info.rcWork.bottom) - height);
+    }
   }
 
   HWND window = CreateWindow(
@@ -401,10 +476,28 @@ Win32Window::MessageHandler(HWND hwnd,
       auto min_max_info = reinterpret_cast<MINMAXINFO*>(lparam);
       const UINT dpi = GetDpiForWindow(hwnd);
       const double scale_factor = dpi / 96.0;
-      min_max_info->ptMinTrackSize.x =
-          Scale(kMinimumLogicalClientWidth, scale_factor);
-      min_max_info->ptMinTrackSize.y =
-          Scale(kMinimumLogicalClientHeight, scale_factor);
+      const HMONITOR monitor =
+          MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+      MONITORINFO monitor_info{sizeof(MONITORINFO)};
+      if (GetMonitorInfo(monitor, &monitor_info)) {
+        const LONG work_width =
+            monitor_info.rcWork.right - monitor_info.rcWork.left;
+        const LONG work_height =
+            monitor_info.rcWork.bottom - monitor_info.rcWork.top;
+        min_max_info->ptMinTrackSize.x = std::min(
+            Scale(kMinimumLogicalClientWidth, scale_factor),
+            static_cast<int>(work_width));
+        min_max_info->ptMinTrackSize.y = std::min(
+            Scale(kMinimumLogicalClientHeight, scale_factor),
+            static_cast<int>(work_height));
+        min_max_info->ptMaxTrackSize.x = work_width;
+        min_max_info->ptMaxTrackSize.y = work_height;
+      } else {
+        min_max_info->ptMinTrackSize.x =
+            Scale(kMinimumLogicalClientWidth, scale_factor);
+        min_max_info->ptMinTrackSize.y =
+            Scale(kMinimumLogicalClientHeight, scale_factor);
+      }
       return 0;
     }
     case WM_NCHITTEST: {
@@ -456,7 +549,6 @@ Win32Window::MessageHandler(HWND hwnd,
       return HTCLIENT;
     }
     case WM_SIZE: {
-      SaveWindowState(hwnd);
       RECT rect = GetClientArea();
       if (child_content_ != nullptr) {
         // Size and position the child window.
@@ -466,7 +558,6 @@ Win32Window::MessageHandler(HWND hwnd,
       return 0;
     }
 
-    case WM_MOVE:
     case WM_EXITSIZEMOVE:
       SaveWindowState(hwnd);
       return 0;
@@ -614,6 +705,14 @@ void Win32Window::UpdateTheme(HWND const window) {
                           &enable_dark_mode, sizeof(enable_dark_mode));
   }
 
+  // Let DWM own the top-level silhouette and shadow. Unsupported Windows
+  // versions safely ignore the corner preference.
+  const DWORD corner_preference = kDwmWindowCornerPreferenceRound;
+  DwmSetWindowAttribute(window, DWMWA_WINDOW_CORNER_PREFERENCE,
+                        &corner_preference, sizeof(corner_preference));
+
+  // Flutter paints its own edge-to-edge shell. Suppressing the extra DWM
+  // outline keeps the client area flush with the top-level window.
   const COLORREF border_color = DWMWA_COLOR_NONE;
   DwmSetWindowAttribute(window, DWMWA_BORDER_COLOR, &border_color,
                         sizeof(border_color));

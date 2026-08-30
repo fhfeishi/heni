@@ -23,4 +23,23 @@ void main() {
       isFalse,
     );
   });
+
+  test('switches bottom layout at the 1180 logical-pixel boundary', () {
+    expect(
+      shouldUseCompactBottomBar(
+        windowWidth: 1179,
+        focusMode: false,
+        verticallyDense: false,
+      ),
+      isTrue,
+    );
+    expect(
+      shouldUseCompactBottomBar(
+        windowWidth: 1180,
+        focusMode: false,
+        verticallyDense: false,
+      ),
+      isFalse,
+    );
+  });
 }

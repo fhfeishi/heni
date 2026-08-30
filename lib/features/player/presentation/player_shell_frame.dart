@@ -7,31 +7,22 @@ import '../../../design/heni_shell_theme.dart';
 class HeniPanoramicShellFrame extends StatelessWidget {
   const HeniPanoramicShellFrame({
     required this.shellTheme,
-    required this.isMaximized,
     required this.child,
     super.key,
   });
 
   final HeniShellTheme shellTheme;
-  final bool isMaximized;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final radius = isMaximized ? 0.0 : 14.0;
-    return AnimatedContainer(
+    // The native desktop window owns the outer silhouette. Keeping this layer
+    // opaque and edge-to-edge prevents the transparent pixels outside a
+    // Flutter ClipRRect from exposing the Win32 host at the four corners.
+    return ColoredBox(
       key: const ValueKey('heni-panoramic-frame'),
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-      padding: isMaximized ? EdgeInsets.zero : const EdgeInsets.all(1),
-      decoration: BoxDecoration(
-        color: shellTheme.border.withValues(alpha: 0.64),
-        borderRadius: BorderRadius.circular(radius),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius == 0 ? 0 : radius - 1),
-        child: child,
-      ),
+      color: shellTheme.canvas,
+      child: child,
     );
   }
 }

@@ -1112,7 +1112,6 @@ class PlayerScreen extends ConsumerWidget {
     final sidebarPreferencesRestored = ref.watch(
       sidebarPreferencesRestoredProvider,
     );
-    final isMaximized = ref.watch(heniWindowControllerProvider);
     final windowWidth = MediaQuery.sizeOf(context).width;
 
     void toggleMutedFromKeyboard() {
@@ -1139,7 +1138,6 @@ class PlayerScreen extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       body: HeniPanoramicShellFrame(
         shellTheme: shellTheme,
-        isMaximized: isMaximized,
         child: Stack(
           children: [
             Positioned.fill(
@@ -6151,7 +6149,7 @@ class _AddFromLibraryDialogState extends State<_AddFromLibraryDialog> {
   }
 }
 
-class _BottomPlayerBar extends ConsumerWidget {
+class _BottomPlayerBar extends ConsumerStatefulWidget {
   const _BottomPlayerBar({
     required this.palette,
     required this.shellTheme,
@@ -6183,13 +6181,46 @@ class _BottomPlayerBar extends ConsumerWidget {
   final ValueChanged<double> onPersistVolume;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_BottomPlayerBar> createState() => _BottomPlayerBarState();
+}
+
+class _BottomPlayerBarState extends ConsumerState<_BottomPlayerBar> {
+  final _progressKey = GlobalKey(debugLabel: 'bottom-player-progress');
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = widget.palette;
+    final shellTheme = widget.shellTheme;
+    final currentMedia = widget.currentMedia;
+    final mediaProbe = widget.mediaProbe;
+    final queue = widget.queue;
+    final engine = widget.engine;
+    final layout = widget.layout;
+    final onPreviousTrack = widget.onPreviousTrack;
+    final onNextTrack = widget.onNextTrack;
+    final onCyclePlaybackMode = widget.onCyclePlaybackMode;
+    final onSelectPlaybackMode = widget.onSelectPlaybackMode;
+    final onShowPlaybackQueue = widget.onShowPlaybackQueue;
+    final onPersistVolume = widget.onPersistVolume;
     final focusMode = ref.watch(focusModeProvider);
     final windowWidth = MediaQuery.sizeOf(context).width;
     final compactBottom = shouldUseCompactBottomBar(
       windowWidth: windowWidth,
       focusMode: focusMode,
       verticallyDense: layout.quiet,
+    );
+    final progress = PlayerProgressWithTime(
+      key: _progressKey,
+      engine: engine,
+      palette: palette,
+      mediaId: currentMedia?.path ?? 'no-media',
+      fallbackDuration:
+          currentMedia?.duration ??
+          mediaProbe.when(
+            data: (probe) => probe?.duration,
+            error: (error, stackTrace) => null,
+            loading: () => null,
+          ),
     );
 
     return _ShellBand(
@@ -6222,6 +6253,7 @@ class _BottomPlayerBar extends ConsumerWidget {
                 currentMedia: currentMedia,
                 engine: engine,
                 queue: queue,
+                progress: progress,
                 onPreviousTrack: onPreviousTrack,
                 onNextTrack: onNextTrack,
                 onCyclePlaybackMode: onCyclePlaybackMode,
@@ -6255,18 +6287,7 @@ class _BottomPlayerBar extends ConsumerWidget {
                           onSelectPlaybackMode: onSelectPlaybackMode,
                         ),
                         const SizedBox(height: 4),
-                        PlayerProgressWithTime(
-                          engine: engine,
-                          palette: palette,
-                          mediaId: currentMedia?.path ?? 'no-media',
-                          fallbackDuration:
-                              currentMedia?.duration ??
-                              mediaProbe.when(
-                                data: (probe) => probe?.duration,
-                                error: (error, stackTrace) => null,
-                                loading: () => null,
-                              ),
-                        ),
+                        progress,
                       ],
                     ),
                   ),
@@ -6292,6 +6313,7 @@ class _CompactBottomBar extends StatelessWidget {
     required this.currentMedia,
     required this.engine,
     required this.queue,
+    required this.progress,
     required this.onPreviousTrack,
     required this.onNextTrack,
     required this.onCyclePlaybackMode,
@@ -6305,6 +6327,7 @@ class _CompactBottomBar extends StatelessWidget {
   final MediaItem? currentMedia;
   final PlaybackEngine engine;
   final PlaybackQueueState queue;
+  final Widget progress;
   final VoidCallback onPreviousTrack;
   final VoidCallback onNextTrack;
   final VoidCallback onCyclePlaybackMode;
@@ -6375,12 +6398,7 @@ class _CompactBottomBar extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      PlayerProgressWithTime(
-                        engine: engine,
-                        palette: palette,
-                        mediaId: currentMedia?.path ?? 'no-media',
-                        fallbackDuration: currentMedia?.duration,
-                      ),
+                      progress,
                     ],
                   ),
                 ),
@@ -8354,27 +8372,31 @@ class _PulseRingState extends State<_PulseRing>
       alignment: Alignment.center,
       clipBehavior: Clip.none,
       children: [
-        AnimatedBuilder(
-          animation: _ctrl,
-          builder: (context, _) {
-            final t = _ctrl.value;
-            final scale = 1.0 + t * 0.56;
-            final opacity = (1.0 - t) * (widget.active ? 0.42 : 0.0);
-            return Transform.scale(
-              scale: scale,
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: widget.color.withValues(alpha: opacity),
-                    width: 1.8,
+        Positioned(
+          left: -2,
+          top: -2,
+          right: -2,
+          bottom: -2,
+          child: AnimatedBuilder(
+            animation: _ctrl,
+            builder: (context, _) {
+              final t = _ctrl.value;
+              final scale = 1.0 + t * 0.56;
+              final opacity = (1.0 - t) * (widget.active ? 0.42 : 0.0);
+              return Transform.scale(
+                scale: scale,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: widget.color.withValues(alpha: opacity),
+                      width: 1.8,
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
         widget.child,
       ],
@@ -8461,6 +8483,7 @@ class _TransportControls extends StatelessWidget {
                         },
                         style: IconButton.styleFrom(
                           fixedSize: const Size.square(44),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           backgroundColor: Colors.transparent,
                           foregroundColor: heniReadableForegroundOn(
                             palette.seed,
@@ -8528,6 +8551,7 @@ class _TransportButton extends StatelessWidget {
           style: IconButton.styleFrom(
             fixedSize: const Size.square(_regularIconButtonSize),
             padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             foregroundColor: _primaryGlassText(),
           ),
           icon: Icon(icon, size: 22),

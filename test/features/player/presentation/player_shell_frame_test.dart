@@ -5,48 +5,29 @@ import 'package:heni/design/heni_shell_theme.dart';
 import 'package:heni/features/player/presentation/player_shell_frame.dart';
 
 void main() {
-  testWidgets('restored shell keeps border while maximized shell is flush', (
+  testWidgets('outer shell paints edge-to-edge without Flutter clipping', (
     tester,
   ) async {
     final shell = HeniShellTheme.fromPalette(HeniPalette.nocturne);
+    const contentKey = ValueKey('shell-content');
 
-    Future<void> pump(bool maximized) => tester.pumpWidget(
+    await tester.pumpWidget(
       MaterialApp(
         home: HeniPanoramicShellFrame(
           shellTheme: shell,
-          isMaximized: maximized,
-          child: const SizedBox.expand(),
+          child: const SizedBox.expand(key: contentKey),
         ),
       ),
     );
 
-    await pump(false);
-    final decoration =
-        tester
-                .widget<AnimatedContainer>(
-                  find.byKey(const ValueKey('heni-panoramic-frame')),
-                )
-                .decoration!
-            as BoxDecoration;
-    expect(decoration.gradient, isNull);
-    expect(decoration.color, shell.border.withValues(alpha: 0.64));
-    expect(
-      tester
-          .widget<AnimatedContainer>(
-            find.byKey(const ValueKey('heni-panoramic-frame')),
-          )
-          .padding,
-      const EdgeInsets.all(1),
+    final frame = tester.widget<ColoredBox>(
+      find.byKey(const ValueKey('heni-panoramic-frame')),
     );
-
-    await pump(true);
+    expect(frame.color, shell.canvas);
+    expect(find.byType(ClipRRect), findsNothing);
     expect(
-      tester
-          .widget<AnimatedContainer>(
-            find.byKey(const ValueKey('heni-panoramic-frame')),
-          )
-          .padding,
-      EdgeInsets.zero,
+      tester.getRect(find.byKey(contentKey)),
+      tester.getRect(find.byKey(const ValueKey('heni-panoramic-frame'))),
     );
   });
 }

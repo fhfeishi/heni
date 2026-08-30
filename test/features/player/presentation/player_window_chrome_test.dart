@@ -80,6 +80,7 @@ void main() {
     await tester.pump();
 
     expect(methods, contains('toggleMaximize'));
+    await tester.pump(const Duration(milliseconds: 400));
   });
 
   testWidgets('wide top chrome exposes drag spacer without stealing search', (
@@ -90,14 +91,16 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
-          home: Center(
-            child: SizedBox(
-              width: 800,
-              height: 48,
-              child: HeniTopChromeCenter(
-                search: TextField(
-                  key: const ValueKey('chrome-search'),
-                  focusNode: focusNode,
+          home: Material(
+            child: Center(
+              child: SizedBox(
+                width: 800,
+                height: 48,
+                child: HeniTopChromeCenter(
+                  search: TextField(
+                    key: const ValueKey('chrome-search'),
+                    focusNode: focusNode,
+                  ),
                 ),
               ),
             ),
@@ -130,7 +133,7 @@ void main() {
       find.byKey(const ValueKey('heni-top-chrome-drag-spacer')),
       const Offset(40, 0),
     );
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(methods, contains('beginDrag'));
   });
 

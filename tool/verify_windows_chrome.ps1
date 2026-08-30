@@ -1,7 +1,9 @@
 param(
   [string]$Executable = (
     Join-Path $PSScriptRoot '..\build\windows\x64\runner\Debug\heni.exe'
-  )
+  ),
+  [string]$Screenshot,
+  [switch]$SkipPointerDragChecks
 )
 
 $ErrorActionPreference = 'Stop'
@@ -47,11 +49,79 @@ public static class HeniChromeProbe {
   public static extern bool BringWindowToTop(IntPtr window);
 
   [DllImport("user32.dll")]
+  private static extern uint GetWindowThreadProcessId(
+    IntPtr window, IntPtr processId
+  );
+
+  [DllImport("kernel32.dll")]
+  private static extern uint GetCurrentThreadId();
+
+  [DllImport("user32.dll")]
+  private static extern bool AttachThreadInput(
+    uint attachThread, uint attachToThread, bool attach
+  );
+
+  [DllImport("user32.dll")]
+  public static extern IntPtr SendMessage(
+    IntPtr window, uint message, IntPtr wparam, IntPtr lparam
+  );
+
+  [DllImport("user32.dll")]
+  public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+
+  [DllImport("user32.dll")]
+  public static extern uint GetDpiForWindow(IntPtr window);
+
+  [DllImport("dwmapi.dll")]
+  public static extern int DwmGetWindowAttribute(
+    IntPtr window, uint attribute, out int value, int valueSize
+  );
+
+  [DllImport("user32.dll")]
   public static extern void mouse_event(
     uint flags, uint x, uint y, uint data, UIntPtr extraInfo
   );
+
+  [DllImport("user32.dll")]
+  private static extern void keybd_event(
+    byte virtualKey, byte scanCode, uint flags, UIntPtr extraInfo
+  );
+
+  public static bool ForceForeground(IntPtr window) {
+    IntPtr foreground = GetForegroundWindow();
+    uint currentThread = GetCurrentThreadId();
+    uint foregroundThread = GetWindowThreadProcessId(foreground, IntPtr.Zero);
+    uint targetThread = GetWindowThreadProcessId(window, IntPtr.Zero);
+    bool foregroundAttached = false;
+    bool targetAttached = false;
+    try {
+      if (foregroundThread != 0 && foregroundThread != currentThread) {
+        foregroundAttached = AttachThreadInput(
+          currentThread, foregroundThread, true
+        );
+      }
+      if (targetThread != 0 && targetThread != currentThread) {
+        targetAttached = AttachThreadInput(currentThread, targetThread, true);
+      }
+      BringWindowToTop(window);
+      keybd_event(0x12, 0, 0, UIntPtr.Zero);
+      keybd_event(0x12, 0, 0x0002, UIntPtr.Zero);
+      SetForegroundWindow(window);
+      return GetForegroundWindow() == window;
+    } finally {
+      if (targetAttached) {
+        AttachThreadInput(currentThread, targetThread, false);
+      }
+      if (foregroundAttached) {
+        AttachThreadInput(currentThread, foregroundThread, false);
+      }
+    }
+  }
 }
 '@
+
+# Make the probe coordinates physical and deterministic on non-100% displays.
+[HeniChromeProbe]::SetProcessDpiAwarenessContext([IntPtr]::new(-4)) | Out-Null
 
 function Invoke-HeniDrag(
   [IntPtr]$Handle,
@@ -66,8 +136,13 @@ function Invoke-HeniDrag(
     $before = New-Object HeniChromeProbe+RECT
     [HeniChromeProbe]::GetWindowRect($Handle, [ref]$before) | Out-Null
 
-    [HeniChromeProbe]::BringWindowToTop($Handle) | Out-Null
-    [HeniChromeProbe]::SetForegroundWindow($Handle) | Out-Null
+    [HeniChromeProbe]::SetWindowPos(
+      $Handle, [IntPtr]::new(-1), 0, 0, 0, 0, 0x0043
+    ) | Out-Null
+    [HeniChromeProbe]::SetWindowPos(
+      $Handle, [IntPtr]::new(-2), 0, 0, 0, 0, 0x0043
+    ) | Out-Null
+    [HeniChromeProbe]::ForceForeground($Handle) | Out-Null
     Start-Sleep -Milliseconds 50
     if ([HeniChromeProbe]::GetForegroundWindow() -ne $Handle) {
       $activationX = $before.Left + 360
@@ -83,6 +158,7 @@ function Invoke-HeniDrag(
         $mousePressed = $false
       }
       Start-Sleep -Milliseconds 100
+      [HeniChromeProbe]::ForceForeground($Handle) | Out-Null
     }
     if ([HeniChromeProbe]::GetForegroundWindow() -ne $Handle) {
       throw "Heni window handle $Handle did not become foreground after activation click."
@@ -119,7 +195,11 @@ function Invoke-HeniDrag(
   }
 }
 
-function Wait-HeniTargetGeometry([IntPtr]$Handle) {
+function Wait-HeniTargetGeometry(
+  [IntPtr]$Handle,
+  [int]$TargetWidth,
+  [int]$TargetHeight
+) {
   $stableSamples = 0
   $lastGeometry = 'unavailable'
   for ($attempt = 0; $attempt -lt 50; $attempt++) {
@@ -143,7 +223,7 @@ function Wait-HeniTargetGeometry([IntPtr]$Handle) {
       )
       $atTarget =
         $windowRect.Left -eq 50 -and $windowRect.Top -eq 50 -and
-        $outerWidth -eq 1180 -and $outerHeight -eq 760 -and
+        $outerWidth -eq $TargetWidth -and $outerHeight -eq $TargetHeight -and
         $clientRect.Right -eq $outerWidth -and
         $clientRect.Bottom -eq $outerHeight -and
         $origin.X -eq $windowRect.Left -and
@@ -171,16 +251,35 @@ function Wait-HeniTargetGeometry([IntPtr]$Handle) {
 
 function Reset-HeniWindow([IntPtr]$Handle) {
   [HeniChromeProbe]::ShowWindow($Handle, 9) | Out-Null
+  # Move first so the target monitor, rather than a persisted monitor, decides
+  # the DPI used for the deterministic logical size below.
   [HeniChromeProbe]::SetWindowPos(
     $Handle, [IntPtr]::Zero, 50, 50, 1180, 760, 0x0040
   ) | Out-Null
-  return Wait-HeniTargetGeometry $Handle
+  Start-Sleep -Milliseconds 100
+  $scale = [HeniChromeProbe]::GetDpiForWindow($Handle) / 96.0
+  $targetWidth = [Math]::Round(1180 * $scale)
+  $targetHeight = [Math]::Round(760 * $scale)
+  [HeniChromeProbe]::SetWindowPos(
+    $Handle, [IntPtr]::Zero, 50, 50, $targetWidth, $targetHeight, 0x0040
+  ) | Out-Null
+  return Wait-HeniTargetGeometry $Handle $targetWidth $targetHeight
 }
 
-$process = Start-Process -FilePath (Resolve-Path $Executable).Path -PassThru
+$probeAppData = Join-Path (
+  [IO.Path]::GetTempPath()
+) "heni-chrome-probe-$([Guid]::NewGuid().ToString('N'))"
+[IO.Directory]::CreateDirectory($probeAppData) | Out-Null
+$previousAppData = $env:APPDATA
+try {
+  $env:APPDATA = $probeAppData
+  $process = Start-Process -FilePath (Resolve-Path $Executable).Path -PassThru
+} finally {
+  $env:APPDATA = $previousAppData
+}
 try {
   $handle = [IntPtr]::Zero
-  for ($attempt = 0; $attempt -lt 120; $attempt++) {
+  for ($attempt = 0; $attempt -lt 300; $attempt++) {
     Start-Sleep -Milliseconds 100
     $process.Refresh()
     if ($process.HasExited) {
@@ -218,10 +317,122 @@ try {
     throw 'Heni client area does not fill the top-level window.'
   }
 
+  $cornerPreference = 0
+  $cornerResult = [HeniChromeProbe]::DwmGetWindowAttribute(
+    $handle,
+    33,
+    [ref]$cornerPreference,
+    4
+  )
+  if ($cornerResult -eq 0) {
+    Write-Output "Heni DWM corner preference: $cornerPreference"
+    if ($cornerPreference -ne 2) {
+      throw "Heni did not request the standard rounded DWM corner style."
+    }
+  } else {
+    Write-Output (
+      "Heni DWM corner preference unavailable; square fallback expected " +
+      "(HRESULT=0x$($cornerResult.ToString('X8')))."
+    )
+  }
+
+  if ($Screenshot) {
+    $padding = 24
+    $captureWidth = $outerWidth + ($padding * 2)
+    $captureHeight = $outerHeight + ($padding * 2)
+    $bitmap = [System.Drawing.Bitmap]::new($captureWidth, $captureHeight)
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    try {
+      $graphics.CopyFromScreen(
+        $windowRect.Left - $padding,
+        $windowRect.Top - $padding,
+        0,
+        0,
+        $bitmap.Size
+      )
+      $resolvedScreenshot = [IO.Path]::GetFullPath($Screenshot)
+      [IO.Directory]::CreateDirectory(
+        [IO.Path]::GetDirectoryName($resolvedScreenshot)
+      ) | Out-Null
+      $bitmap.Save(
+        $resolvedScreenshot,
+        [System.Drawing.Imaging.ImageFormat]::Png
+      )
+      Write-Output "Heni chrome screenshot: $resolvedScreenshot"
+    } finally {
+      $graphics.Dispose()
+      $bitmap.Dispose()
+    }
+  }
+
+  $middleX = [Math]::Round(($windowRect.Left + $windowRect.Right) / 2)
+  $middleY = [Math]::Round(($windowRect.Top + $windowRect.Bottom) / 2)
+  $hitTests = @(
+    @('left', ($windowRect.Left + 1), $middleY, 10),
+    @('right', ($windowRect.Right - 1), $middleY, 11),
+    @('top', $middleX, ($windowRect.Top + 1), 12),
+    @(
+      'topLeft',
+      ($windowRect.Left + 1),
+      ($windowRect.Top + 1),
+      13
+    ),
+    @(
+      'topRight',
+      ($windowRect.Right - 1),
+      ($windowRect.Top + 1),
+      14
+    ),
+    @('bottom', $middleX, ($windowRect.Bottom - 1), 15),
+    @(
+      'bottomLeft',
+      ($windowRect.Left + 1),
+      ($windowRect.Bottom - 1),
+      16
+    ),
+    @(
+      'bottomRight',
+      ($windowRect.Right - 1),
+      ($windowRect.Bottom - 1),
+      17
+    )
+  )
+  $hitResults = foreach ($test in $hitTests) {
+    $packedPoint = (($test[2] -band 0xFFFF) -shl 16) -bor (
+      $test[1] -band 0xFFFF
+    )
+    $actual = [HeniChromeProbe]::SendMessage(
+      $handle,
+      0x0084,
+      [IntPtr]::Zero,
+      [IntPtr]::new($packedPoint)
+    ).ToInt32()
+    if ($actual -ne $test[3]) {
+      throw "Heni $($test[0]) hit test returned $actual, expected $($test[3])."
+    }
+    "$($test[0])=$actual"
+  }
+  Write-Output "Heni resize hit tests: $($hitResults -join ' ')"
+
+  if ($SkipPointerDragChecks) {
+    Write-Output 'Heni pointer drag checks skipped by request.'
+    return
+  }
+
   # Relative coordinates inside the Heni top chrome.
-  $brandPoint = [System.Drawing.Point]::new(42, 32)
-  $searchPoint = [System.Drawing.Point]::new(360, 32)
-  $spacerPoint = [System.Drawing.Point]::new(820, 32)
+  $scale = [HeniChromeProbe]::GetDpiForWindow($handle) / 96.0
+  $brandPoint = [System.Drawing.Point]::new(
+    [Math]::Round(42 * $scale),
+    [Math]::Round(32 * $scale)
+  )
+  $searchPoint = [System.Drawing.Point]::new(
+    [Math]::Round(360 * $scale),
+    [Math]::Round(32 * $scale)
+  )
+  $spacerPoint = [System.Drawing.Point]::new(
+    [Math]::Round(820 * $scale),
+    [Math]::Round(32 * $scale)
+  )
 
   # Expected results after a 180x90 pointer drag:
   # brand: window origin changes
@@ -244,4 +455,12 @@ try {
   }
 } finally {
   if (-not $process.HasExited) { Stop-Process -Id $process.Id }
+  $resolvedProbeAppData = [IO.Path]::GetFullPath($probeAppData)
+  $resolvedTemp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+  if ($resolvedProbeAppData.StartsWith(
+    $resolvedTemp,
+    [StringComparison]::OrdinalIgnoreCase
+  )) {
+    Remove-Item -LiteralPath $resolvedProbeAppData -Recurse -Force
+  }
 }
