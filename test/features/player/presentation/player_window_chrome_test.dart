@@ -61,6 +61,58 @@ void main() {
     expect(find.text('HENI'), findsNothing);
   });
 
+  testWidgets('brand switcher toggles views without stealing window drag', (
+    tester,
+  ) async {
+    final shellTheme = HeniShellTheme.fromPalette(HeniPalette.plum);
+    var toggleCount = 0;
+
+    Future<void> pumpSwitcher(HeniUiStyle activeView) {
+      return tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                height: 48,
+                child: HeniBrandViewSwitcher(
+                  activeView: activeView,
+                  shellTheme: shellTheme,
+                  onToggleView: () => toggleCount += 1,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    await pumpSwitcher(HeniUiStyle.scenery);
+    await tester.pump();
+    methods.clear();
+
+    expect(find.text('heni'), findsOneWidget);
+    expect(find.byTooltip('切换到歌曲列表'), findsOneWidget);
+    expect(find.byIcon(Icons.queue_music_rounded), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('heni-view-switch-button')));
+    await tester.pump();
+    expect(toggleCount, 1);
+    expect(methods, isNot(contains('beginDrag')));
+
+    await pumpSwitcher(HeniUiStyle.library);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('返回播放页面'), findsOneWidget);
+    expect(find.byIcon(Icons.graphic_eq_rounded), findsOneWidget);
+
+    methods.clear();
+    await tester.drag(
+      find.byKey(const ValueKey('heni-brand-drag-region')),
+      const Offset(40, 0),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(methods, contains('beginDrag'));
+  });
+
   testWidgets('double-clicking drag region toggles maximize', (tester) async {
     await tester.pumpWidget(
       const ProviderScope(

@@ -32,6 +32,7 @@ import 'playback_queue_location.dart';
 import 'player_progress.dart';
 import 'player_responsive_layout.dart';
 import 'player_shell_frame.dart';
+import 'player_view_switcher.dart';
 import 'player_window_chrome.dart';
 import 'volume_control.dart';
 
@@ -1134,6 +1135,18 @@ class PlayerScreen extends ConsumerWidget {
       );
     }
 
+    void selectUiStyle(HeniUiStyle style) {
+      if (style == uiStyle) {
+        return;
+      }
+      ref.read(activeUiStyleProvider.notifier).select(style);
+      unawaited(
+        ref
+            .read(playbackQueueControllerProvider.notifier)
+            .persistShellPreferences(uiStyle: style),
+      );
+    }
+
     final scaffold = Scaffold(
       backgroundColor: Colors.transparent,
       body: HeniPanoramicShellFrame(
@@ -1184,6 +1197,8 @@ class PlayerScreen extends ConsumerWidget {
                                           shellTheme: shellTheme,
                                           queue: queue,
                                           layout: layout,
+                                          uiStyle: uiStyle,
+                                          onSelectUiStyle: selectUiStyle,
                                         ),
                               ),
                               Expanded(
@@ -1435,23 +1450,6 @@ class PlayerScreen extends ConsumerWidget {
                                                     .notifier,
                                               )
                                               .enqueueItem(item);
-                                        },
-                                        onSelectUiStyle: (style) {
-                                          ref
-                                              .read(
-                                                activeUiStyleProvider.notifier,
-                                              )
-                                              .select(style);
-                                          unawaited(
-                                            ref
-                                                .read(
-                                                  playbackQueueControllerProvider
-                                                      .notifier,
-                                                )
-                                                .persistShellPreferences(
-                                                  uiStyle: style,
-                                                ),
-                                          );
                                         },
                                       ),
                                     ),
@@ -1800,12 +1798,16 @@ class _TopNavigation extends ConsumerWidget {
     required this.shellTheme,
     required this.queue,
     required this.layout,
+    required this.uiStyle,
+    required this.onSelectUiStyle,
   });
 
   final HeniPalette palette;
   final HeniShellTheme shellTheme;
   final PlaybackQueueState queue;
   final _ShellLayout layout;
+  final HeniUiStyle uiStyle;
+  final ValueChanged<HeniUiStyle> onSelectUiStyle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1821,7 +1823,18 @@ class _TopNavigation extends ConsumerWidget {
       radius: 0,
       child: Row(
         children: [
-          HeniWindowDragRegion(child: _TopBrand(layout: layout)),
+          HeniBrandViewSwitcher(
+            activeView: uiStyle,
+            shellTheme: shellTheme,
+            compact: layout.quiet,
+            onToggleView: () {
+              onSelectUiStyle(
+                uiStyle == HeniUiStyle.scenery
+                    ? HeniUiStyle.library
+                    : HeniUiStyle.scenery,
+              );
+            },
+          ),
           Expanded(
             child: HeniTopChromeCenter(
               search: Padding(
@@ -1962,24 +1975,6 @@ class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 14),
         ),
-      ),
-    );
-  }
-}
-
-class _TopBrand extends StatelessWidget {
-  const _TopBrand({required this.layout});
-
-  final _ShellLayout layout;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: layout.quiet ? 54 : 82,
-      height: double.infinity,
-      child: const Align(
-        alignment: Alignment.centerLeft,
-        child: HeniBrandWordmark(),
       ),
     );
   }
@@ -3001,7 +2996,6 @@ class _ContentArea extends ConsumerWidget {
     required this.onRemoveFromPlaybackQueue,
     required this.onPlayNext,
     required this.onEnqueue,
-    required this.onSelectUiStyle,
   });
 
   final HeniPalette palette;
@@ -3027,7 +3021,6 @@ class _ContentArea extends ConsumerWidget {
   final ValueChanged<int> onRemoveFromPlaybackQueue;
   final void Function(MediaItem item) onPlayNext;
   final void Function(MediaItem item) onEnqueue;
-  final ValueChanged<HeniUiStyle> onSelectUiStyle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -3064,7 +3057,6 @@ class _ContentArea extends ConsumerWidget {
                 palette: palette,
                 uiStyle: uiStyle,
                 queue: queue,
-                currentMedia: currentMedia,
                 layout: layout,
                 onPickScenery: onPickScenery,
                 onPickMedia: onPickMedia,
@@ -3072,45 +3064,48 @@ class _ContentArea extends ConsumerWidget {
                 onRefreshLibrary: onRefreshLibrary,
                 onAddFromLibrary: onAddFromLibrary,
                 onManagePlaylist: onManagePlaylist,
-                onSelectUiStyle: onSelectUiStyle,
               ),
             ),
           if (uiStyle == HeniUiStyle.scenery && !fullBleed)
             SizedBox(height: layout.contentGap),
           Expanded(
-            child: switch (uiStyle) {
-              HeniUiStyle.library => _LibraryContent(
-                palette: palette,
-                shellTheme: shellTheme,
-                queue: queue,
-                layout: layout,
-                onPlayIndex: onPlayIndex,
-                onAddToPlaylist: onAddToPlaylist,
-                onRemoveFromPlaylist: onRemoveFromPlaylist,
-                onRemoveFromPlaybackQueue: onRemoveFromPlaybackQueue,
-                onPlayNext: onPlayNext,
-                onEnqueue: onEnqueue,
-                onPickFolder: onPickFolder,
-                onPickMedia: onPickMedia,
-                onRefreshLibrary: onRefreshLibrary,
-                onAddFromLibrary: onAddFromLibrary,
-                onManagePlaylist: onManagePlaylist,
-                onSelectUiStyle: onSelectUiStyle,
-              ),
-              _ => _SceneryContent(
-                palette: palette,
-                queue: queue,
-                currentMedia: currentMedia,
-                mediaProbe: mediaProbe,
-                engine: engine,
-                videoController: videoController,
-                layout: layout,
-                onShowPlaybackQueue: onShowPlaybackQueue,
-                onOpenFileLocation: onOpenFileLocation,
-                onPickMedia: onPickMedia,
-                onPickFolder: onPickFolder,
-              ),
-            },
+            child: HeniRetainedViewStack(
+              activeIndex: uiStyle == HeniUiStyle.library ? 0 : 1,
+              children: [
+                _LibraryContent(
+                  key: const ValueKey('heni-library-view'),
+                  palette: palette,
+                  shellTheme: shellTheme,
+                  queue: queue,
+                  layout: layout,
+                  onPlayIndex: onPlayIndex,
+                  onAddToPlaylist: onAddToPlaylist,
+                  onRemoveFromPlaylist: onRemoveFromPlaylist,
+                  onRemoveFromPlaybackQueue: onRemoveFromPlaybackQueue,
+                  onPlayNext: onPlayNext,
+                  onEnqueue: onEnqueue,
+                  onPickFolder: onPickFolder,
+                  onPickMedia: onPickMedia,
+                  onRefreshLibrary: onRefreshLibrary,
+                  onAddFromLibrary: onAddFromLibrary,
+                  onManagePlaylist: onManagePlaylist,
+                ),
+                _SceneryContent(
+                  key: const ValueKey('heni-playback-view'),
+                  palette: palette,
+                  queue: queue,
+                  currentMedia: currentMedia,
+                  mediaProbe: mediaProbe,
+                  engine: engine,
+                  videoController: videoController,
+                  layout: layout,
+                  onShowPlaybackQueue: onShowPlaybackQueue,
+                  onOpenFileLocation: onOpenFileLocation,
+                  onPickMedia: onPickMedia,
+                  onPickFolder: onPickFolder,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -3123,7 +3118,6 @@ class _ContentHeader extends StatelessWidget {
     required this.palette,
     required this.uiStyle,
     required this.queue,
-    required this.currentMedia,
     required this.layout,
     required this.onPickScenery,
     required this.onPickMedia,
@@ -3131,13 +3125,11 @@ class _ContentHeader extends StatelessWidget {
     required this.onRefreshLibrary,
     required this.onAddFromLibrary,
     required this.onManagePlaylist,
-    required this.onSelectUiStyle,
   });
 
   final HeniPalette palette;
   final HeniUiStyle uiStyle;
   final PlaybackQueueState queue;
-  final MediaItem? currentMedia;
   final _ShellLayout layout;
   final VoidCallback onPickScenery;
   final VoidCallback onPickMedia;
@@ -3145,7 +3137,6 @@ class _ContentHeader extends StatelessWidget {
   final VoidCallback onRefreshLibrary;
   final ValueChanged<String> onAddFromLibrary;
   final ValueChanged<HeniPlaylist> onManagePlaylist;
-  final ValueChanged<HeniUiStyle> onSelectUiStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -3166,9 +3157,7 @@ class _ContentHeader extends StatelessWidget {
       return _StageHeaderDock(
         palette: palette,
         headingLabel: headingLabel,
-        active: uiStyle,
         onPickScenery: onPickScenery,
-        onSelectUiStyle: onSelectUiStyle,
       );
     }
 
@@ -3186,16 +3175,7 @@ class _ContentHeader extends StatelessWidget {
               FilledButton(onPressed: onPickMedia, child: const Text('添加文件')),
             ]
             : browsingPlaybackQueue
-            ? <Widget>[
-              FilledButton.tonalIcon(
-                onPressed:
-                    currentMedia == null
-                        ? null
-                        : () => onSelectUiStyle(HeniUiStyle.scenery),
-                icon: const Icon(Icons.play_circle_outline),
-                label: const Text('回到播放中'),
-              ),
-            ]
+            ? <Widget>[]
             : <Widget>[
               OutlinedButton(
                 onPressed: () => onManagePlaylist(playlist),
@@ -3269,16 +3249,9 @@ class _ContentHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  _HeadingChip(label: headingLabel, palette: palette),
-                  const Spacer(),
-                  _UiStyleSwitch(
-                    palette: palette,
-                    active: uiStyle,
-                    onSelect: onSelectUiStyle,
-                  ),
-                ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _HeadingChip(label: headingLabel, palette: palette),
               ),
               const SizedBox(height: 10),
               titleText,
@@ -3298,12 +3271,6 @@ class _ContentHeader extends StatelessWidget {
             _HeadingChip(label: headingLabel, palette: palette),
             const SizedBox(width: 10),
             Expanded(child: titleText),
-            const SizedBox(width: 12),
-            _UiStyleSwitch(
-              palette: palette,
-              active: uiStyle,
-              onSelect: onSelectUiStyle,
-            ),
           ],
         );
 
@@ -3369,16 +3336,12 @@ class _StageHeaderDock extends StatelessWidget {
   const _StageHeaderDock({
     required this.palette,
     required this.headingLabel,
-    required this.active,
     required this.onPickScenery,
-    required this.onSelectUiStyle,
   });
 
   final HeniPalette palette;
   final String headingLabel;
-  final HeniUiStyle active;
   final VoidCallback onPickScenery;
-  final ValueChanged<HeniUiStyle> onSelectUiStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -3448,12 +3411,6 @@ class _StageHeaderDock extends StatelessWidget {
                   ),
                 ),
               const Spacer(),
-              _UiStyleSwitch(
-                palette: palette,
-                active: active,
-                onSelect: onSelectUiStyle,
-              ),
-              SizedBox(width: tight ? 6 : 8),
               Tooltip(
                 message: '更换背景',
                 child: AnimatedContainer(
@@ -3548,13 +3505,11 @@ class _LibraryHeroBanner extends StatelessWidget {
   const _LibraryHeroBanner({
     required this.palette,
     required this.activePlaylist,
-    required this.uiStyle,
     required this.browsingLibrary,
     required this.browsingPlaybackQueue,
     required this.itemCount,
     required this.totalDurationLabel,
     required this.actions,
-    required this.onSelectUiStyle,
     required this.libraryDirCount,
     required this.isScanning,
     this.playbackSourceName,
@@ -3562,13 +3517,11 @@ class _LibraryHeroBanner extends StatelessWidget {
 
   final HeniPalette palette;
   final HeniPlaylist activePlaylist;
-  final HeniUiStyle uiStyle;
   final bool browsingLibrary;
   final bool browsingPlaybackQueue;
   final int itemCount;
   final String totalDurationLabel;
   final List<Widget> actions;
-  final ValueChanged<HeniUiStyle> onSelectUiStyle;
   final int libraryDirCount;
   final bool isScanning;
 
@@ -3711,14 +3664,7 @@ class _LibraryHeroBanner extends StatelessWidget {
       runSpacing: 6,
       crossAxisAlignment: WrapCrossAlignment.center,
       alignment: WrapAlignment.end,
-      children: [
-        ...actions,
-        _UiStyleSwitch(
-          palette: palette,
-          active: uiStyle,
-          onSelect: onSelectUiStyle,
-        ),
-      ],
+      children: actions,
     );
 
     return LayoutBuilder(
@@ -3888,6 +3834,7 @@ class _HeadingChip extends StatelessWidget {
 
 class _SceneryContent extends ConsumerWidget {
   const _SceneryContent({
+    super.key,
     required this.palette,
     required this.queue,
     required this.currentMedia,
@@ -4406,6 +4353,7 @@ class _SceneryInfoBlock extends StatelessWidget {
 
 class _LibraryContent extends ConsumerStatefulWidget {
   const _LibraryContent({
+    super.key,
     required this.palette,
     required this.shellTheme,
     required this.queue,
@@ -4421,7 +4369,6 @@ class _LibraryContent extends ConsumerStatefulWidget {
     required this.onRefreshLibrary,
     required this.onAddFromLibrary,
     required this.onManagePlaylist,
-    required this.onSelectUiStyle,
   });
 
   final HeniPalette palette;
@@ -4439,7 +4386,6 @@ class _LibraryContent extends ConsumerStatefulWidget {
   final VoidCallback onRefreshLibrary;
   final ValueChanged<String> onAddFromLibrary;
   final ValueChanged<HeniPlaylist> onManagePlaylist;
-  final ValueChanged<HeniUiStyle> onSelectUiStyle;
 
   @override
   ConsumerState<_LibraryContent> createState() => _LibraryContentState();
@@ -4548,22 +4494,7 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
               ),
             ]
             : browsingPlaybackQueue
-            ? <Widget>[
-              IconButton.filledTonal(
-                tooltip: '回到播放界面',
-                onPressed:
-                    widget.queue.currentItem == null
-                        ? null
-                        : () => widget.onSelectUiStyle(HeniUiStyle.scenery),
-                icon: const Icon(Icons.play_circle_outline, size: 22),
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(38, 38),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  padding: EdgeInsets.zero,
-                  foregroundColor: _stateIconOnGlass(context, active: true),
-                ),
-              ),
-            ]
+            ? <Widget>[]
             : <Widget>[
               IconButton(
                 tooltip: '管理歌单',
@@ -4601,13 +4532,11 @@ class _LibraryContentState extends ConsumerState<_LibraryContent> {
         _LibraryHeroBanner(
           palette: widget.palette,
           activePlaylist: activePlaylist,
-          uiStyle: HeniUiStyle.library,
           browsingLibrary: browsingLibrary,
           browsingPlaybackQueue: browsingPlaybackQueue,
           itemCount: items.length,
           totalDurationLabel: totalLabel,
           actions: actionButtons,
-          onSelectUiStyle: widget.onSelectUiStyle,
           libraryDirCount: widget.queue.libraryDirectories.length,
           isScanning: widget.queue.isScanning,
           playbackSourceName:
@@ -8738,121 +8667,6 @@ class _PaletteSwatch extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _UiStyleSwitch extends StatelessWidget {
-  const _UiStyleSwitch({
-    required this.palette,
-    required this.active,
-    required this.onSelect,
-  });
-
-  final HeniPalette palette;
-  final HeniUiStyle active;
-  final ValueChanged<HeniUiStyle> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final styles = HeniUiStyle.values;
-    final activeIndex = styles.indexOf(active);
-
-    return Container(
-      width: 132,
-      height: 38,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final segW = constraints.maxWidth / styles.length;
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeOutCubic,
-                left: activeIndex * segW,
-                top: 0,
-                bottom: 0,
-                width: segW,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        palette.accent.withValues(alpha: 0.92),
-                        Color.lerp(palette.accent, palette.seed, 0.36)!,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: palette.accent.withValues(alpha: 0.20),
-                        blurRadius: 8,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  for (final style in styles)
-                    Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => onSelect(style),
-                        child: Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                style == HeniUiStyle.scenery
-                                    ? Icons.wallpaper_outlined
-                                    : Icons.table_rows_rounded,
-                                size: 13,
-                                color:
-                                    style == active
-                                        ? heniReadableForegroundOn(
-                                          palette.accent,
-                                        )
-                                        : Colors.white.withValues(alpha: 0.62),
-                              ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  style.label,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
-                                    color:
-                                        style == active
-                                            ? heniReadableForegroundOn(
-                                              palette.accent,
-                                            )
-                                            : Colors.white.withValues(
-                                              alpha: 0.62,
-                                            ),
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          );
-        },
       ),
     );
   }

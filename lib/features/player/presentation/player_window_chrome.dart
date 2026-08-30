@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../design/app_theme.dart';
 import '../../../design/heni_shell_theme.dart';
 import '../../../services/window/heni_window_controller.dart';
 
@@ -42,6 +43,110 @@ class HeniWindowDragRegion extends ConsumerWidget {
         unawaited(ref.read(heniWindowControllerProvider.notifier).beginDrag());
       },
       child: child,
+    );
+  }
+}
+
+class HeniBrandViewSwitcher extends StatelessWidget {
+  const HeniBrandViewSwitcher({
+    required this.activeView,
+    required this.shellTheme,
+    required this.onToggleView,
+    this.compact = false,
+    super.key,
+  });
+
+  final HeniUiStyle activeView;
+  final HeniShellTheme shellTheme;
+  final VoidCallback onToggleView;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final showLibrary = activeView == HeniUiStyle.scenery;
+    final tooltip = showLibrary ? '切换到歌曲列表' : '返回播放页面';
+    final icon =
+        showLibrary ? Icons.queue_music_rounded : Icons.graphic_eq_rounded;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        HeniWindowDragRegion(
+          child: SizedBox(
+            key: const ValueKey('heni-brand-drag-region'),
+            width: compact ? 52 : 68,
+            height: double.infinity,
+            child: const Align(
+              alignment: Alignment.centerLeft,
+              child: HeniBrandWordmark(),
+            ),
+          ),
+        ),
+        SizedBox(width: compact ? 2 : 4),
+        Semantics(
+          button: true,
+          label: tooltip,
+          child: Tooltip(
+            message: tooltip,
+            child: IconButton(
+              key: const ValueKey('heni-view-switch-button'),
+              onPressed: onToggleView,
+              style: ButtonStyle(
+                fixedSize: WidgetStatePropertyAll(
+                  Size.square(compact ? 32 : 34),
+                ),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+                shape: WidgetStatePropertyAll(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                foregroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.hovered) ||
+                      states.contains(WidgetState.focused)) {
+                    return shellTheme.primaryText;
+                  }
+                  return shellTheme.secondaryText;
+                }),
+                backgroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.pressed)) {
+                    return shellTheme.pressed;
+                  }
+                  if (states.contains(WidgetState.hovered) ||
+                      states.contains(WidgetState.focused)) {
+                    return shellTheme.hover;
+                  }
+                  return Colors.white.withValues(alpha: 0.025);
+                }),
+                overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+              ),
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 190),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeOutCubic,
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.18),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  );
+                },
+                child: Icon(
+                  icon,
+                  key: ValueKey(activeView),
+                  size: compact ? 17 : 18,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
