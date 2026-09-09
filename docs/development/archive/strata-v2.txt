@@ -1,0 +1,598 @@
+Heni Strata V2
+第二阶段：架构收敛、产品视觉重建与 Windows 发布闭环
+
+状态：第二阶段执行基线
+生效日期：2026-09-03
+适用仓库：Heni 根目录的 Tauri 2 + React + TypeScript 实现
+历史基线：docs/task-demand.md
+
+本文件从生效日起替代 docs/task-demand.md 作为后续工作的第一需求入口。
+docs/task-demand.md、旧 strata.md 和 legacy/v1-flutter 中的文档继续保留为历史证据，
+不得删除或篡改。若本文件与旧需求冲突，以本文件为准；若本文件与真实代码、测试或
+Windows 实机证据冲突，先记录事实和风险，再修正文档或提交 ADR，不得掩盖差异。
+
+“第二阶段”指 Strata V2 的产品与工程阶段，不等同于旧 task-demand 中已经完成的
+“Phase 2 播放会话”。旧 Phase 0–6 进度只用于追溯，不再直接代表产品完成度。
+
+动态进度（2026-09-03）：S2-0 已完成；S2-1 代码已落地，验收收尾中。文件/目录导入已
+抽为具名工作流，启动已建立 booting/ready/degraded/blocked 纯投影；浏览器预览与真实
+桌面握手失败有独立语义，预期预览错误不再冒充产品故障。global.css 现在只保留 10 行
+有序导入，主题变量统一在 tokens.css，功能样式按现有职责拆分，未引入全局 store 或
+通用 manager。当前自动检查为 TypeScript 47 个文件/271 项、Rust 114 项常规测试通过，
+3 项设备/ffprobe 环境测试本轮未重跑；lint、typecheck、build、fmt 与 clippy 均通过。
+GUI 子系统和既有窗口/曲库证据按实际产物分别记录，不自动继承到最新构建。
+待验收：浏览器工具运行时无法加载内部模块，本轮预览截图/DOM 未能执行；125%/150% DPI
+仍待检查。S2-1 不因此标记为全部完成。为避免工具故障阻塞独立工作，S2-2 已先落地品牌与
+中文文案切片：主播放台、底部播放条和 MiniPlayer 移除 H 占位，改为无文字唱片；四工作区、
+启动状态和媒体详情去除工程英文，保留真实编码、采样率等事实。实机发现的空态标题截断已
+通过精简文案修正。未更换数据/播放架构；曲库密度和美景首切片已继续落地，完整视觉验收仍待。
+后续推进：已修复把最大化矩形当作普通窗保存的问题，并对普通窗按工作区边界限位；
+普通窗 → 最大化 → Mini → 返回 → 还原，以及最大化退出后重启/还原已实机检查。
+曲库密度切片已落地，路径移入“更多”，缺失状态不再整行降低对比度；前序构建完成真实
+201 项曲库检查。美景设置代码已落地：独立 SceneryPort、本地静态 PNG/JPEG 选择、
+验证后持久化、取消/清除、坏图回退；中间 Release 已实测选图显示和取消保留。最新的
+主题遮罩、语义表面与启动深色底屏已生成 13:24:17 的 Release（SHA-256 前缀 5D83B28C，
+完整值见发布记录），启动恢复用户已保存的背景；真实 201 项曲库在 902×790、902×651
+与最大化外框下检查，次级路径/操作可滚动到达。三主题已实际切换；潮汐主题完成最大化
+→ Mini 422×267 → 最小 Mini 362×251 → 返回最大化 → 还原为 902×651 的链路。
+录音室主题和用户背景已保留，未播放或改动媒体。以上是捕获外框，不等于 CSS 视口；
+完整主题/图片组合、实机清除/源图丢失、精确 DPI 和多屏移动仍未通过，不关闭 S2-2。
+S2-3 的播放时钟首切片已落地：采样时间与 snapshot 原子接收，进度控件局部插值；
+750ms 推算上限、隐藏/卸载取消、seek 等待/失败/取消、键盘秒级移动和迟到请求已有测试。
+首切片保留 300ms 原生快照读取。前序 Release 为 14:52:23 的 91BB188E（完整 SHA-256
+见发布记录），真实 FLAC 已完成
+静音播放、暂停、拖动、条外松开、连续秒级按键、Mini 往返与曲尾自动续播；首轮发现的
+seek 禁用丢焦点问题已修正并实机复核。测试结束停止播放、恢复未静音并重启；没有改动
+媒体或旧数据。未测听感、帧率、毫秒误差和完整格式/模式矩阵，不关闭 S2-3。
+接续的条件读取已实现：Rust 在 tick 后比较已知版本，稳定状态只返回位置/时长和媒体身份，
+变化后才返回完整快照；不增加状态 sequence，不复制 queue。移除从未接入的旧事件草案，
+共享响应夹具、恢复读取和 seek 草稿保持已加入测试。5,000 项合成队列的位置/完整响应
+实测分别为 133/551,874 bytes；仅证明载荷大小，不宣称 CPU、帧率或 IPC 次数改善。
+前序 Release 为 15:24:03 的 6EDE9510（完整 SHA-256 见发布记录），已实测暂停/拖动/键盘
+续接、曲尾自动切歌、播放中队列确认保持与取消、Mini 继续/暂停/返回；停止后归零。
+原生 position event/订阅和跨通道采样顺序仍未实现，设计决定见 ADR 0004、学习 028。
+音量恢复切片的代码和自动检查已通过：Rust 在启动播放核心前恢复 volume/muted/
+lastAudibleVolume，作为一组写入既有 SQLite settings；失败不提交声音和会话变化，坏数据
+以静音启动并提示。主窗滑块先预览、松开一次应用和保存，取消不写入；这与 Flutter 拖动中
+实时试听存在差异，尚未获批为等价。命令错误保留到关闭或下一次操作，不被正常采样抹掉。
+本切片新增 20 项 TS、13 项 Rust 测试；当前 Release 为 19:22:12 的 CB8E62D6，GUI 子系统
+为 2，已观察到就绪空队列、用户当前深夜主题和既有背景。桌面工具激活窗口连续失败，
+按技能规则暂停输入；没有执行音量修改，重启和 Mini 验收仍待补齐，详见发布记录。
+模型和取舍见 ADR 0005、学习 029；不把此前 6EDE 的播放证据继承为本切片证据。
+CB8E 之后又完成三个源码加固：音量失效草稿不会在外部静音来回切换后复活；播放与
+设置五条入口显式移入后台阻塞工作池；曲库 Hook 增加同步防重入、连接隔离、迟到
+started 的原端口取消、取消去重/重试，以及扫描结束/失败的有限展示。空曲库残留的
+SQLite 术语已清除。另增 20 项 TS（音量 3、曲库 Hook 14、组件 3）与 6 项 Rust 测试。
+这些后续源码尚未进入 CB8E exe；当前测试进程仍占用该路径，已请用户方便时关闭，
+不强行结束用户窗口。学习 030、ADR 0006 记录线程边界与连接生命周期。客户端全绿后，
+曲库/歌单/旧库/扫描/ffprobe 的 12 条 I/O 入口也已移入阻塞工作池，另增 3 项 Rust；
+取消仍使用独立的短同步控制，授权、备份、事务和批次规则不变。窗口/Shell 平台边界、
+实机取消延迟与性能门槛没有因此关闭。
+
+
+一、执行角色与最终目标
+
+你是一名资深桌面音乐产品架构师、Tauri/Rust 工程师、React/TypeScript 工程师和
+TypeScript 教练。请在当前 Heni 仓库中继续完成 Windows 优先的 local-first 本地音乐
+播放器。
+
+第二阶段不是再次推倒重写。现有 Tauri/TypeScript 架构方向总体合理，应保留已经验证的
+播放、曲库、SQLite、歌单、队列、错误恢复和 Windows 系统边界，在此基础上完成：
+
+1. 恢复并守住全绿工程基线；
+2. 收敛顶层装配、启动和跨 feature 工作流；
+3. 重建具有 Heni 个性的产品 UI，而不是继续停留在工程样机；
+4. 以真实 Windows Release、真实媒体和真实用户数据闭环剩余功能；
+5. 继续把真实生产代码建设成可学习的 TypeScript 工程。
+
+首要平台仍是 Windows。Linux、macOS 只在 Windows 稳定后评估；iOS、Android 属于另一个
+产品和运行时阶段，不得为了“未来跨平台”提前污染当前边界。
+
+
+二、审计结论
+
+2.1 总体判断
+
+当前 Heni 的顶层设计是合理的，结论是“继续演进，不重新换架构”。正确的核心包括：
+
+- 仓库根只有一个在建应用，Flutter v1 完整保存在 legacy/v1-flutter；
+- React/TypeScript 负责界面、展示投影、交互用例和运行时契约；
+- Rust 负责权威播放会话、音频资源、SQLite、扫描、元数据和 Windows 能力；
+- src/infrastructure/tauri 是前端唯一 Tauri API 边界；
+- IPC 输入由 Zod/serde 校验，错误使用有限 code，不把底层诊断直接显示给用户；
+- 播放队列和状态由 Rust 持有唯一真相，generation/sequence 防止迟到结果覆盖新状态；
+- SQLite schema、migration 和事务留在 Rust；
+- 没有为了形式引入 workspace、通用 repository 基类、事件总线或万能全局 store；
+- Rust lib.rs 保持为小型装配根，没有发展成参考项目中的巨型入口文件；
+- capability 和 CSP 保持收敛。
+
+这些边界不得因 UI 重建而倒退。
+
+2.2 当前需要修正的顶层问题
+
+以下是第二阶段的真实工程债，不允许继续用“Phase 已完成”跳过：
+
+1. App.tsx 曾同时承担依赖装配、导入文件、扫描目录、重新定位、跨 feature 错误恢复、
+   视图选择和视图渲染。S2-1 已先把文件/目录导入收敛到 useLocalImportWorkflows；重新定位
+   与错误恢复仍需按真实用例审查。拆分继续以变化原因为依据，App.tsx 保持清楚的
+   composition root。
+2. 原 global.css 的约 2,100 行混合职责已在 S2-1 收敛为有序 CSS 入口：tokens、base、shell、
+   now-playing、queue、library、playlist、playback、feedback 和 responsive。主题定义只在
+   tokens.css；不得在功能样式中重新复制主题变量，也不因此引入 CSS-in-JS 或大型 UI 框架。
+3. Rust 的 library/repository.rs、playback/session.rs、legacy_import.rs 和 native.rs
+   是职责审查热点。只在它们混合两个独立变化原因时拆分，不按机械行数切碎。
+4. settings 与 library 分别持有同一 SQLite 文件的连接是可接受的 SQLite 模式，但
+   数据库打开参数、migration、busy timeout 和错误映射必须只有一个明确来源；不得让
+   每个新 feature 复制一套数据库初始化逻辑。
+5. S2-3 已建立 playback clock seam、有界局部插值和 300ms 条件读取：稳定状态不再传输
+   全队列，状态变化返回完整快照；每帧时间不进入 React 全局状态。位置采样与状态版本
+   已分离，原生 position event、订阅生命周期和跨通道采样顺序仍需单独实现/验收；不能
+   把减小载荷说成减少 IPC 次数，也不能把条件读取误标为事件推送完成。
+6. 初审曾发现 architecture.md 仍把主题描述为会话状态，而代码已经加入 SQLite settings；
+   S2-0 已修正文档，S2-1 继续同步启动/样式与发布证据。每个切片必须保持代码、测试、
+   架构和 Strata 进度一致。
+7. 不强制引入 Zustand。当前局部 Hook 和纯投影是更小的方案；只有同一客户端状态确实被
+   多个远距离消费者共享且 props/Context 已形成负担时，才建立窄而明确的 Zustand store。
+8. 不强制引入 React Router。Heni 当前四个工作区没有 URL、历史栈或深链接需求，字符串
+   联合视图足够。出现第二个真实导航需求时再引入路由。
+
+2.3 本次审计发现并已在 S2-0 关闭的红色基线
+
+2026-09-03 首次重新检查时：
+
+- pnpm lint 通过；
+- pnpm typecheck 失败，两个 settings 测试使用 object spread 合并 Partial update，
+  在 exactOptionalPropertyTypes 下把必填字段推导为可能 undefined；
+- Vitest 观察到 3 个 App 集成测试失败，症状集中在 settings hydration 期间主操作被禁用
+  以及设置错误干扰其他恢复流程；
+- cargo fmt --check、cargo clippy --all-targets -- -D warnings 和 cargo test 在
+  2026-09-03 重新通过；Rust 为 70 项常规测试通过、3 项真实设备/ffprobe 环境测试忽略；
+- 浏览器预览不具备 Tauri runtime，出现“本地核心连接失败”本身可解释，但预览模式不应
+  产生会遮盖主要任务的“设置没有保存”产品噪声；真实 Release 必须另行验证。
+
+这些问题现已按 S2-0 关闭：测试用显式字段 merge 表达 Partial update 语义，主操作在
+settings hydration 期间使用安全默认值，迟到读取仍受 mutation epoch 保护，设置错误留在
+设置入口。Windows Release 同时补上 GUI subsystem 标记。当前全绿结果以上方动态进度为准。
+
+
+三、Museek 顶层设计研究结论
+
+研究对象：https://github.com/aeroray/Museek
+本地只读快照：research/upstream/Museek
+固定提交：83c547df1525a7a2b6de66f5151b458a1abe04fb
+许可证：MIT
+
+Museek 是值得尊重的成熟 Tauri 音乐产品，但 Heni 只借鉴经审计的原则，保持 clean-room
+独立命名、独立实现和独立测试。
+
+3.1 应借鉴
+
+- App 只声明路由和全局产品入口，RootLayout 固定组合侧栏、TopBar、Outlet 和 PlayerBar；
+- 主内容切换时播放器和队列外壳保持稳定，音乐产品不会因页面导航重建播放核心；
+- AppInit 明确表达设置、来源、下载、曲库、Open With 和播放恢复之间的启动顺序；
+- main.tsx 能按窗口角色选择不同根组件，说明多窗口不是在单个页面里堆条件分支；
+- playback/clock.ts 把平滑播放时间做成独立订阅缝隙，UI 不直接抓取底层音频对象；
+- 通知、Play All 等窄端口避免 store 互相反向导入；
+- Mini Player、系统媒体控制、防休眠、托盘、自动更新、NSIS/DMG 和数据备份形成完整的
+  桌面产品发布清单；
+- 缺失本地文件保留 unavailable 状态，不静默破坏用户收藏和分类。
+
+Heni 应借鉴的是“稳定外壳 + 明确启动 + 独立播放时钟 + 发布闭环”，不是目录名称。
+
+3.2 不得照搬
+
+- Museek 的 playerStore.ts 约 1,033 行、localMusicStore.ts 约 1,043 行，播放、I/O、歌词、
+  封面、持久化和大量副作用聚合；Heni 不得用一个 Zustand store 复刻这种复杂度。
+- Museek 的 Rust lib.rs 约 1,956 行；Heni 当前 67 行装配根明显更健康，不得倒退。
+- Windows 本地音频存在 fetch arrayBuffer + decodeAudioData 的整文件 WebView 解码路径；
+  Heni 正式内核继续使用 Rust 原生解码/输出，Web Audio 只可作为实验对照。
+- Museek 的本地曲库和多类偏好大量使用前端 JSON/文件插件；Heni 继续使用 Rust SQLite、
+  migration 和事务。
+- 参考快照设置 csp: null，并开放 **、HOME、Desktop、Downloads 等宽文件权限；Heni
+  保持最小 capability 和结构化原生命令。
+- Museek 的在线音源、下载、歌词和识曲不属于 Heni 当前产品范围。
+- 不因为 Museek 使用 Tailwind、Radix、React Router 或 Zustand，就把这些依赖视为
+  “现代化套餐”。只有 Heni 的真实问题证明收益时才引入。
+
+
+四、legacy Flutter UI 审计与 Heni 视觉宪章
+
+审计事实来自：
+
+- legacy/v1-flutter/lib/design/app_theme.dart
+- legacy/v1-flutter/lib/design/heni_shell_theme.dart
+- legacy/v1-flutter/lib/features/player/presentation/
+- legacy/v1-flutter/docs/superpowers/specs/
+- legacy/v1-flutter/docs/plans/2026-07-17-panoramic-theme-shell-design.md
+- legacy/v1-flutter/build-cache/visual-check/*.png
+- legacy/v1-flutter/logs/visual-qa/*.png
+
+用户对 legacy 视觉的偏好是产品需求，不是可选灵感。
+
+4.1 必须继承的气质
+
+- 全窗口只有一个全景美景背景层，贯穿顶栏、侧栏、主内容和底部播放坞；
+- 深色、低眩光、带主题染色的录音室哑光/玻璃材质；
+- 背景负责氛围，语义主题负责可读性和交互状态，两者不能互相替代；
+- 常驻底部播放坞：左侧当前曲目，中间播放/进度，右侧队列/模式/音量；
+- 桌面宽度默认展开侧栏，空间不足时紧凑化，并有迟滞避免 resize 抖动；
+- 中文为默认产品语言，字体优先 Microsoft YaHei、Segoe UI 和系统 sans-serif；
+- 播放页是安静的 listening console，展示可信的源文件与音频信息，不伪造音质；
+- 动效克制：短 hover、平稳布局切换、缓慢背景交叉淡化，不持续漂浮或脉冲；
+- Windows 最小可用逻辑尺寸 900 × 620，1180 × 760 是主要设计基准；
+- 左上角品牌只显示四个小写字母“heni”。
+
+4.2 必须修正的 legacy 缺陷
+
+- 不复刻多层透明蒙版相乘后的灰雾和低对比度；
+- 不复刻每一层、每一行都套大圆角边框的“卡片套卡片”；
+- 不让大面积装饰和空白压过曲库信息密度；
+- 不让背景图导致正文、路径、disabled 状态和焦点环不可辨认；
+- 不让主题色以高饱和度大面积铺在文本下面；
+- 不把文件路径放在比歌曲元数据更抢眼的位置；
+- 不依赖单个截图的临时配色，所有主题都必须经过同一语义 token 规则。
+
+4.3 初审时对 Tauri UI 的判断与修复追踪
+
+初审时 Tauri UI 比早期 Flutter 版本更清楚、更克制，侧栏、主区和底栏层级已经成立；但它
+仍然是工程样机，不是最终成品：
+
+- 真实美景图片选择、授权、持久化和失败回退尚未闭环，Heni 的核心个性缺失；
+- 录音室绿的默认画面过于单一，空状态占据大面积空间；
+- “LISTENING CONSOLE”“LOCAL LIBRARY · SQLITE”“LOCAL FIRST”等技术英文泄漏到默认
+  中文产品 UI；SQLite、runtime、schema 术语应留在诊断/开发信息中；
+- 曲库空状态和空列表没有形成成熟的信息层级，真实大曲库的密度与性能还未证明；
+- 设置错误通知会遮挡主要内容，错误优先级和 degraded 模式需要重新设计；
+- CSS 已经难以维护，视觉改动容易产生跨 feature 回归。
+
+修复追踪：以上保留初审事实，不作为当前未实现清单。S2-0/S2-1 已收敛设置错误与 CSS；
+S2-2 已落地纯小写字标、中性唱片占位、中文文案、曲库密度和单张静态美景设置，且有
+部分真实 Windows 证据。大曲库性能、全主题/图像/尺寸矩阵与空态整体完成度仍待验收；
+当前结论由动态进度和发布记录限定，不能仅凭代码存在就视为产品闭环。
+
+因此旧 task-demand 中“Phase 4 UI 核心完成”只能表示功能竖切存在，不能表示视觉验收完成。
+
+4.4 品牌硬约束
+
+- 窗口左上角只显示纯文字“heni”，全小写；
+- 禁止圆形 H、单字母 H、单字母 h、Heni、HENI 作为应用内品牌徽标；
+- 唱片或封面占位不得用单字母 H 冒充品牌，可使用中性唱片纹理、音符或封面色块；
+- 不做字标发光、旋转或持续动画；
+- Windows 小尺寸应用图标需要单独做光学可读性验证，但不能反向污染应用内字标规则。
+
+
+五、第二阶段目标架构
+
+5.1 依赖方向
+
+React product shell
+    ↓
+feature UI + application workflow
+    ↓
+typed port + Zod contract
+    ↓
+src/infrastructure/tauri adapter
+    ↓
+thin Tauri command boundary
+    ↓
+Rust application/runtime
+    ↓
+playback engine | SQLite repositories | scanner | metadata | Windows platform
+
+依赖只能向下。React 组件不得直接 import Tauri API；TypeScript application 不得直接读写
+文件或 SQL；Rust 核心不得依赖 React 的 view 名称、CSS 或 DOM 概念。
+
+5.2 TypeScript 目标结构
+
+src/
+  app/
+    App.tsx                    只负责装配和稳定外壳
+    bootstrap/                 只有出现真实启动顺序后建立
+    workflows/                 只有跨 feature 用例需要时建立
+  contracts/                  wire schema、DTO、有限错误、Port
+  features/
+    library/
+    playlist/
+    playback/
+    player/
+    settings/
+    scenery/
+    shell/
+  infrastructure/tauri/       唯一 Tauri adapter
+  styles/
+    tokens.css
+    base.css
+    shell.css
+    feature 样式靠近 feature 或使用清楚的独立文件
+
+不要一次创建空目录。每次只为当前切片建立需要的文件。
+
+跨 feature 协调应按用例命名，例如 importLocalFiles、scanLibraryRoot、recoverMissingMedia，
+不得创建万能 useAppManager、GlobalStore 或 ServiceContainer。App.tsx 的目标是让读者一眼看懂
+Heni 由哪些能力组成；不设置僵硬行数上限，但混入第二个变化原因时必须拆分。
+
+5.3 启动模型
+
+启动状态使用有限状态而不是多个互相矛盾的 boolean：
+
+- booting：读取 runtime、settings、library、playback snapshot；
+- ready：核心能力可用；
+- degraded：部分能力失败，但可安全使用默认值或其他功能；
+- blocked：关键数据库或播放核心不可用，显示明确恢复动作。
+
+设置读取期间可以使用经过版本化的安全默认值，不能无理由禁用“选择文件”“进入曲库”等主
+操作。迟到的读取结果不得覆盖用户已经提交的新设置。错误按影响范围显示：局部设置失败留在
+设置区域；只有全局阻断才占据全局 notice。
+
+5.4 播放状态与时钟
+
+- Rust PlaybackSession 继续是 queue、current、status、mode、volume 和 position 的权威；
+- command 处理用户意图，snapshot 处理重建，低频 event 处理变化；
+- position 事件约 4–5Hz，前端 clock seam 使用 performance time 局部插值；
+- seek 草稿绑定 generation，切歌后自动失效；
+- 不把 currentTime 每帧写进 Zustand、Context 或 App 根状态；
+- WebView reload、MiniPlayer、窗口隐藏和系统媒体控制必须共享同一 Rust 会话。
+
+5.5 Rust 与数据库
+
+- lib.rs 继续只做模块装配、插件和 command 注册；
+- command 只做 DTO/授权校验、调用 use case 和错误映射；
+- 播放实时线程不锁数据库、不分配、不记录日志、不做 IPC；
+- SQLite 连接配置和 migration 有唯一入口；repository 按领域用例组织；
+- 扫描在后台执行，支持取消、批次写入、背压和最终对账；
+- 媒体 ID 是稳定身份，路径可重新定位，歌单和活动队列引用不被静默替换；
+- settings、library、playlist 的写入继续使用事务；Partial update 必须有明确 merge 语义；
+- Rust 文件拆分以职责和不变量为准，不以“每 300 行一个文件”为准。
+
+5.6 安全
+
+- 保持 CSP，禁止 csp: null；
+- capability 默认拒绝，不开放 **、整个 HOME、Desktop 或 Downloads；
+- 用户选择路径后由 Rust 复核 scope、存在性、媒体类型和稳定 ID；
+- 外部程序只用结构化参数，不拼 shell 字符串；
+- UI 不显示底层原始 message、完整用户路径或堆栈；
+- 任何新增 sidecar、codec、系统插件和更新器必须审计来源、许可证和打包义务。
+
+
+六、第二阶段产品 UI 规范
+
+6.1 外壳
+
+- 一个背景层、一个顶栏、一个侧栏、一个主工作区、一个常驻播放坞；
+- 主视图切换不得卸载或重建播放会话；
+- 顶栏左侧是 heni 和可拖动空白，中间是当前工作区/搜索，右侧是主题、设置和窗口能力；
+- 当前仍可保留系统装饰。启用自定义标题栏前必须通过 Windows 拖动、双击最大化、Snap、
+  系统菜单、Alt+F4、多显示器和 100%/125%/150% DPI 矩阵；
+- 最大化时不得保留错误外圆角或屏幕边缘缝隙。
+
+6.2 主题与美景
+
+- semantic tokens 至少包含 canvas、chrome、rail、content、dock、border、hover、pressed、
+  selected、primaryText、secondaryText、accent、danger、focus；
+- studio/nocturne/tide 是语义主题，不允许 feature 内散落独立黑白修正值；
+- 美景播放模式建议：blur 8–12px、saturation 0.78–0.88、遮罩 0.26–0.36；
+- 曲库浏览模式建议：blur 14–18px、saturation 0.66–0.76、遮罩 0.38–0.50；
+- 数值是审美起点，不是免测常量；最终以对比度和实机截图为准；
+- 图片不可读时回退主题渐变，不出现空白、破图或全黑窗口；
+- 用户必须能选择、移除和持久化美景图片，路径授权和读取通过独立 scenery port。
+
+6.3 信息层级
+
+- 默认中文 UI 不出现 LOCAL FIRST、SQLITE、SCHEMA、RUNTIME 等实现术语；
+- 主标题、歌曲名、歌手/专辑、音频属性、路径和诊断信息按重要性递减；
+- 路径默认弱化或按需展开，特殊路径仍可完整复制/定位；
+- 曲库行减少边框，用 hover、selected、playing 左标记和短暂定位闪光表达状态；
+- 空状态应给出下一步和必要上下文，不用巨幅装饰填满工作区；
+- disabled、missing、error、focus-visible 在三套主题和美景背景上都必须清楚。
+
+6.4 响应式
+
+- 1180 × 760：展开侧栏、完整底栏、完整元数据；
+- 900 × 620：保证所有核心操作可达，不溢出；
+- 侧栏收缩使用迟滞；
+- 窄宽度依次隐藏次要路径、重复标签和非关键按钮；
+- 播放/暂停、进度、音量、队列和错误恢复始终可达；
+- MiniPlayer 继续共享会话，尺寸、置顶和几何恢复由 Windows 实机验证。
+
+6.5 可访问性与动效
+
+- 键盘可完成导航、播放、seek、队列重排、dialog 和设置操作；
+- dialog 有初始焦点、焦点边界、Esc 关闭和焦点回还；
+- icon-only 控件必须有中文 accessible name 和 tooltip；
+- 遵循 prefers-reduced-motion；
+- hover 120–200ms，布局切换 220–320ms，背景交叉淡化 700–900ms；
+- 不加入持续频谱、漂浮、脉冲或与播放位置绑定的背景动画。
+
+
+七、第二阶段执行序列
+
+S2-0：恢复绿色基线
+
+- 修复 settings Partial update 测试类型，不使用 any、断言或关闭 strict 逃避问题；
+- 修复 hydration 期间主操作被禁用和错误越级展示；
+- 重新运行完整 TypeScript/Rust 检查；
+- 同步 architecture、project-overview、feature matrix 和 release evidence；
+- 在全绿前不增加新产品功能。
+
+完成标准：lint、typecheck、Vitest、fmt、clippy、Rust test 全部有本次真实通过记录。
+
+S2-1：顶层装配与样式收敛
+
+进度：实现已落地，Windows 主要尺寸目视回归通过；浏览器专属验收与 DPI 检查待完成。
+接续已补齐曲库客户端生命周期：同一连接单次 mutation、初始化合并、换端口/卸载隔离、
+扫描身份和取消保护，未增加 store 或万能 manager；代码测试通过，新的实机证据待补。
+补充审计：数据库初始化硬失败仍从 Rust setup 返回错误，尚未进入前端可见恢复流程；
+现有 boot 四态测试不能替代该故障路径，需使用隔离数据库验证，不对用户数据注入故障。
+
+- 按真实用例从 App.tsx 抽出跨 feature workflow；
+- 建立可测试的 booting/ready/degraded/blocked 投影；
+- 拆分 global.css，同时保持 semantic token 是唯一主题来源；
+- 更新文档中已经过时的主题、settings 和进度描述；
+- 不改变已验证的 Rust 播放和数据行为。
+
+完成标准：App 是可读装配根；浏览器预览和 Tauri Release 的失败模式有明确区别；样式拆分
+没有视觉回归。
+
+S2-2：Heni 视觉基础重建
+
+进度：品牌、中文文案、曲库密度与单张静态美景切片已落地。图片由原生选择器授权，Rust
+限量读取/验证，SQLite 保存引用；TypeScript 使用独立契约和 Hook，取消或失败保留原图。
+主题遮罩、顶栏/侧栏/播放坞语义表面和深色启动底屏已进入当前 Release。真实曲库、
+保存背景恢复、三主题切换及主窗/Mini 几何链路已有分产物实机记录，最小主窗设置可见。
+尚未完成：三主题 × 无图/坏图/真实图 × 空库/真实库的完整矩阵、精确 DOM/DPI 与稳定
+截图基线。为保留用户当前背景，不执行实机清除；清除/回滚/重开由隔离测试覆盖。
+这些切片不依赖浏览器工具修复，不视为 S2-1 或整个 S2-2 完成；详细证据和未执行项见
+docs/migration/release-evidence.md。
+
+- 落实纯小写 heni 品牌规则，移除产品 UI 中单字母 H 占位品牌；
+- 移除默认中文界面的技术英文标签；
+- 完成全景背景、主题遮罩、语义表面和真实 scenery 设置闭环；
+- 重做空状态、通知优先级、曲库密度和底部播放坞细节；
+- 为 1180 × 760、900 × 620 和 MiniPlayer 建立稳定截图基线。
+
+完成标准：与 legacy 的气质一致但更清楚；三套主题、无图/坏图/真实图、空曲库/真实曲库均
+通过可读性和溢出检查；用户不再看到工程样机术语。
+
+S2-3：播放体验与桌面集成
+
+进度：显示时钟、seek 交互、轻量条件读取和音量恢复代码已实现，全部 271 项 TypeScript 与 114 项 Rust
+常规测试通过。时钟首切片新增 37 项 TS；条件读取新增 28 项 TS、替换 3 项旧草案测试，
+另增 8 项 Rust。音量恢复另增 20 项 TS、13 项 Rust，持久化、回滚、安全默认值和拖动交互
+已由隔离测试覆盖；后续音量、后台入口与曲库生命周期再增 20 项 TS、9 项 Rust。
+当前等待包含后续源码的 Release 和重启验收；拖动中实时试听的差异尚未关闭。
+原生事件订阅、系统集成和完整实际播放矩阵仍未完成。
+前序 91BB Release 已完成真实 FLAC 静音播放/暂停/seek/连续按键、Mini 和曲尾自动续播，
+焦点回归已修复；条件读取的 6EDE Release 已复核暂停/seek/键盘、自动续播、播放中的队列
+确认保持/取消、Mini 同会话往返和停止归零。它们不等于全部模式/格式、
+听感和长时验收，不关闭 S2-3。
+
+- 建立 playback clock seam 和 position event/插值；
+- 完成音量/静音恢复与必要的持久化；
+- 验证队列、四种播放模式、切歌、seek、completed、错误恢复和 reload；
+- 评估并实现 Windows 系统媒体控制、防休眠和托盘，逐项提供真实收益与测试；
+- 不引入在线音源、歌词、均衡器或下载。
+
+S2-4：真实曲库与数据验收
+
+进度：客户端竞态、取消、异常返回和扫描终态展示已补测试；这些不是实际数据验收。
+原生曲库的 12 条 I/O 入口和扫描/ffprobe 已移入阻塞工作池，保留授权、备份、事务和取消
+顺序；真实数据、取消延迟与平台调用的线程边界仍待验证。
+
+- 使用真实 201 项及更大目录验证导入、刷新、取消、去重、缺失和重新定位；
+- 覆盖中文、空格、特殊字符、长路径、权限失败、损坏媒体；
+- 只有性能证据证明需要时才加入虚拟列表；
+- 使用真实 Flutter library.json 验证备份、事务、幂等和失败回滚；
+- 完成 ffprobe sidecar 发现、许可证和安装包行为。
+
+S2-5：Windows Release 闭环
+
+- MP3、AAC/M4A、FLAC、WAV、Opus 和常见视频进行 Debug/Release 验证；
+- 验证 100%/125%/150% DPI、最小尺寸、最大化、Snap、多显示器、睡眠恢复、设备变化；
+- 验证长时播放、连续切歌、CPU 和内存趋势；
+- 生成 NSIS 安装包，验证安装、升级、卸载和用户数据保留；
+- 记录可执行文件/安装器大小、时间、SHA-256 和精确启动路径；
+- 只有视频能力完成或用户明确批准差异后，才可替代 legacy 默认版本。
+
+
+八、范围边界
+
+第二阶段默认不包含：
+
+- 在线搜索、音源脚本、抓取、下载、账户或云同步；
+- 歌词、桌面歌词、均衡器、DSP、标签编辑、音频导出；
+- 把有损音频转成 FLAC 并宣称无损；
+- 同时开发 Linux、macOS、iOS、Android；
+- 为展示技术而加入 Electron 式全前端系统能力；
+- 为“架构完整”预建空 package、插件系统、抽象基类或微前端；
+- 复制 Museek、musicdl、WaveFlow 或其他项目的源码、注释、类型和算法。
+
+视频是 legacy 已有能力，不属于可静默删除的非目标。若 Windows 切换时仍未完成，必须在
+功能矩阵中保留阻断项并取得用户明确批准。
+
+
+九、TypeScript 学习要求
+
+每个第二阶段切片都必须留下可学习的真实工程材料：
+
+- 外部输入从 unknown 开始，用 Zod 收窄；
+- 使用 discriminated union 表达启动状态、错误和命令；
+- 使用 readonly 数据、纯投影和 Result 风格边界；
+- Partial update 必须解释 exactOptionalPropertyTypes 下“缺失”和“显式 undefined”的区别；
+- async 流程解释 epoch/generation、取消、迟到结果和资源清理；
+- React 解释局部状态、派生状态、useSyncExternalStore/订阅边界和依赖倒置；
+- 禁止 any、非空断言、无依据类型断言和炫技类型体操；
+- 每个关键切片在 docs/learning 中写一篇短文：问题、直白模型、最终选择、替代方案和练习；
+- 每个里程碑推荐用户阅读 3–5 个真实 TypeScript 文件，并给一个可独立完成的小练习。
+
+
+十、验证与交付协议
+
+适用切片必须实际执行：
+
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+git diff --check
+
+Windows 发布切片再执行：
+
+pnpm tauri build --no-bundle
+正式 bundle/NSIS 构建
+精确 Release 路径启动
+真实媒体和窗口行为检查
+
+规则：
+
+1. 未运行、超时、失败和环境忽略必须分别报告；
+2. 浏览器预览不能替代 Tauri Release；mock 不能替代真实媒体；
+3. 视觉改动至少对照 1180 × 760、900 × 620、MiniPlayer，并检查 125%/150% DPI；
+4. 任何持久化变更都要有 migration/事务/回滚测试；
+5. 保留用户已有改动，不使用 reset --hard 或清理整个工作树；
+6. 不修改 legacy/v1-flutter 的归档内容，除非只增加明确的归档说明；
+7. 不把第三方 research/upstream 代码复制到产品目录；
+8. 每次交付先报告用户可见结果，再报告验证证据、剩余风险和下一步；
+9. 只有所有必需门槛有证据时才写“完成”。
+
+
+十一、阶段完成定义
+
+Strata V2 第二阶段完成必须同时满足：
+
+- 顶层依赖方向没有倒置，App、样式和 Rust 热点职责清楚；
+- 所有自动检查持续全绿；
+- 左上角和应用内品牌严格遵守纯小写 heni；
+- Heni 重新拥有 legacy 的全景美景、深色哑光、主题染色和安静播放台气质；
+- 默认中文界面没有工程实现术语，空状态、错误和 degraded 模式成熟；
+- 播放、曲库、歌单、队列、设置和美景均在真实 Windows Release 中闭环；
+- 真实 codec、路径、旧数据、DPI、长时运行和安装升级矩阵通过；
+- 视频已完成，或用户明确批准切换版本的能力差异；
+- legacy/v1-flutter 和其 Release 仍可回退；
+- 用户明确批准把 Tauri 版设为默认 Heni。
+
+
+十二、当前下一步
+
+S2-0 已恢复并守住绿色基线。S2-1 的导入 workflow、启动投影和 CSS 职责拆分已落地；
+S2-2 的品牌、中文文案、曲库密度与静态美景设置已有代码、测试和部分实机证据；窗口
+最大化/还原问题已修复，不再把它作为尚未实现的下一项。接续顺序：
+
+1. 在不扰动用户真实偏好的隔离环境补齐无图/坏图/清除/源图丢失与空库组合；用明亮、暗色
+   和高细节图片复核三主题的正文、路径、禁用态和焦点环，必要时继续收敛表面。
+2. 浏览器工具恢复后补齐 1180×760、900×620 和 Mini 的精确视口 DOM/截图；125%/150%
+   DPI、Snap 和多屏实际移动单独补验。截图外框尺寸与数值单测不能替代这些证据。
+3. S2-3 的 playback clock seam、时间/seek 与条件读取已落地。音量恢复作为独立切片先行，
+   关闭当前测试进程后重新生成包含最新源码的 Release；桌面工具恢复后完成保存、重启、
+   零音量恢复和 Mini 静音验收，保持用户现有深夜主题/背景，并恢复测试前音量偏好。
+   客户端生命周期和曲库 I/O 线程边界已加固，接续核对平台文件定位、原生取消链路与慢盘。
+   随后按 ADR 0004 推进 position event/订阅生命周期/低频恢复读取；跨通道采样顺序必须
+   与状态版本分清，不能因每次位置采样改变 sequence 而取消 seek 草稿和队列确认。
+   音量拖动中实时试听的行为差异仍须补齐或明确获批，不因此关闭 S2-2 或 S2-3。
+4. 后续继续真实音乐/旧数据、ffprobe sidecar、视频差异和 NSIS 安装升级门槛。未取得
+   用户明确批准前，不把 Tauri 版替换为默认 Heni，不删除 Flutter 归档或其 Release。
+
+这些未通过项始终保留为阶段门槛，不把当前工程样机视为成品。
+每个切片继续保持代码、测试、架构文档和本动态进度同步。

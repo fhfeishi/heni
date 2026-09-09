@@ -1,0 +1,38 @@
+/* A permanent, quiet window rail, sharing the scenery instead of a black OS band. */
+.app-frame:has(> .window-chrome) { padding-top: 36px; }
+.app-frame[data-window-mode="mini-player"]:has(> .window-chrome) { grid-template-rows: minmax(0, 1fr); }
+.app-frame:has(> .window-chrome) .mini-player-chrome { display: none; }
+.window-chrome {
+  position: absolute;
+  z-index: 30;
+  inset: 0 0 auto;
+  height: 36px;
+  display: flex;
+  align-items: stretch;
+  user-select: none;
+  background: color-mix(in srgb, var(--matte) 42%, transparent);
+  backdrop-filter: blur(12px);
+}
+.window-chrome__drag { flex: 1; min-width: 32px; display: flex; align-items: center; padding-left: 20px; }
+.window-chrome__wordmark { font-size: 13px; font-weight: 750; letter-spacing: -0.04em; color: var(--text-muted); pointer-events: none; }
+.window-chrome__actions { display: flex; padding: 3px 6px 3px 0; gap: 2px; }
+.window-chrome__actions button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+}
+.window-chrome__actions .interface-icon { width: 14px; height: 14px; }
+.window-chrome__actions button:hover:not(:disabled) { color: var(--text); background: rgb(var(--accent-rgb) / 18%); }
+.window-chrome__actions .window-chrome__close:hover { color: white; background: #c43b50; }
+.window-chrome__actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.window-chrome__actions button:disabled { opacity: 0.3; }
+.window-chrome__error { align-self: center; font-size: 11px; color: var(--text); }
+@media (hover: hover) and (pointer: fine) {
+  .app-frame:has(> .window-chrome)[data-edge-panels="auto"] .app-topbar { top: 52px; }
+  .app-frame:has(> .window-chrome)[data-edge-panels="auto"] .app-sidebar { top: 128px; }
+}

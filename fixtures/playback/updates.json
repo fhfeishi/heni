@@ -1,0 +1,37 @@
+[
+  {
+    "type": "snapshot",
+    "snapshot": {
+      "generation": 1,
+      "sequence": 0,
+      "status": "playing",
+      "queue": [
+        {
+          "id": "one",
+          "path": "C:/one.flac",
+          "title": "one",
+          "kind": "audio",
+          "durationMs": 60000
+        }
+      ],
+      "currentIndex": 0,
+      "positionMs": 0,
+      "durationMs": 60000,
+      "volume": 100,
+      "muted": false,
+      "repeatMode": "all",
+      "shuffle": false
+    }
+  },
+  {
+    "type": "position",
+    "position": {
+      "generation": 1,
+      "sequence": 0,
+      "status": "playing",
+      "mediaId": "one",
+      "positionMs": 250,
+      "durationMs": 60000
+    }
+  }
+]

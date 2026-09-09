@@ -1,0 +1,130 @@
+@media (max-width: 1240px) {
+  .listening-console {
+    grid-template-columns: minmax(190px, 0.75fr) minmax(330px, 1.25fr);
+  }
+
+  .next-track-card {
+    display: none;
+  }
+}
+
+@media (max-width: 1050px) {
+  .app-topbar {
+    grid-template-columns: 84px minmax(0, 1fr) auto;
+  }
+
+  .app-workspace {
+    grid-template-columns: 84px minmax(0, 1fr);
+  }
+
+  .app-sidebar {
+    padding-inline: 8px;
+  }
+
+  .sidebar-link {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 2px;
+    padding: 6px 3px;
+  }
+
+  .sidebar-link__label {
+    max-width: 66px;
+    font-size: 9px;
+  }
+
+  .sidebar-link__count,
+  .sidebar-note {
+    display: none;
+  }
+
+  .sidebar-playlists__heading { padding-inline: 0; font-size: 10px; text-align: center; }
+  .sidebar-playlists button { padding: 8px 4px; }
+  .sidebar-playlists button span { font-size: 11px; }
+  .sidebar-playlists button small { display: none; }
+
+  .main-view {
+    padding: 20px 22px 24px;
+  }
+
+  .library-toolbar {
+    grid-template-columns: minmax(190px, 1fr) repeat(3, minmax(96px, auto));
+  }
+
+  .queue-toolbar {
+    grid-template-columns: minmax(180px, 1fr) auto auto;
+  }
+
+  .queue-count {
+    display: none;
+  }
+
+  .listening-console {
+    grid-template-columns: minmax(175px, 0.72fr) minmax(260px, 1.28fr);
+    min-height: 220px;
+    margin-top: 12px;
+    padding: 20px;
+    gap: 20px;
+  }
+
+  .listening-console .artwork-fallback {
+    width: min(100%, 180px);
+  }
+
+  .playback-bar {
+    grid-template-columns: minmax(160px, 0.7fr) minmax(320px, 1.35fr) minmax(210px, 0.85fr);
+    gap: 14px;
+    padding-inline: 16px;
+  }
+
+  .playback-bar__utilities > span {
+    display: none;
+  }
+
+  .playlist-metadata {
+    grid-template-columns: 1fr 1.3fr;
+  }
+
+  .playlist-metadata__actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 960px) {
+  .theme-control > span,
+  .runtime-status__copy {
+    display: none;
+  }
+
+  .topbar-actions {
+    gap: 9px;
+  }
+
+  .mini-artwork {
+    width: 40px;
+    height: 40px;
+  }
+
+  .playback-bar__track span {
+    display: none;
+  }
+
+  .playback-progress {
+    grid-template-columns: minmax(80px, 1fr);
+  }
+
+  .playback-progress span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

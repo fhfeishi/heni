@@ -1,12 +1,18 @@
 # Heni Project Router
 
-Heni is a Windows-first Flutter local music player with a panoramic,
-theme-derived desktop shell. Keep this file short: use it to choose the
-smallest relevant document set before changing code.
+Heni is a Windows-first local music player. Flutter remains the product
+baseline while a Tauri 2 + React + TypeScript implementation is developed
+incrementally. Keep this file short: use it to choose the smallest relevant
+document set before changing code.
 
 ## Start Here
 
 - Product surface and directory map: `docs/project-overview.md`
+- Frozen Tauri demand and authority: `docs/task-demand.md`
+- Migration baseline and parity: `docs/migration/phase-0-audit.md` →
+  `docs/migration/feature-parity-matrix.md`
+- Architecture decisions: `docs/adr/`
+- Open-source research and license boundaries: `research/README.md`
 - Runtime boundaries: `docs/architecture.md`
 - Playback, probing, and audio-quality notes: `docs/media-pipeline.md`
 - Current priorities and residual risks: `logs/plan.md`
@@ -17,6 +23,7 @@ smallest relevant document set before changing code.
 ## Current Product Boundary
 
 - Active platform: Windows desktop.
+- Current default: Flutter; Tauri walking skeleton: `apps/desktop`.
 - Playback: original local media path through `media_kit`.
 - Metadata: `ffprobe` when available on `PATH`.
 - No lyric surface.
@@ -28,6 +35,11 @@ smallest relevant document set before changing code.
   the compact icon rail without overwriting the stored preference.
 
 ## Task Routing
+
+- Any Tauri migration task: `docs/task-demand.md` →
+  `docs/migration/feature-parity-matrix.md` → relevant ADR and learning note.
+- Playback-engine selection: `docs/adr/0002-playback-engine-spike.md` →
+  `docs/migration/phase-1-plan.md` → `docs/media-pipeline.md`.
 
 - UI, resize, title bar, queue, or playback interaction:
   `docs/project-overview.md` → `logs/plan.md` →
@@ -42,6 +54,8 @@ smallest relevant document set before changing code.
 
 ## Verification Rule
 
-Before release, run static analysis, available pure-Dart tests, Windows Debug
-and Release builds, and a launch/UI smoke check. Record environmental blockers
-instead of reporting an unexecuted test as passing.
+For Flutter releases, run static analysis, available pure-Dart tests, Windows
+Debug/Release and launch/UI smoke. For Tauri milestones, run pnpm lint,
+typecheck, test and build plus Rust fmt, clippy, test and the applicable Windows
+Release build. Record environmental blockers instead of reporting an
+unexecuted test as passing.

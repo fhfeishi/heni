@@ -1,0 +1,65 @@
+[
+  {
+    "type": "replace-queue",
+    "queue": [
+      {
+        "id": "fixture-one",
+        "path": "C:\\Music\\fixture-one.flac",
+        "title": "fixture-one.flac",
+        "kind": "audio",
+        "durationMs": 60000
+      }
+    ],
+    "currentIndex": 0,
+    "autoplay": true
+  },
+  { "type": "play" },
+  { "type": "pause" },
+  { "type": "stop" },
+  { "type": "next" },
+  { "type": "previous" },
+  { "type": "play-index", "index": 0 },
+  { "type": "remove-index", "index": 0 },
+  { "type": "reorder-queue", "fromIndex": 0, "toIndex": 1 },
+  {
+    "type": "refresh-item",
+    "item": {
+      "id": "fixture-one",
+      "path": "D:\\Recovered\\fixture-one.flac",
+      "title": "fixture-one.flac",
+      "kind": "audio",
+      "durationMs": 60000
+    }
+  },
+  {
+    "type": "enqueue",
+    "items": [
+      {
+        "id": "fixture-two",
+        "path": "C:\\Music\\fixture-two.flac",
+        "title": "fixture-two.flac",
+        "kind": "audio",
+        "durationMs": null
+      }
+    ]
+  },
+  {
+    "type": "play-next",
+    "items": [
+      {
+        "id": "fixture-three",
+        "path": "C:\\Music\\fixture-three.flac",
+        "title": "fixture-three.flac",
+        "kind": "audio",
+        "durationMs": null
+      }
+    ]
+  },
+  { "type": "seek", "positionMs": 1000 },
+  { "type": "set-volume", "volume": 50 },
+  { "type": "preview-volume", "volume": 35, "generation": 1, "sequence": 2 },
+  { "type": "cancel-volume-preview", "generation": 1, "sequence": 2 },
+  { "type": "set-muted", "muted": true },
+  { "type": "set-repeat-mode", "repeatMode": "one" },
+  { "type": "set-shuffle", "shuffle": true }
+]

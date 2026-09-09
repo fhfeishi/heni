@@ -1,0 +1,877 @@
+use super::{
+    contracts::{
+        PlaybackCommand, PlaybackError, PlaybackItem, PlaybackSnapshot, PlaybackStatus,
+        PlaybackUpdate, PlaybackVersion,
+    },
+    engine::{EngineObservation, PlaybackEngine},
+    preferences::PlaybackPreferences,
+    session::PlaybackSession,
+};
+
+pub(super) struct PlaybackController<E> {
+    session: PlaybackSession,
+    engine: E,
+    volume_preview: Option<std::time::Instant>,
+}
+
+impl<E: PlaybackEngine> PlaybackController<E> {
+    pub(super) fn new(engine: E) -> Self {
+        Self {
+            session: PlaybackSession::default(),
+            engine,
+            volume_preview: None,
+        }
+    }
+
+    pub(super) fn snapshot(&mut self) -> PlaybackSnapshot {
+        let _ = self.tick();
+        self.session.snapshot()
+    }
+
+    pub(super) fn restore_preferences(
+        &mut self,
+        preferences: Result<PlaybackPreferences, PlaybackError>,
+    ) {
+        self.session.restore_preferences(preferences);
+        let preferences = self.session.preferences();
+        self.engine.set_volume(preferences.volume);
+        self.engine.set_muted(preferences.muted);
+    }
+
+    pub(super) fn update(&mut self, known_version: PlaybackVersion) -> PlaybackUpdate {
+        // Reconcile completion/failure before deciding whether a full snapshot is needed.
+        let _ = self.tick();
+        self.session.update(known_version)
+    }
+
+    pub(super) fn dispatch(
+        &mut self,
+        command: PlaybackCommand,
+    ) -> Result<PlaybackSnapshot, PlaybackError> {
+        self.dispatch_with_preferences(command, |_| Ok(()))
+    }
+
+    pub(super) fn dispatch_with_preferences(
+        &mut self,
+        command: PlaybackCommand,
+        save: impl FnOnce(PlaybackPreferences) -> Result<(), PlaybackError>,
+    ) -> Result<PlaybackSnapshot, PlaybackError> {
+        let _ = self.tick();
+
+        let previous_snapshot = self.session.snapshot();
+        match &command {
+            PlaybackCommand::PreviewVolume {
+                volume,
+                generation,
+                sequence,
+            } => {
+                if !volume.is_finite() || !(0.0..=100.0).contains(volume) {
+                    return Err(PlaybackError::new(
+                        "invalid-contract",
+                        "Invalid preview volume.",
+                    ));
+                }
+                if *generation != previous_snapshot.generation
+                    || *sequence != previous_snapshot.sequence
+                {
+                    return Err(PlaybackError::new(
+                        "invalid-contract",
+                        "The volume gesture is stale.",
+                    ));
+                }
+                self.engine.set_volume(*volume);
+                self.engine.set_muted(previous_snapshot.muted);
+                self.volume_preview = Some(std::time::Instant::now());
+                return Ok(previous_snapshot);
+            }
+            PlaybackCommand::CancelVolumePreview {
+                generation,
+                sequence,
+            } => {
+                if *generation == previous_snapshot.generation
+                    && *sequence == previous_snapshot.sequence
+                {
+                    self.cancel_volume_preview();
+                }
+                return Ok(previous_snapshot);
+            }
+            _ => self.cancel_volume_preview(),
+        }
+        let mut candidate = self.session.clone();
+        let candidate_snapshot = candidate.dispatch(command.clone())?;
+        if matches!(
+            command,
+            PlaybackCommand::SetVolume { .. } | PlaybackCommand::SetMuted { .. }
+        ) {
+            // These engine setters are infallible. Persist first so a failed write changes neither
+            // the live output nor the authoritative session; no database work runs on the audio thread.
+            save(candidate.preferences())?;
+        }
+        let duration_ms = self.apply(&command, &previous_snapshot, &candidate_snapshot)?;
+        if duration_ms.is_some() {
+            candidate.set_duration(duration_ms);
+        }
+
+        self.session = candidate;
+        self.synchronize();
+        Ok(self.session.snapshot())
+    }
+
+    pub(super) fn tick(&mut self) -> Result<(), PlaybackError> {
+        // A dropped frontend gesture must not leave an unsaved gain active indefinitely.
+        if self
+            .volume_preview
+            .is_some_and(|started| started.elapsed() >= std::time::Duration::from_secs(2))
+        {
+            self.cancel_volume_preview();
+        }
+        let observation = self.synchronize();
+        if !observation.active
+            || !observation.completed
+            || self.session.snapshot().status != PlaybackStatus::Completed
+        {
+            return Ok(());
+        }
+
+        let mut candidate = self.session.clone();
+        self.cancel_volume_preview();
+        if !candidate.advance_automatically()? {
+            self.engine.stop();
+            self.session = candidate;
+            return Ok(());
+        }
+
+        let candidate_snapshot = candidate.snapshot();
+        let item = required_current_item(&candidate_snapshot)?;
+        match self.engine.load(
+            item,
+            0,
+            true,
+            candidate_snapshot.volume,
+            candidate_snapshot.muted,
+        ) {
+            Ok(duration_ms) => {
+                candidate.set_duration(duration_ms);
+                self.session = candidate;
+                Ok(())
+            }
+            Err(error) => {
+                self.session.mark_failed();
+                Err(error)
+            }
+        }
+    }
+
+    fn cancel_volume_preview(&mut self) {
+        if self.volume_preview.take().is_some() {
+            let preferences = self.session.preferences();
+            self.engine.set_volume(preferences.volume);
+            self.engine.set_muted(preferences.muted);
+        }
+    }
+
+    fn apply(
+        &mut self,
+        command: &PlaybackCommand,
+        previous: &PlaybackSnapshot,
+        next: &PlaybackSnapshot,
+    ) -> Result<Option<u64>, PlaybackError> {
+        match command {
+            PlaybackCommand::PreviewVolume { .. } | PlaybackCommand::CancelVolumePreview { .. } => {
+                Ok(None)
+            }
+            PlaybackCommand::ReplaceQueue { .. } => {
+                let Some(item) = current_item(next)? else {
+                    self.engine.stop();
+                    return Ok(None);
+                };
+                self.engine.load(
+                    item,
+                    0,
+                    next.status == PlaybackStatus::Playing,
+                    next.volume,
+                    next.muted,
+                )
+            }
+            PlaybackCommand::Play => {
+                let observation = self.engine.observation();
+                if !observation.active || observation.completed || observation.failed {
+                    let item = required_current_item(next)?;
+                    self.engine
+                        .load(item, next.position_ms, true, next.volume, next.muted)
+                } else {
+                    self.engine.set_playing(true)?;
+                    Ok(None)
+                }
+            }
+            PlaybackCommand::Pause => {
+                self.engine.set_playing(false)?;
+                Ok(None)
+            }
+            PlaybackCommand::Stop => {
+                self.engine.stop();
+                Ok(None)
+            }
+            PlaybackCommand::Seek { .. } => {
+                let item = required_current_item(next)?;
+                self.engine.load(
+                    item,
+                    next.position_ms,
+                    next.status == PlaybackStatus::Playing,
+                    next.volume,
+                    next.muted,
+                )
+            }
+            PlaybackCommand::Next
+            | PlaybackCommand::Previous
+            | PlaybackCommand::PlayIndex { .. } => {
+                if next.generation == previous.generation {
+                    return Ok(None);
+                }
+                let item = required_current_item(next)?;
+                self.engine.load(item, 0, true, next.volume, next.muted)
+            }
+            PlaybackCommand::RemoveIndex { .. } => {
+                if next.queue.is_empty() {
+                    self.engine.stop();
+                    return Ok(None);
+                }
+                if next.generation == previous.generation {
+                    return Ok(None);
+                }
+                let item = required_current_item(next)?;
+                self.engine.load(item, 0, true, next.volume, next.muted)
+            }
+            PlaybackCommand::Enqueue { .. } | PlaybackCommand::PlayNext { .. } => {
+                if next.generation == previous.generation {
+                    return Ok(None);
+                }
+                let item = required_current_item(next)?;
+                self.engine.load(item, 0, true, next.volume, next.muted)
+            }
+            PlaybackCommand::RefreshItem { .. } => {
+                if next.generation == previous.generation {
+                    return Ok(None);
+                }
+                let item = required_current_item(next)?;
+                self.engine.load(
+                    item,
+                    next.position_ms,
+                    next.status == PlaybackStatus::Playing,
+                    next.volume,
+                    next.muted,
+                )
+            }
+            PlaybackCommand::SetVolume { .. } | PlaybackCommand::SetMuted { .. } => {
+                self.engine.set_volume(next.volume);
+                self.engine.set_muted(next.muted);
+                Ok(None)
+            }
+            PlaybackCommand::SetRepeatMode { .. } | PlaybackCommand::SetShuffle { .. } => Ok(None),
+            PlaybackCommand::ReorderQueue { .. } => Ok(None),
+        }
+    }
+
+    fn synchronize(&mut self) -> EngineObservation {
+        let observation = self.engine.observation();
+        if observation.active {
+            self.session.sync_runtime(
+                observation.position_ms,
+                observation.duration_ms,
+                observation.completed,
+                observation.failed,
+            );
+        }
+        observation
+    }
+}
+
+fn current_item(snapshot: &PlaybackSnapshot) -> Result<Option<&PlaybackItem>, PlaybackError> {
+    match snapshot.current_index {
+        Some(index) => snapshot.queue.get(index).map(Some).ok_or_else(|| {
+            PlaybackError::new(
+                "invalid-current-index",
+                "The selected item is outside the playback queue.",
+            )
+        }),
+        None if snapshot.queue.is_empty() => Ok(None),
+        None => Err(PlaybackError::new(
+            "invalid-current-index",
+            "A non-empty queue must select a current item.",
+        )),
+    }
+}
+
+fn required_current_item(snapshot: &PlaybackSnapshot) -> Result<&PlaybackItem, PlaybackError> {
+    current_item(snapshot)?.ok_or_else(|| {
+        PlaybackError::new(
+            "empty-queue",
+            "Cannot control playback while the queue is empty.",
+        )
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{path::PathBuf, thread, time::Duration};
+
+    use super::*;
+    use crate::playback::contracts::{MediaKind, PlaybackStatus};
+    use crate::playback::engine::NativeAudioEngine;
+
+    #[derive(Default)]
+    struct FakeEngine {
+        fail_next_load: bool,
+        loaded_ids: Vec<String>,
+        observation: EngineObservation,
+        volume: f64,
+        muted: bool,
+    }
+
+    #[test]
+    fn preview_changes_only_output_and_respects_mute() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller.restore_preferences(Ok(PlaybackPreferences {
+            volume: 25.0,
+            muted: true,
+            last_audible_volume: 25.0,
+        }));
+        let before = controller.snapshot();
+        let after = controller
+            .dispatch_with_preferences(
+                PlaybackCommand::PreviewVolume {
+                    volume: 65.0,
+                    generation: before.generation,
+                    sequence: before.sequence,
+                },
+                |_| panic!("preview must not persist"),
+            )
+            .expect("preview");
+        assert_eq!(controller.engine.volume, 65.0);
+        assert!(controller.engine.muted);
+        assert_eq!(after.volume, before.volume);
+        assert_eq!(after.sequence, before.sequence);
+        controller
+            .dispatch(PlaybackCommand::CancelVolumePreview {
+                generation: before.generation,
+                sequence: before.sequence,
+            })
+            .expect("cancel");
+        assert_eq!(controller.engine.volume, 25.0);
+        assert!(controller.engine.muted);
+    }
+
+    #[test]
+    fn preview_expires_and_rejects_invalid_or_stale_input() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller.restore_preferences(Ok(PlaybackPreferences::default()));
+        let before = controller.snapshot();
+        for (volume, sequence) in [
+            (f64::NAN, before.sequence),
+            (101.0, before.sequence),
+            (30.0, before.sequence + 1),
+        ] {
+            assert!(controller
+                .dispatch(PlaybackCommand::PreviewVolume {
+                    volume,
+                    generation: before.generation,
+                    sequence,
+                })
+                .is_err());
+        }
+        controller
+            .dispatch(PlaybackCommand::PreviewVolume {
+                volume: 30.0,
+                generation: before.generation,
+                sequence: before.sequence,
+            })
+            .expect("preview");
+        controller.volume_preview = Some(std::time::Instant::now() - Duration::from_secs(3));
+        controller.tick().expect("expiry");
+        assert_eq!(controller.engine.volume, before.volume);
+        assert!(controller.volume_preview.is_none());
+    }
+
+    #[test]
+    fn failed_commit_restores_saved_output_after_preview() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller.restore_preferences(Ok(PlaybackPreferences::default()));
+        let before = controller.snapshot();
+        controller
+            .dispatch(PlaybackCommand::PreviewVolume {
+                volume: 30.0,
+                generation: before.generation,
+                sequence: before.sequence,
+            })
+            .expect("preview");
+        assert!(controller
+            .dispatch_with_preferences(PlaybackCommand::SetVolume { volume: 30.0 }, |_| {
+                Err(PlaybackError::new("preferences-unavailable", "fixture"))
+            })
+            .is_err());
+        assert_eq!(controller.engine.volume, before.volume);
+        assert_eq!(controller.snapshot().volume, before.volume);
+        assert!(controller.volume_preview.is_none());
+    }
+
+    #[test]
+    fn mute_command_cancels_preview_and_late_preview_cannot_override_it() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller.restore_preferences(Ok(PlaybackPreferences::default()));
+        let before = controller.snapshot();
+        let command = PlaybackCommand::PreviewVolume {
+            volume: 30.0,
+            generation: before.generation,
+            sequence: before.sequence,
+        };
+        controller.dispatch(command.clone()).expect("preview");
+        controller
+            .dispatch(PlaybackCommand::SetMuted { muted: true })
+            .expect("mute");
+        assert!(controller.dispatch(command).is_err());
+        assert!(controller.engine.muted);
+        assert_eq!(controller.engine.volume, before.volume);
+    }
+
+    impl PlaybackEngine for FakeEngine {
+        fn load(
+            &mut self,
+            item: &PlaybackItem,
+            position_ms: u64,
+            _playing: bool,
+            volume: f64,
+            muted: bool,
+        ) -> Result<Option<u64>, PlaybackError> {
+            if self.fail_next_load {
+                self.fail_next_load = false;
+                return Err(PlaybackError::new("decoder-failed", "test failure"));
+            }
+            self.loaded_ids.push(item.id.clone());
+            self.volume = volume;
+            self.muted = muted;
+            self.observation = EngineObservation {
+                active: true,
+                position_ms,
+                duration_ms: Some(60_000),
+                completed: false,
+                failed: false,
+            };
+            Ok(Some(60_000))
+        }
+
+        fn set_playing(&mut self, _playing: bool) -> Result<(), PlaybackError> {
+            if self.observation.active {
+                Ok(())
+            } else {
+                Err(PlaybackError::new("playback-unavailable", "test failure"))
+            }
+        }
+
+        fn stop(&mut self) {
+            self.observation = EngineObservation::default();
+        }
+
+        fn set_volume(&mut self, volume: f64) {
+            self.volume = volume;
+        }
+
+        fn set_muted(&mut self, muted: bool) {
+            self.muted = muted;
+        }
+
+        fn observation(&self) -> EngineObservation {
+            self.observation
+        }
+    }
+
+    fn track(id: &str) -> PlaybackItem {
+        PlaybackItem {
+            id: id.to_owned(),
+            path: format!(r"C:\Music\{id}.flac"),
+            title: id.to_owned(),
+            kind: MediaKind::Audio,
+            duration_ms: None,
+        }
+    }
+
+    #[test]
+    fn restored_preferences_apply_before_the_first_audio_load() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller.restore_preferences(Ok(PlaybackPreferences {
+            volume: 27.0,
+            muted: true,
+            last_audible_volume: 27.0,
+        }));
+        controller
+            .dispatch(PlaybackCommand::ReplaceQueue {
+                queue: vec![track("one")],
+                current_index: Some(0),
+                autoplay: true,
+            })
+            .expect("load restored session");
+        assert_eq!(controller.engine.volume, 27.0);
+        assert!(controller.engine.muted);
+        assert!(controller.snapshot().preferences_error.is_none());
+    }
+
+    #[test]
+    fn failed_audio_preference_write_keeps_live_output_and_session_unchanged() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller.restore_preferences(Ok(PlaybackPreferences::default()));
+        let before = controller.snapshot();
+        let result = controller.dispatch_with_preferences(
+            PlaybackCommand::SetVolume { volume: 31.0 },
+            |_| {
+                Err(PlaybackError::new(
+                    "preferences-unavailable",
+                    "write failed",
+                ))
+            },
+        );
+        assert!(result.is_err());
+        assert_eq!(controller.engine.volume, before.volume);
+        assert_eq!(controller.engine.muted, before.muted);
+        assert_eq!(controller.snapshot().sequence, before.sequence);
+        assert_eq!(controller.snapshot().volume, before.volume);
+    }
+
+    #[test]
+    fn volume_and_mute_commit_the_same_preferences_to_output_and_storage() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        let mut saved = Vec::new();
+        for command in [
+            PlaybackCommand::SetVolume { volume: 47.0 },
+            PlaybackCommand::SetVolume { volume: 0.0 },
+            PlaybackCommand::SetMuted { muted: false },
+        ] {
+            controller
+                .dispatch_with_preferences(command, |preferences| {
+                    saved.push(preferences);
+                    Ok(())
+                })
+                .expect("save and apply");
+        }
+        assert_eq!(saved.len(), 3);
+        assert_eq!(saved[1].volume, 0.0);
+        assert!(saved[1].muted);
+        assert_eq!(saved[2].volume, 47.0);
+        assert_eq!(controller.engine.volume, saved[2].volume);
+        assert_eq!(controller.engine.muted, saved[2].muted);
+    }
+
+    #[test]
+    fn invalid_volume_and_unrelated_commands_do_not_write_preferences() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        let mut writes = 0;
+        assert!(controller
+            .dispatch_with_preferences(PlaybackCommand::SetVolume { volume: 101.0 }, |_| {
+                writes += 1;
+                Ok(())
+            })
+            .is_err());
+        controller
+            .dispatch_with_preferences(PlaybackCommand::SetShuffle { shuffle: true }, |_| {
+                writes += 1;
+                Ok(())
+            })
+            .expect("shuffle");
+        assert_eq!(writes, 0);
+    }
+
+    #[test]
+    fn engine_failure_does_not_commit_the_candidate_session() {
+        let mut controller = PlaybackController::new(FakeEngine {
+            fail_next_load: true,
+            ..FakeEngine::default()
+        });
+
+        let result = controller.dispatch(PlaybackCommand::ReplaceQueue {
+            queue: vec![track("one")],
+            current_index: Some(0),
+            autoplay: true,
+        });
+
+        assert_eq!(result.expect_err("load should fail").code, "decoder-failed");
+        let snapshot = controller.snapshot();
+        assert_eq!(snapshot.generation, 0);
+        assert!(snapshot.queue.is_empty());
+        assert_eq!(snapshot.status, PlaybackStatus::Idle);
+    }
+
+    #[test]
+    fn conditional_reads_reconcile_automatic_next_before_comparing_versions() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        let previous = controller
+            .dispatch(PlaybackCommand::ReplaceQueue {
+                queue: vec![track("one"), track("two")],
+                current_index: Some(0),
+                autoplay: true,
+            })
+            .expect("load");
+        controller.engine.observation.completed = true;
+        controller.engine.observation.position_ms = 60_000;
+        let PlaybackUpdate::Snapshot { snapshot } = controller.update(PlaybackVersion {
+            generation: previous.generation,
+            sequence: previous.sequence,
+        }) else {
+            panic!("automatic next must supply its new queue state");
+        };
+        assert_eq!(snapshot.current_index, Some(1));
+        assert_eq!(snapshot.status, PlaybackStatus::Playing);
+        assert_eq!(snapshot.generation, previous.generation + 1);
+        assert_eq!(snapshot.position_ms, 0);
+    }
+
+    #[test]
+    fn conditional_reads_do_not_hide_failure_to_load_the_next_track() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        let previous = controller
+            .dispatch(PlaybackCommand::ReplaceQueue {
+                queue: vec![track("one"), track("two")],
+                current_index: Some(0),
+                autoplay: true,
+            })
+            .expect("load");
+        controller.engine.observation.completed = true;
+        controller.engine.fail_next_load = true;
+        let PlaybackUpdate::Snapshot { snapshot } = controller.update(PlaybackVersion {
+            generation: previous.generation,
+            sequence: previous.sequence,
+        }) else {
+            panic!("failure must supply its complete state");
+        };
+        assert_eq!(snapshot.status, PlaybackStatus::Failed);
+        assert_eq!(snapshot.current_index, Some(0));
+        assert!(snapshot.sequence > previous.sequence);
+    }
+
+    #[test]
+    fn conditional_reads_report_terminal_completion_without_fabricating_next() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller
+            .dispatch(PlaybackCommand::ReplaceQueue {
+                queue: vec![track("one")],
+                current_index: Some(0),
+                autoplay: true,
+            })
+            .expect("load");
+        let previous = controller
+            .dispatch(PlaybackCommand::SetRepeatMode {
+                repeat_mode: crate::playback::contracts::RepeatMode::None,
+            })
+            .expect("mode");
+        controller.engine.observation.completed = true;
+        controller.engine.observation.position_ms = 60_000;
+        let PlaybackUpdate::Snapshot { snapshot } = controller.update(PlaybackVersion {
+            generation: previous.generation,
+            sequence: previous.sequence,
+        }) else {
+            panic!("completion must supply its complete state");
+        };
+        assert_eq!(snapshot.status, PlaybackStatus::Completed);
+        assert_eq!(snapshot.position_ms, 60_000);
+        assert_eq!(controller.engine.loaded_ids, ["one"]);
+    }
+
+    #[test]
+    fn runtime_completion_is_projected_into_the_snapshot() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller
+            .dispatch(PlaybackCommand::ReplaceQueue {
+                queue: vec![track("one")],
+                current_index: Some(0),
+                autoplay: true,
+            })
+            .expect("load should work");
+        controller
+            .dispatch(PlaybackCommand::SetRepeatMode {
+                repeat_mode: crate::playback::contracts::RepeatMode::None,
+            })
+            .expect("mode should work");
+        controller.engine.observation.position_ms = 60_000;
+        controller.engine.observation.completed = true;
+
+        let snapshot = controller.snapshot();
+
+        assert_eq!(snapshot.status, PlaybackStatus::Completed);
+        assert_eq!(snapshot.position_ms, 60_000);
+    }
+
+    #[test]
+    fn completion_advances_to_the_next_item_without_a_webview_event() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller
+            .dispatch(PlaybackCommand::ReplaceQueue {
+                queue: vec![track("one"), track("two")],
+                current_index: Some(0),
+                autoplay: true,
+            })
+            .expect("load should work");
+        controller.engine.observation.position_ms = 60_000;
+        controller.engine.observation.completed = true;
+
+        controller.tick().expect("automatic advance should work");
+        let snapshot = controller.session.snapshot();
+
+        assert_eq!(snapshot.current_index, Some(1));
+        assert_eq!(snapshot.generation, 2);
+        assert_eq!(snapshot.status, PlaybackStatus::Playing);
+        assert_eq!(controller.engine.loaded_ids, ["one", "two"]);
+    }
+
+    #[test]
+    fn removing_the_current_item_is_transactional_when_the_next_load_fails() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller
+            .dispatch(PlaybackCommand::ReplaceQueue {
+                queue: vec![track("one"), track("two")],
+                current_index: Some(0),
+                autoplay: true,
+            })
+            .expect("initial load should work");
+        controller.engine.fail_next_load = true;
+
+        let error = controller
+            .dispatch(PlaybackCommand::RemoveIndex { index: 0 })
+            .expect_err("replacement load should fail");
+        let snapshot = controller.session.snapshot();
+
+        assert_eq!(error.code, "decoder-failed");
+        assert_eq!(snapshot.queue.len(), 2);
+        assert_eq!(snapshot.current_index, Some(0));
+        assert_eq!(snapshot.queue[0].id, "one");
+    }
+
+    #[test]
+    fn reordering_does_not_reload_the_active_engine_item() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller
+            .dispatch(PlaybackCommand::ReplaceQueue {
+                queue: vec![track("one"), track("two"), track("three")],
+                current_index: Some(1),
+                autoplay: true,
+            })
+            .expect("initial load should work");
+        let generation = controller.session.snapshot().generation;
+
+        let snapshot = controller
+            .dispatch(PlaybackCommand::ReorderQueue {
+                from_index: 0,
+                to_index: 2,
+            })
+            .expect("reorder should work");
+
+        assert_eq!(controller.engine.loaded_ids, ["two"]);
+        assert_eq!(snapshot.current_index, Some(0));
+        assert_eq!(snapshot.queue[0].id, "two");
+        assert_eq!(snapshot.generation, generation);
+    }
+
+    #[test]
+    fn enqueue_only_loads_the_engine_when_the_queue_was_empty() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+
+        controller
+            .dispatch(PlaybackCommand::Enqueue {
+                items: vec![track("one")],
+            })
+            .expect("empty enqueue should load");
+        controller
+            .dispatch(PlaybackCommand::Enqueue {
+                items: vec![track("two")],
+            })
+            .expect("non-empty enqueue should append");
+
+        assert_eq!(controller.engine.loaded_ids, ["one"]);
+        assert_eq!(controller.session.snapshot().queue.len(), 2);
+    }
+
+    #[test]
+    fn refreshing_only_reloads_the_engine_for_the_current_item() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller
+            .dispatch(PlaybackCommand::ReplaceQueue {
+                queue: vec![track("one"), track("two")],
+                current_index: Some(0),
+                autoplay: true,
+            })
+            .expect("initial load");
+        let mut queued_replacement = track("two");
+        queued_replacement.path = r"D:\Recovered\two.flac".to_owned();
+        controller
+            .dispatch(PlaybackCommand::RefreshItem {
+                item: queued_replacement,
+            })
+            .expect("queued refresh");
+        assert_eq!(controller.engine.loaded_ids, ["one"]);
+
+        let mut current_replacement = track("one");
+        current_replacement.path = r"D:\Recovered\one.flac".to_owned();
+        controller
+            .dispatch(PlaybackCommand::RefreshItem {
+                item: current_replacement,
+            })
+            .expect("current refresh");
+        assert_eq!(controller.engine.loaded_ids, ["one", "one"]);
+        assert_eq!(
+            controller.session.snapshot().queue[0].path,
+            r"D:\Recovered\one.flac"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires a Windows audio device and the generated media fixtures"]
+    fn production_engine_advances_between_two_generated_files() {
+        let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("spikes")
+            .join("media-fixtures")
+            .join("generated");
+        let fixture_track = |filename: &str| PlaybackItem {
+            id: filename.to_owned(),
+            path: fixtures.join(filename).to_string_lossy().into_owned(),
+            title: filename.to_owned(),
+            kind: MediaKind::Audio,
+            duration_ms: None,
+        };
+        let queue = vec![
+            fixture_track("tone.wav"),
+            fixture_track("tone-44100-mono.wav"),
+        ];
+        assert!(queue.iter().all(|item| PathBuf::from(&item.path).is_file()));
+
+        let mut controller = PlaybackController::new(NativeAudioEngine::default());
+        controller
+            .dispatch(PlaybackCommand::SetRepeatMode {
+                repeat_mode: crate::playback::contracts::RepeatMode::None,
+            })
+            .expect("mode should work");
+        controller
+            .dispatch(PlaybackCommand::SetMuted { muted: true })
+            .expect("mute should work");
+        controller
+            .dispatch(PlaybackCommand::ReplaceQueue {
+                queue,
+                current_index: Some(0),
+                autoplay: true,
+            })
+            .expect("production queue should load");
+
+        for _ in 0..500 {
+            controller
+                .tick()
+                .expect("production queue tick should work");
+            let snapshot = controller.session.snapshot();
+            if snapshot.current_index == Some(1) {
+                assert_eq!(snapshot.status, PlaybackStatus::Playing);
+                controller
+                    .dispatch(PlaybackCommand::Stop)
+                    .expect("queue should stop cleanly");
+                return;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+
+        panic!("production engine did not advance within five seconds");
+    }
+}

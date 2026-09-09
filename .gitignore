@@ -1,37 +1,29 @@
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-build/
-coverage/
-
-android/.gradle/
-android/app/debug/
-android/app/profile/
-android/app/release/
-
-ios/Flutter/.last_build_id
-ios/Flutter/App.framework
-ios/Flutter/Flutter.framework
-ios/Flutter/Flutter.podspec
-ios/Pods/
-ios/Runner.xcworkspace/
-
-macos/Flutter/ephemeral/
-macos/Pods/
-
-linux/flutter/ephemeral/
-windows/flutter/ephemeral/
-
-*.iml
+# Editors and local task state.
 .idea/
 .vscode/
+.superpowers/
+.worktrees/
 
+# TypeScript / Tauri generated outputs.
+node_modules/
+.pnpm-store/
+dist/
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Reproducible or local-only research outputs.
+research/upstream/
+spikes/**/target/
+spikes/media-fixtures/generated/
+
+# Flutter v1 binaries and generated caches are preserved locally, not in Git.
+legacy/v1-flutter/releases/
+legacy/v1-flutter/build-cache/
+
+# General local outputs.
 *.log
 *.tmp
 *.temp
 
-.superpowers/
-.worktrees/
+# Local design explorations and visual QA captures; keep out of source releases.
+output/

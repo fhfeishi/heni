@@ -1,0 +1,14 @@
+.video-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 8px 20px 20px; }
+.video-stage[hidden] { display: none; }
+.video-stage__surface { position: relative; min-height: 0; width: 100%; flex: 1; overflow: hidden; border-radius: 18px; background: #08090b; box-shadow: 0 16px 48px rgb(0 0 0 / 20%); }
+.video-stage video { display: block; width: 100%; height: 100%; object-fit: contain; }
+.video-stage__caption { margin: 0; text-align: center; color: var(--text-muted); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.video-stage__error { position: absolute; inset: 0; display: grid; place-content: center; padding: 32px; background: #11151d; color: #eee; text-align: center; }
+
+/* A single moving lens, not two separately boxed buttons. */
+.workspace-switch { position: relative; isolation: isolate; padding: 4px; gap: 0; border-radius: 999px; background: color-mix(in srgb, var(--surface) 24%, transparent); backdrop-filter: blur(12px); box-shadow: inset 0 1px 0 rgb(255 255 255 / 9%); }
+.workspace-switch::before { content: ""; position: absolute; z-index: -1; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 2); border-radius: 999px; background: rgb(var(--accent-rgb) / 18%); box-shadow: inset 0 0 0 1px rgb(var(--accent-rgb) / 16%), 0 2px 8px rgb(0 0 0 / 8%); transition: transform 220ms cubic-bezier(.2,.8,.2,1); }
+.workspace-switch[data-stage="true"]::before { transform: translateX(100%); }
+.workspace-switch button { min-width: 80px; min-height: 32px; border-radius: 999px; gap: 6px; }
+.workspace-switch button[aria-pressed="true"] { background: transparent; box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .workspace-switch::before { transition: none; } }

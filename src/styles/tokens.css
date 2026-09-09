@@ -1,0 +1,113 @@
+:root {
+  font-family: "Segoe UI Variable", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  color: #f1f3ed;
+  background: #0c110d;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --matte: #0c110d;
+  --surface: #111913;
+  --surface-raised: #172119;
+  --surface-hover: #1d2a20;
+  --line: rgb(207 230 192 / 11%);
+  --line-strong: rgb(166 205 138 / 26%);
+  --text: #f1f3ed;
+  --text-muted: #9ca89d;
+  --text-quiet: #717d73;
+  --accent: #a8cf7b;
+  --accent-strong: #c0e596;
+  --accent-rgb: 168 207 123;
+  --accent-strong-rgb: 192 229 150;
+  --accent-ink: #16200f;
+  --danger: #ffb1ba;
+  --focus: #c4e89b;
+}
+
+.app-frame[data-theme="rose"] {
+  --matte: #160f15; --surface: #211820; --surface-raised: #302028; --surface-hover: #3d2a35;
+  --line: rgb(237 179 189 / 13%); --line-strong: rgb(237 179 189 / 30%);
+  --text: #f8eff2; --text-muted: #c5aeb9; --text-quiet: #aa929e;
+  --accent: #edb3bd; --accent-strong: #f6cbd2; --accent-rgb: 237 179 189; --accent-strong-rgb: 246 203 210;
+  --accent-ink: #331821; --danger: #ffb1ba; --focus: #f6cbd2;
+  --scenery-seed: 153 82 111; --scenery-glow: 185 125 89;
+}
+
+.app-frame[data-theme="iris"] {
+  --matte: #11101b; --surface: #1a192a; --surface-raised: #242239; --surface-hover: #302d48;
+  --line: rgb(189 179 238 / 13%); --line-strong: rgb(189 179 238 / 30%);
+  --text: #f2effc; --text-muted: #b8b1d1; --text-quiet: #9991b5;
+  --accent: #bdb3ee; --accent-strong: #d7cef9; --accent-rgb: 189 179 238; --accent-strong-rgb: 215 206 249;
+  --accent-ink: #241d3b; --danger: #ffb1c8; --focus: #d7cef9;
+  --scenery-seed: 103 87 158; --scenery-glow: 78 139 151;
+}
+
+.app-frame[data-theme="ember"] {
+  --matte: #17120e; --surface: #231b15; --surface-raised: #30251e; --surface-hover: #3d3026;
+  --line: rgb(237 189 144 / 13%); --line-strong: rgb(237 189 144 / 30%);
+  --text: #f8f1e9; --text-muted: #c9b5a4; --text-quiet: #ab9482;
+  --accent: #edbd90; --accent-strong: #f4d2ae; --accent-rgb: 237 189 144; --accent-strong-rgb: 244 210 174;
+  --accent-ink: #332012; --danger: #ffb1ba; --focus: #f4d2ae;
+  --scenery-seed: 158 107 67; --scenery-glow: 144 78 65;
+}
+
+.app-frame[data-theme="studio"] {
+  --matte: #0c110d;
+  --surface: #111913;
+  --surface-raised: #172119;
+  --surface-hover: #1d2a20;
+  --line: rgb(207 230 192 / 11%);
+  --line-strong: rgb(166 205 138 / 26%);
+  --text: #f1f3ed;
+  --text-muted: #9ca89d;
+  --text-quiet: #717d73;
+  --accent: #a8cf7b;
+  --accent-strong: #c0e596;
+  --accent-rgb: 168 207 123;
+  --accent-strong-rgb: 192 229 150;
+  --accent-ink: #16200f;
+  --danger: #ffb1ba;
+  --focus: #c4e89b;
+  --scenery-seed: 119 166 91;
+  --scenery-glow: 62 107 83;
+}
+
+.app-frame[data-theme="nocturne"] {
+  --matte: #0b1112;
+  --surface: #10191a;
+  --surface-raised: #172224;
+  --surface-hover: #1d2b2e;
+  --line: rgb(193 222 218 / 11%);
+  --line-strong: rgb(104 177 167 / 30%);
+  --text: #eef3f1;
+  --text-muted: #99aaa7;
+  --text-quiet: #6d7f7c;
+  --accent: #d1b56f;
+  --accent-strong: #e6cb86;
+  --accent-rgb: 209 181 111;
+  --accent-strong-rgb: 230 203 134;
+  --accent-ink: #241d0d;
+  --danger: #ffb4bd;
+  --focus: #f0d58c;
+  --scenery-seed: 68 139 126;
+  --scenery-glow: 188 145 73;
+}
+
+.app-frame[data-theme="tide"] {
+  --matte: #0b1016;
+  --surface: #101923;
+  --surface-raised: #172433;
+  --surface-hover: #1c2d40;
+  --line: rgb(194 216 237 / 12%);
+  --line-strong: rgb(106 164 219 / 30%);
+  --text: #f0f4f8;
+  --text-muted: #99a8b7;
+  --text-quiet: #6e7e90;
+  --accent: #e5b66d;
+  --accent-strong: #f1ca88;
+  --accent-rgb: 229 182 109;
+  --accent-strong-rgb: 241 202 136;
+  --accent-ink: #251a0c;
+  --danger: #ffb3bc;
+  --focus: #f2cf91;
+  --scenery-seed: 63 125 190;
+  --scenery-glow: 46 142 160;
+}
