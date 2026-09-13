@@ -44,6 +44,11 @@ describe("PreferencesControl", () => {
     expect(details.open).toBe(false);
     expect(details.querySelector("summary")).toHaveFocus();
     details.open = true;
+    // A draft action may disable itself and leave keyboard focus on the page.
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(details.open).toBe(false);
+    expect(details.querySelector("summary")).toHaveFocus();
+    details.open = true;
     fireEvent.pointerDown(document.body);
     expect(details.open).toBe(false);
   });

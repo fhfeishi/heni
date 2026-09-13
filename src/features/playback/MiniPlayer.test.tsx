@@ -42,7 +42,8 @@ describe("MiniPlayer", () => {
     );
 
     expect(screen.getByText("one.flac")).toBeInTheDocument();
-    expect(screen.getByText("本地音乐")).toBeInTheDocument();
+    expect(screen.getByText("正在聆听")).toBeInTheDocument();
+    expect(screen.queryByText(item.path)).not.toBeInTheDocument();
     expect(screen.queryByText(/^H$/u)).toBeNull();
     const queue = screen.getByRole("button", { name: "队列 1" });
     expect(queue.textContent).toBe("");

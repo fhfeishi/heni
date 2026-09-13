@@ -660,18 +660,31 @@ mod tests {
 
     #[test]
     #[ignore = "requires a Windows audio device and the generated media fixture"]
-    fn plays_the_generated_wav_through_the_production_engine() {
+    fn plays_generated_audio_formats_through_the_production_engine() {
+        for filename in [
+            "tone.wav",
+            "tone-44100-mono.wav",
+            "tone.flac",
+            "tone.mp3",
+            "tone.m4a",
+            "tone.opus",
+        ] {
+            assert_generated_audio_plays(filename);
+        }
+    }
+
+    fn assert_generated_audio_plays(filename: &str) {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("spikes")
             .join("media-fixtures")
             .join("generated")
-            .join("tone.wav");
+            .join(filename);
         assert!(path.is_file(), "generate the local spike fixtures first");
         let item = PlaybackItem {
             id: "hardware-smoke".to_owned(),
             path: path.to_string_lossy().into_owned(),
-            title: "tone.wav".to_owned(),
+            title: filename.to_owned(),
             kind: MediaKind::Audio,
             duration_ms: None,
         };
@@ -679,11 +692,14 @@ mod tests {
 
         let duration = engine
             .load(&item, 0, true, 5.0, true)
-            .expect("production engine should load the generated WAV");
+            .unwrap_or_else(|error| panic!("{filename}: production load failed: {error:?}"));
 
         for _ in 0..500 {
             let observation = engine.observation();
-            assert!(!observation.failed, "production audio stream failed");
+            assert!(
+                !observation.failed,
+                "{filename}: production audio stream failed"
+            );
             if observation.completed {
                 assert!(observation.position_ms >= 900);
                 assert!(duration.is_some());
@@ -692,6 +708,6 @@ mod tests {
             }
             thread::sleep(Duration::from_millis(10));
         }
-        panic!("production audio stream did not complete within five seconds");
+        panic!("{filename}: production audio stream did not complete within five seconds");
     }
 }

@@ -63,6 +63,23 @@ afterEach(() => {
 });
 
 describe("usePlayback", () => {
+  it("keeps transport controls available during previews and preserves foreground errors", async () => {
+    const pending = deferred<PlaybackResult>();
+    const port: PlaybackPort = { ...source(), dispatch: async (command) =>
+      command.type === "preview-volume" ? pending.promise : err(failure) };
+    const { result } = renderHook(() => usePlayback(port));
+    await act(async () => undefined);
+    let preview: Promise<boolean> | undefined;
+    act(() => { preview = result.current.dispatch({ type: "preview-volume", volume: 30,
+      generation: 1, sequence: 1, gestureId: "owner" }); });
+    expect(result.current.busy).toBe(false);
+    await act(async () => { await result.current.dispatch({ type: "set-muted", muted: true }); });
+    expect(result.current.error).toEqual(failure);
+    await act(async () => { pending.resolve(ok(snapshot)); await preview; });
+    expect(result.current.error).toEqual(failure);
+    expect(result.current.busy).toBe(false);
+  });
+
   it("keeps a command failure visible across successful reads until dismissed", async () => {
     const port = { ...source(), dispatch: async () => err(failure) };
     const { result } = renderHook(() => usePlayback(port));

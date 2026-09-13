@@ -80,6 +80,27 @@ describe("VideoOutput", () => {
     detach();
   });
 
+  it("applies audition and committed gain without reloading, seeking or pausing video", async () => {
+    let current = intent();
+    const output = new VideoOutput({ exchange: async () => current });
+    const detach = output.attach(video, vi.fn());
+    await flush();
+    vi.mocked(video.pause).mockClear();
+    vi.mocked(video.load).mockClear();
+    video.currentTime = 7;
+    for (const type of ["preview-volume", "commit-volume-preview"] as const) {
+      await output.withCommand({ type, volume: 60, generation: 1, sequence: 1, gestureId: "owner" }, async () => {
+        current = { ...current, revision: current.revision + 1, volume: 60 };
+      });
+      await vi.advanceTimersByTimeAsync(100);
+      expect(video.volume).toBe(0.6);
+      expect(video.currentTime).toBe(7);
+      expect(video.pause).not.toHaveBeenCalled();
+      expect(video.load).not.toHaveBeenCalled();
+    }
+    detach();
+  });
+
   it("does not dispatch a replacement when the quiet acknowledgment fails", async () => {
     const exchange = vi.fn().mockResolvedValue(intent());
     const output = new VideoOutput({ exchange });

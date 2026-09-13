@@ -16,8 +16,8 @@ body,
 html:has(.app-frame[data-window-mode="mini-player"]),
 body:has(.app-frame[data-window-mode="mini-player"]),
 #root:has(.app-frame[data-window-mode="mini-player"]) {
-  min-width: 360px;
-  min-height: 220px;
+  min-width: 320px;
+  min-height: 180px;
 }
 
 body {
@@ -61,4 +61,3 @@ button:not(:disabled) {
 input[type="range"] {
   accent-color: var(--accent);
 }
-

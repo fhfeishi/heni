@@ -130,10 +130,18 @@ pub enum PlaybackCommand {
         volume: f64,
         generation: u64,
         sequence: u64,
+        gesture_id: String,
     },
     CancelVolumePreview {
         generation: u64,
         sequence: u64,
+        gesture_id: String,
+    },
+    CommitVolumePreview {
+        volume: f64,
+        generation: u64,
+        sequence: u64,
+        gesture_id: String,
     },
     SetMuted {
         muted: bool,

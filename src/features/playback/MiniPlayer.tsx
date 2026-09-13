@@ -13,6 +13,7 @@ export interface MiniPlayerProps {
   clockSample: PlaybackClockSample | null;
   currentItem: PlaybackItem | null;
   busy: boolean;
+  sceneryImageUrl?: string | null;
   onDispatch(command: PlaybackCommand): Promise<boolean>;
   onOpenQueue(): void;
 }
@@ -22,6 +23,7 @@ export const MiniPlayer = ({
   clockSample,
   currentItem,
   busy,
+  sceneryImageUrl,
   onDispatch,
   onOpenQueue,
 }: MiniPlayerProps) => {
@@ -31,11 +33,12 @@ export const MiniPlayer = ({
   return (
     <section className="mini-player" aria-label="迷你播放器">
       <div className="mini-player__track">
-        <span className="mini-artwork mini-artwork--large" aria-hidden="true" />
+        <span className="mini-artwork mini-artwork--large" aria-hidden="true">
+          {sceneryImageUrl && <img src={sceneryImageUrl} alt="" onError={(event) => { event.currentTarget.hidden = true; }} />}
+        </span>
         <div>
-          <span>本地音乐</span>
+          <span>{isPlaying ? "正在聆听" : "随时聆听"}</span>
           <strong>{currentItem?.title ?? "尚未播放"}</strong>
-          <small>{currentItem?.path ?? "返回主窗口选择本地音乐"}</small>
         </div>
       </div>
 

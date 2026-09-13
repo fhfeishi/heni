@@ -104,6 +104,8 @@ enum GlassMaterial {
 struct GlassSettings {
     material: GlassMaterial,
     transparency: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fog: Option<u8>,
 }
 
 impl Default for GlassSettings {
@@ -111,6 +113,7 @@ impl Default for GlassSettings {
         Self {
             material: GlassMaterial::Soft,
             transparency: 35,
+            fog: None,
         }
     }
 }
@@ -233,7 +236,7 @@ impl SettingsRepository {
         if scenery_reveal > 300 {
             return Err(SettingsError::database());
         }
-        if glass.transparency > 100 {
+        if glass.transparency > 100 || glass.fog.is_some_and(|fog| fog > 100) {
             return Err(SettingsError::database());
         }
         Ok(SettingsSnapshot {
@@ -265,7 +268,7 @@ impl SettingsRepository {
         if request
             .glass
             .as_ref()
-            .is_some_and(|glass| glass.transparency > 100)
+            .is_some_and(|glass| glass.transparency > 100 || glass.fog.is_some_and(|fog| fog > 100))
         {
             return Err(SettingsError::new(
                 "invalid-contract",
@@ -739,6 +742,20 @@ mod tests {
 
     #[test]
     fn glass_reopens_and_failed_update_preserves_material_and_theme() {
+        let legacy: GlassSettings =
+            serde_json::from_str(r#"{"material":"clear","transparency":70}"#)
+                .expect("legacy glass");
+        assert_eq!(legacy.fog, None);
+        let mut fixture = repository();
+        assert!(fixture
+            .update(&SettingsUpdateRequest {
+                glass: Some(GlassSettings {
+                    fog: Some(101),
+                    ..legacy
+                }),
+                ..SettingsUpdateRequest::default()
+            })
+            .is_err());
         let path = std::env::temp_dir().join(format!(
             "heni-glass-{}-{}.sqlite3",
             std::process::id(),
@@ -747,6 +764,7 @@ mod tests {
         let glass = GlassSettings {
             material: GlassMaterial::Clear,
             transparency: 80,
+            fog: Some(62),
         };
         {
             let mut repository = SettingsRepository::open(&path).expect("fixture");
@@ -768,7 +786,8 @@ mod tests {
                 .update(&SettingsUpdateRequest {
                     glass: Some(GlassSettings {
                         material: GlassMaterial::Soft,
-                        transparency: 101
+                        transparency: 101,
+                        fog: None,
                     }),
                     ..SettingsUpdateRequest::default()
                 })

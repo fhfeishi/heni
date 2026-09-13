@@ -67,11 +67,11 @@ export const WindowChrome = ({ mini, onRestoreMain, busy = false, port = nativeW
       <button type="button" aria-label="最小化窗口" title="最小化" onClick={() => void run(() => port.minimize())}>
         <InterfaceIcon name="minimize" />
       </button>
-      <button type="button" aria-label={maximized ? "还原窗口" : "最大化窗口"}
+      {!mini && <button type="button" aria-label={maximized ? "还原窗口" : "最大化窗口"}
         title={mini ? "迷你播放器保持紧凑尺寸" : maximized ? "还原" : "最大化"}
         disabled={mini} onClick={() => void run(() => port.toggleMaximize())}>
         <InterfaceIcon name={maximized ? "restore" : "maximize"} />
-      </button>
+      </button>}
       <button type="button" className="window-chrome__close" aria-label="关闭窗口" title="关闭"
         onClick={() => void run(() => port.close())}>
         <InterfaceIcon name="close" />

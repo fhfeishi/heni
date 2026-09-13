@@ -14,9 +14,7 @@
   padding: clamp(24px, 4vw, 44px);
   overflow: hidden;
   border: 0;
-  border-radius: 20px;
-  background:
-    linear-gradient(110deg, color-mix(in srgb, var(--matte) 58%, transparent), color-mix(in srgb, var(--matte) 30%, transparent));
+  background: transparent;
 }
 
 .stage-audio-details { margin-top: 16px; color: var(--text-muted); font-size: 12px; }

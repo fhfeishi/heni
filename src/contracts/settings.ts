@@ -10,9 +10,12 @@ const sceneryIntensitySchema = z.number().int().min(0).max(100);
 export const glassSettingsSchema = z.object({
   material: z.enum(["clear", "soft", "frosted"]),
   transparency: z.number().int().min(0).max(100),
+  fog: z.number().int().min(0).max(100).optional(),
 }).strict();
 export type GlassSettings = Readonly<z.infer<typeof glassSettingsSchema>>;
 export const defaultGlassSettings: GlassSettings = { material: "soft", transparency: 35 };
+export const glassFog = (value: GlassSettings): number =>
+  value.fog ?? ({ clear: 10, soft: 40, frosted: 70 } as const)[value.material];
 
 export const settingsSnapshotSchema = z.object({
   schemaVersion: z.literal(1),

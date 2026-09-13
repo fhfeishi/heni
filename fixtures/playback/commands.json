@@ -57,8 +57,9 @@
   },
   { "type": "seek", "positionMs": 1000 },
   { "type": "set-volume", "volume": 50 },
-  { "type": "preview-volume", "volume": 35, "generation": 1, "sequence": 2 },
-  { "type": "cancel-volume-preview", "generation": 1, "sequence": 2 },
+  { "type": "preview-volume", "volume": 35, "generation": 1, "sequence": 2, "gestureId": "gesture-1" },
+  { "type": "cancel-volume-preview", "generation": 1, "sequence": 2, "gestureId": "gesture-1" },
+  { "type": "commit-volume-preview", "volume": 35, "generation": 1, "sequence": 2, "gestureId": "gesture-1" },
   { "type": "set-muted", "muted": true },
   { "type": "set-repeat-mode", "repeatMode": "one" },
   { "type": "set-shuffle", "shuffle": true }

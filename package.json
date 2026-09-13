@@ -8,12 +8,15 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "audit:licenses": "node scripts/license-audit.mjs",
     "dev": "vite --host 127.0.0.1 --port 5173",
     "lint": "eslint src vite.config.ts --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "tsc --noEmit && vite build",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "package:windows": "tauri build --config src-tauri/tauri.installer.conf.json",
+    "bundle:windows": "tauri bundle --config src-tauri/tauri.installer.conf.json"
   },
   "dependencies": {
     "@tauri-apps/api": "2.11.1",

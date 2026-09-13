@@ -8,12 +8,12 @@
 | 歌单 | 创建、说明/改名、删除；整单/行播放、双击起播；跨歌单或曲库多选加入；定位当前项；单项/批量移除 | src/features/playlist/、src/app/App.tsx | 最新交互实机、重启后成员一致性回归 |
 | 队列与音频 | 唯一 Rust 会话、播放/暂停/seek、顺序/循环/随机、增删/重排及曲尾续播 | src/features/playback/、src-tauri/src/playback/ | 当前版本声音/设备变化/长时验证 |
 | 视频 | HybridEngine 与唯一 video 输出、受控本机连续流、MP4/M4V/MOV/WebM 资格判断 | src-tauri/src/playback/video/、src/features/playback/ | 编码实际支持、连续播放/音画同步/切换释放未完整验收 |
-| 浏览与舞台 | 保留浏览来源、搜索/滚动；顶部唯一歌曲/舞台双选；中央视频呈现 | src/app/App.tsx、src/features/shell/ | 最新版本真实声音及 Mini 连续性 |
-| 外壳 | 小写 heni、同背景窗口控制栏、主玻璃与顶/左/底边缘工具面板、固定模式 | src/features/shell/、src/styles/edge-glass.css | Snap/系统菜单/DPI/边缘命中完整矩阵 |
+| 浏览与舞台 | 保留浏览来源、搜索/滚动；顶部唯一双选；中央单层展示，歌曲无嵌套衬底、视频铺满同一区域且保持完整比例 | src/app/App.tsx、src/features/shell/ | 最新版本真实声音及 Mini 连续性 |
+| 外壳 | 整窗连续玻璃、顶/左/底贴边展开及无把手收起、固定模式；舞台隐藏顶栏重复字标 | src/features/shell/、src/styles/edge-glass.css | 新版收起/展开实机观感、Snap/系统菜单/DPI/边缘命中矩阵 |
 | 设置与主题 | 外观/导入分区、六主题、固定头部与滚动内容、隐藏分区保留草稿、错误常显 | src/features/settings/ | 六主题与最小窗实机复核 |
 | 场景 | PNG/JPEG 单/多图、轮换恢复、强度草稿；显露 0–300，中央淡出与顶部恢复操作 | src/features/scenery/、src/features/shell/SceneryBackdrop.tsx | 100–300 代码完成，明暗图/极值实机待验 |
-| 玻璃 | 清透/柔雾/磨砂预设、通透度预览/保存/取消 | src/features/settings/、src/features/shell/glass.ts | 独立雾度微调与完整视觉验收 |
-| 音量 | 音量/静音恢复、细轨道、拖动草稿与松开应用 | src/features/playback/ | 实时试听未实现，不等同于滑块已有 |
+| 玻璃 | 清透/柔雾/磨砂预设、通透度与独立雾度 0–100、草稿预览/保存/取消；雾度端点与取消已实机检查 | src/features/settings/、src/features/shell/glass.ts | 六主题/明暗图与完整窗口尺寸矩阵待验 |
+| 音量 | 拖动/键盘实时试听、松开单次保存、静音独立；取消/失焦/卸载恢复、过期手势隔离 | src/features/playback/application/volumeGesture.ts、src-tauri/src/playback/controller.rs | 真实听感、音视频/Mini 切换与设备变化待验 |
 | Mini | 同会话切换、返回主窗与几何恢复、关闭清理 | src/features/shell/、src/features/playback/ | 当前视频/多 DPI 回归 |
 
 

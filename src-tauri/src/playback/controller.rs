@@ -8,10 +8,15 @@ use super::{
     session::PlaybackSession,
 };
 
+struct VolumePreview {
+    gesture_id: String,
+    last_update: std::time::Instant,
+}
+
 pub(super) struct PlaybackController<E> {
     session: PlaybackSession,
     engine: E,
-    volume_preview: Option<std::time::Instant>,
+    volume_preview: Option<VolumePreview>,
 }
 
 impl<E: PlaybackEngine> PlaybackController<E> {
@@ -59,53 +64,103 @@ impl<E: PlaybackEngine> PlaybackController<E> {
         let _ = self.tick();
 
         let previous_snapshot = self.session.snapshot();
+        let is_commit = matches!(command, PlaybackCommand::CommitVolumePreview { .. });
         match &command {
             PlaybackCommand::PreviewVolume {
                 volume,
                 generation,
                 sequence,
+                gesture_id,
             } => {
+                Self::validate_gesture(&previous_snapshot, *generation, *sequence, gesture_id)?;
                 if !volume.is_finite() || !(0.0..=100.0).contains(volume) {
                     return Err(PlaybackError::new(
                         "invalid-contract",
                         "Invalid preview volume.",
                     ));
                 }
-                if *generation != previous_snapshot.generation
-                    || *sequence != previous_snapshot.sequence
+                if self
+                    .volume_preview
+                    .as_ref()
+                    .is_some_and(|preview| preview.gesture_id != *gesture_id)
                 {
                     return Err(PlaybackError::new(
                         "invalid-contract",
-                        "The volume gesture is stale.",
+                        "Another volume gesture is active.",
                     ));
                 }
                 self.engine.set_volume(*volume);
                 self.engine.set_muted(previous_snapshot.muted);
-                self.volume_preview = Some(std::time::Instant::now());
+                self.volume_preview = Some(VolumePreview {
+                    gesture_id: gesture_id.clone(),
+                    last_update: std::time::Instant::now(),
+                });
                 return Ok(previous_snapshot);
             }
             PlaybackCommand::CancelVolumePreview {
                 generation,
                 sequence,
+                gesture_id,
             } => {
                 if *generation == previous_snapshot.generation
                     && *sequence == previous_snapshot.sequence
+                    && self
+                        .volume_preview
+                        .as_ref()
+                        .is_none_or(|preview| preview.gesture_id == *gesture_id)
                 {
-                    self.cancel_volume_preview();
+                    if self.volume_preview.is_some() {
+                        self.cancel_volume_preview();
+                    } else {
+                        self.session.invalidate_volume_gesture();
+                    }
                 }
-                return Ok(previous_snapshot);
+                return Ok(self.session.snapshot());
+            }
+            PlaybackCommand::CommitVolumePreview {
+                generation,
+                sequence,
+                gesture_id,
+                ..
+            } => {
+                Self::validate_gesture(&previous_snapshot, *generation, *sequence, gesture_id)?;
+                if self
+                    .volume_preview
+                    .as_ref()
+                    .is_none_or(|preview| preview.gesture_id != *gesture_id)
+                {
+                    return Err(PlaybackError::new(
+                        "invalid-contract",
+                        "The volume gesture has ended.",
+                    ));
+                }
             }
             _ => self.cancel_volume_preview(),
         }
         let mut candidate = self.session.clone();
-        let candidate_snapshot = candidate.dispatch(command.clone())?;
+        let candidate_snapshot = match candidate.dispatch(command.clone()) {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                if is_commit {
+                    self.cancel_volume_preview();
+                }
+                return Err(error);
+            }
+        };
         if matches!(
             command,
-            PlaybackCommand::SetVolume { .. } | PlaybackCommand::SetMuted { .. }
+            PlaybackCommand::SetVolume { .. }
+                | PlaybackCommand::SetMuted { .. }
+                | PlaybackCommand::CommitVolumePreview { .. }
         ) {
-            // These engine setters are infallible. Persist first so a failed write changes neither
-            // the live output nor the authoritative session; no database work runs on the audio thread.
-            save(candidate.preferences())?;
+            // Keep the preview audible while saving. Failure restores the authoritative value.
+            if let Err(error) = save(candidate.preferences()) {
+                self.cancel_volume_preview();
+                return Err(error);
+            }
+        }
+        if is_commit {
+            self.volume_preview = None;
         }
         let duration_ms = self.apply(&command, &previous_snapshot, &candidate_snapshot)?;
         if duration_ms.is_some() {
@@ -119,10 +174,9 @@ impl<E: PlaybackEngine> PlaybackController<E> {
 
     pub(super) fn tick(&mut self) -> Result<(), PlaybackError> {
         // A dropped frontend gesture must not leave an unsaved gain active indefinitely.
-        if self
-            .volume_preview
-            .is_some_and(|started| started.elapsed() >= std::time::Duration::from_secs(2))
-        {
+        if self.volume_preview.as_ref().is_some_and(|preview| {
+            preview.last_update.elapsed() >= std::time::Duration::from_secs(2)
+        }) {
             self.cancel_volume_preview();
         }
         let observation = self.synchronize();
@@ -133,8 +187,8 @@ impl<E: PlaybackEngine> PlaybackController<E> {
             return Ok(());
         }
 
-        let mut candidate = self.session.clone();
         self.cancel_volume_preview();
+        let mut candidate = self.session.clone();
         if !candidate.advance_automatically()? {
             self.engine.stop();
             self.session = candidate;
@@ -162,8 +216,28 @@ impl<E: PlaybackEngine> PlaybackController<E> {
         }
     }
 
+    fn validate_gesture(
+        snapshot: &PlaybackSnapshot,
+        generation: u64,
+        sequence: u64,
+        id: &str,
+    ) -> Result<(), PlaybackError> {
+        if id.is_empty()
+            || id.len() > 64
+            || generation != snapshot.generation
+            || sequence != snapshot.sequence
+        {
+            return Err(PlaybackError::new(
+                "invalid-contract",
+                "The volume gesture is stale or invalid.",
+            ));
+        }
+        Ok(())
+    }
+
     fn cancel_volume_preview(&mut self) {
         if self.volume_preview.take().is_some() {
+            self.session.invalidate_volume_gesture();
             let preferences = self.session.preferences();
             self.engine.set_volume(preferences.volume);
             self.engine.set_muted(preferences.muted);
@@ -262,7 +336,9 @@ impl<E: PlaybackEngine> PlaybackController<E> {
                     next.muted,
                 )
             }
-            PlaybackCommand::SetVolume { .. } | PlaybackCommand::SetMuted { .. } => {
+            PlaybackCommand::SetVolume { .. }
+            | PlaybackCommand::SetMuted { .. }
+            | PlaybackCommand::CommitVolumePreview { .. } => {
                 self.engine.set_volume(next.volume);
                 self.engine.set_muted(next.muted);
                 Ok(None)
@@ -325,6 +401,7 @@ mod tests {
         loaded_ids: Vec<String>,
         observation: EngineObservation,
         volume: f64,
+        volume_history: Vec<f64>,
         muted: bool,
     }
 
@@ -340,6 +417,7 @@ mod tests {
         let after = controller
             .dispatch_with_preferences(
                 PlaybackCommand::PreviewVolume {
+                    gesture_id: "test-gesture".to_owned(),
                     volume: 65.0,
                     generation: before.generation,
                     sequence: before.sequence,
@@ -353,6 +431,7 @@ mod tests {
         assert_eq!(after.sequence, before.sequence);
         controller
             .dispatch(PlaybackCommand::CancelVolumePreview {
+                gesture_id: "test-gesture".to_owned(),
                 generation: before.generation,
                 sequence: before.sequence,
             })
@@ -373,6 +452,7 @@ mod tests {
         ] {
             assert!(controller
                 .dispatch(PlaybackCommand::PreviewVolume {
+                    gesture_id: "test-gesture".to_owned(),
                     volume,
                     generation: before.generation,
                     sequence,
@@ -381,12 +461,16 @@ mod tests {
         }
         controller
             .dispatch(PlaybackCommand::PreviewVolume {
+                gesture_id: "test-gesture".to_owned(),
                 volume: 30.0,
                 generation: before.generation,
                 sequence: before.sequence,
             })
             .expect("preview");
-        controller.volume_preview = Some(std::time::Instant::now() - Duration::from_secs(3));
+        controller.volume_preview = Some(VolumePreview {
+            gesture_id: "test-gesture".to_owned(),
+            last_update: std::time::Instant::now() - Duration::from_secs(3),
+        });
         controller.tick().expect("expiry");
         assert_eq!(controller.engine.volume, before.volume);
         assert!(controller.volume_preview.is_none());
@@ -399,15 +483,22 @@ mod tests {
         let before = controller.snapshot();
         controller
             .dispatch(PlaybackCommand::PreviewVolume {
+                gesture_id: "test-gesture".to_owned(),
                 volume: 30.0,
                 generation: before.generation,
                 sequence: before.sequence,
             })
             .expect("preview");
         assert!(controller
-            .dispatch_with_preferences(PlaybackCommand::SetVolume { volume: 30.0 }, |_| {
-                Err(PlaybackError::new("preferences-unavailable", "fixture"))
-            })
+            .dispatch_with_preferences(
+                PlaybackCommand::CommitVolumePreview {
+                    volume: 30.0,
+                    generation: before.generation,
+                    sequence: before.sequence,
+                    gesture_id: "test-gesture".to_owned(),
+                },
+                |_| { Err(PlaybackError::new("preferences-unavailable", "fixture")) }
+            )
             .is_err());
         assert_eq!(controller.engine.volume, before.volume);
         assert_eq!(controller.snapshot().volume, before.volume);
@@ -420,6 +511,7 @@ mod tests {
         controller.restore_preferences(Ok(PlaybackPreferences::default()));
         let before = controller.snapshot();
         let command = PlaybackCommand::PreviewVolume {
+            gesture_id: "test-gesture".to_owned(),
             volume: 30.0,
             generation: before.generation,
             sequence: before.sequence,
@@ -431,6 +523,123 @@ mod tests {
         assert!(controller.dispatch(command).is_err());
         assert!(controller.engine.muted);
         assert_eq!(controller.engine.volume, before.volume);
+    }
+
+    #[test]
+    fn commit_preserves_mute_saves_once_and_does_not_restore_old_gain() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        controller.restore_preferences(Ok(PlaybackPreferences {
+            volume: 25.0,
+            muted: true,
+            last_audible_volume: 25.0,
+        }));
+        let before = controller.snapshot();
+        controller
+            .dispatch(PlaybackCommand::PreviewVolume {
+                volume: 60.0,
+                generation: before.generation,
+                sequence: before.sequence,
+                gesture_id: "owner".to_owned(),
+            })
+            .unwrap();
+        let commit = PlaybackCommand::CommitVolumePreview {
+            volume: 60.0,
+            generation: before.generation,
+            sequence: before.sequence,
+            gesture_id: "owner".to_owned(),
+        };
+        let mut saves = 0;
+        let after = controller
+            .dispatch_with_preferences(commit.clone(), |preferences| {
+                saves += 1;
+                assert_eq!(preferences.volume, 60.0);
+                assert!(preferences.muted);
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(saves, 1);
+        assert_eq!(after.volume, 60.0);
+        assert!(after.muted);
+        assert_eq!(controller.engine.volume_history, vec![25.0, 60.0, 60.0]);
+        assert!(controller
+            .dispatch_with_preferences(commit, |_| panic!("duplicate save"))
+            .is_err());
+    }
+
+    #[test]
+    fn cancellation_and_expiry_reject_late_renewal_and_commit() {
+        for expired in [false, true] {
+            let mut controller = PlaybackController::new(FakeEngine::default());
+            let before = controller.snapshot();
+            let preview = PlaybackCommand::PreviewVolume {
+                volume: 30.0,
+                generation: before.generation,
+                sequence: before.sequence,
+                gesture_id: "owner".to_owned(),
+            };
+            controller.dispatch(preview.clone()).unwrap();
+            if expired {
+                controller.volume_preview.as_mut().unwrap().last_update =
+                    std::time::Instant::now() - Duration::from_secs(3);
+                controller.tick().unwrap();
+            } else {
+                controller
+                    .dispatch(PlaybackCommand::CancelVolumePreview {
+                        generation: before.generation,
+                        sequence: before.sequence,
+                        gesture_id: "owner".to_owned(),
+                    })
+                    .unwrap();
+            }
+            assert!(controller.dispatch(preview).is_err());
+            assert!(controller
+                .dispatch_with_preferences(
+                    PlaybackCommand::CommitVolumePreview {
+                        volume: 30.0,
+                        generation: before.generation,
+                        sequence: before.sequence,
+                        gesture_id: "owner".to_owned(),
+                    },
+                    |_| panic!("stale save")
+                )
+                .is_err());
+            assert_eq!(controller.engine.volume, before.volume);
+            assert!(controller.snapshot().sequence > before.sequence);
+        }
+    }
+
+    #[test]
+    fn other_gesture_cannot_cancel_or_commit_active_preview() {
+        let mut controller = PlaybackController::new(FakeEngine::default());
+        let before = controller.snapshot();
+        controller
+            .dispatch(PlaybackCommand::PreviewVolume {
+                volume: 30.0,
+                generation: before.generation,
+                sequence: before.sequence,
+                gesture_id: "owner".to_owned(),
+            })
+            .unwrap();
+        controller
+            .dispatch(PlaybackCommand::CancelVolumePreview {
+                generation: before.generation,
+                sequence: before.sequence,
+                gesture_id: "other".to_owned(),
+            })
+            .unwrap();
+        assert!(controller
+            .dispatch_with_preferences(
+                PlaybackCommand::CommitVolumePreview {
+                    volume: 10.0,
+                    generation: before.generation,
+                    sequence: before.sequence,
+                    gesture_id: "other".to_owned(),
+                },
+                |_| panic!("foreign save")
+            )
+            .is_err());
+        assert_eq!(controller.engine.volume, 30.0);
+        assert_eq!(controller.snapshot().sequence, before.sequence);
     }
 
     impl PlaybackEngine for FakeEngine {
@@ -473,6 +682,7 @@ mod tests {
 
         fn set_volume(&mut self, volume: f64) {
             self.volume = volume;
+            self.volume_history.push(volume);
         }
 
         fn set_muted(&mut self, muted: bool) {

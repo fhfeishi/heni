@@ -39,7 +39,9 @@ interface Connection {
   active: boolean;
   reading: boolean;
   revision: number;
+  foregroundRevision: number;
   pendingCommands: number;
+  pendingForegroundCommands: number;
   suppressedError: string | null;
   latestSnapshot: PlaybackSnapshot | null;
   needsSnapshot: boolean;
@@ -110,7 +112,9 @@ export const usePlayback = (port: PlaybackPort): PlaybackViewState => {
       active: true,
       reading: false,
       revision: 0,
+      foregroundRevision: 0,
       pendingCommands: 0,
+      pendingForegroundCommands: 0,
       suppressedError: null,
       latestSnapshot: null,
       needsSnapshot: false,
@@ -195,21 +199,27 @@ export const usePlayback = (port: PlaybackPort): PlaybackViewState => {
       const session = connection.current;
       if (session === null || !session.active || session.port !== port)
         return false;
-      const revision = ++session.revision;
+      session.revision += 1;
+      const transient = command.type === "preview-volume" || command.type === "cancel-volume-preview";
+      const foregroundRevision = transient ? session.foregroundRevision : ++session.foregroundRevision;
       session.pendingCommands += 1;
-      session.suppressedError = null;
-      session.commandError = null;
-      setState((previous) => ({
-        ...(previous.port === port ? previous : initialState(port)),
-        busy: true,
-        error: null,
-      }));
+      if (!transient) {
+        session.pendingForegroundCommands += 1;
+        session.suppressedError = null;
+        session.commandError = null;
+        setState((previous) => ({
+          ...(previous.port === port ? previous : initialState(port)),
+          busy: true,
+          error: null,
+        }));
+      }
 
       const result = await readResult(() => port.dispatch(command));
       const sampledAtMs = performance.now();
       session.pendingCommands -= 1;
+      if (!transient) session.pendingForegroundCommands -= 1;
       if (!session.active) return false;
-      if (revision === session.revision) {
+      if (!transient && foregroundRevision === session.foregroundRevision) {
         session.commandError = result.ok ? null : result.error;
       }
       if (result.ok) {
@@ -225,10 +235,10 @@ export const usePlayback = (port: PlaybackPort): PlaybackViewState => {
           : current;
         return {
           ...next,
-          busy: session.pendingCommands > 0,
+          busy: session.pendingForegroundCommands > 0,
           loading: false,
           error:
-            revision === session.revision
+            !transient && foregroundRevision === session.foregroundRevision
               ? result.ok
                 ? (next.snapshot?.preferencesError ?? null)
                 : result.error

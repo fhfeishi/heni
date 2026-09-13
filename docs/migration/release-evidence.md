@@ -1,8 +1,21 @@
 # Windows Release Evidence
 
-更新日期：2026-09-03
+更新日期：2026-09-13
 
-## 当前 Windows 产物
+## 最新本地候选（2026-09-13）
+
+`pnpm package:windows` 成功，版本 0.1.0。本轮仅更新本地程序与安装包，不对外发布。
+
+| 产物 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| `src-tauri/target/release/heni-desktop.exe` | 18,630,144 bytes | `1E3AEAF4000239659BB44692A4D79DA8C6E695170AB312C131620E6F92625D0E` |
+| `src-tauri/target/release/bundle/nsis/Heni_0.1.0_x64-setup.exe` | 4,615,042 bytes | `50D912E0BF85A699758438BB40E959BD0CA9A8B25E0D63351A2E84B3C66FC6B0` |
+
+两项构建时间均为 2026-09-13 17:27:35 +08，签名状态 NotSigned。全量前端 349 项通过，Rust 139 项通过 / 3 项默认忽略；构建、lint、fmt、clippy 与 diff 检查通过。
+
+实机确认灯条展开、迷你紧凑界面、恢复原窗口尺寸及暂停媒体状态保留，真实歌单多选按需显示和退出收起。安装/卸载、全 DPI 矩阵及长时播放未验证。详细过程见 `docs/development/progress.md` 的 2026-09-13 记录。下方为历史证据，不代表最新产物。
+
+## 历史 Windows 产物（2026-09-03）
 
 - 命令：`pnpm tauri build --no-bundle`；
 - 路径：`src-tauri/target/release/heni-desktop.exe`；

@@ -14,6 +14,14 @@ ffmpeg -y -f lavfi -i "sine=frequency=440:duration=1" -ac 1 -ar 44100 -c:a pcm_s
 
 Synthetic fixtures prove deterministic container/decoder plumbing only. Final ADR evidence must also use user-authorized real media with tags, cover art, variable bitrates, longer duration, special paths and damaged files. Do not commit those files by default; record codec/container, provenance, permission and SHA-256 in a local manifest.
 
+Run the opt-in native checks on Windows with an available output device:
+
+```powershell
+cargo test --manifest-path ../../src-tauri/Cargo.toml -- --ignored --nocapture --test-threads=1
+```
+
+Run from this directory. The format test loads WAV (48 kHz stereo / 44.1 kHz mono), FLAC, MP3, M4A/AAC and Opus through the production engine, muted, and waits for completion. Other opt-in tests verify automatic queue advancement and an actual ffprobe process. These checks do not write the user's library or preferences.
+
 ## Current candidate licenses
 
 - Symphonia 0.6.1: MPL-2.0 dependency; Heni does not modify or copy its source.

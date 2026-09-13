@@ -156,7 +156,9 @@ fn dispatch_authorized(
     let mut controller = runtime.lock()?;
     if matches!(
         command,
-        PlaybackCommand::SetVolume { .. } | PlaybackCommand::SetMuted { .. }
+        PlaybackCommand::SetVolume { .. }
+            | PlaybackCommand::SetMuted { .. }
+            | PlaybackCommand::CommitVolumePreview { .. }
     ) {
         controller.dispatch_with_preferences(command, |preferences| {
             settings.set_playback_preferences(preferences).map_err(|_| {

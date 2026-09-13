@@ -57,6 +57,20 @@ const renderPanel = (overrides: Partial<PlaylistPanelProps> = {}) => {
 };
 
 describe("PlaylistPanel", () => {
+  it("reveals bulk controls only in selection mode and clears them on exit", () => {
+    renderPanel({ playlists: [playlist(["media-one", "media-two"])] });
+    expect(screen.queryByRole("checkbox", { name: "选择 One" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "选择 One" }));
+    fireEvent.keyDown(screen.getByRole("checkbox", { name: "选择 One" }), { key: "Escape" });
+    expect(screen.getByRole("button", { name: "多选" })).toHaveFocus();
+    expect(screen.queryByRole("checkbox", { name: "选择 One" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
+    expect(screen.getByRole("checkbox", { name: "选择 One" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "添加歌曲" }));
+    expect(screen.queryByRole("checkbox", { name: "选择 One" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "多选" })).toHaveAttribute("aria-pressed", "false");
+  });
   it("plays a row by button or double click without reducing the full playlist", () => {
     const selected = playlist(["media-two", "missing", "media-one"]);
     const { actions } = renderPanel({ playlists: [selected] });
@@ -65,6 +79,7 @@ describe("PlaylistPanel", () => {
     fireEvent.doubleClick(screen.getByText("One"));
     expect(actions.onPlay).toHaveBeenNthCalledWith(1, selected, "media-one");
     expect(actions.onPlay).toHaveBeenNthCalledWith(2, selected, "media-one");
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     fireEvent.doubleClick(screen.getByRole("checkbox", { name: "选择 One" }));
     expect(actions.onPlay).toHaveBeenCalledTimes(2);
   });
@@ -95,17 +110,34 @@ describe("PlaylistPanel", () => {
     expect(screen.getByRole("button", { name: "加入所选（0）" })).toBeDisabled();
   });
 
+  it("preserves add-panel selection across Escape and lets users clear row selection", () => {
+    renderPanel({ playlists: [playlist(["media-one"])] });
+    const add = screen.getByRole("button", { name: "添加歌曲" });
+    fireEvent.click(add);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Two" }));
+    fireEvent.keyDown(screen.getByRole("searchbox", { name: "搜索可加入曲目" }), { key: "Escape" });
+    expect(add).toHaveFocus();
+    expect(add).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(add);
+    expect(screen.getByRole("checkbox", { name: "Two" })).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "选择 One" }));
+    fireEvent.click(screen.getByRole("button", { name: "取消选择" }));
+    expect(screen.getByRole("checkbox", { name: "选择 One" })).not.toBeChecked();
+  });
+
   it("preserves failed removal selection and limits select-all to visible rows", async () => {
     const onRemoveItems = vi.fn(async () => false);
     renderPanel({ playlists: [playlist(["media-one", "media-two"])], onRemoveItems });
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索此歌单" }), { target: { value: "Two" } });
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "全选当前搜索结果" }));
     fireEvent.click(screen.getByRole("button", { name: "移除所选（1）" }));
     await screen.findByText(/曲目未移除/u);
     expect(onRemoveItems).toHaveBeenCalledExactlyOnceWith("playlist-one", ["media-two"]);
     expect(screen.getByRole("checkbox", { name: "选择 Two" })).toBeChecked();
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索此歌单" }), { target: { value: "" } });
-    expect(screen.getByRole("button", { name: "移除所选（0）" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "移除所选（0）" })).not.toBeInTheDocument();
   });
 
   it("keeps creation secondary and preserves its draft when saving fails", async () => {
@@ -184,6 +216,7 @@ describe("PlaylistPanel", () => {
         playlists={[playlist(["media-one", "media-two"])]}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "选择 One" }));
     fireEvent.click(screen.getByRole("button", { name: "移除所选（1）" }));
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { InterfaceIcon } from "../../components/InterfaceIcon";
 
 import type {
   LibraryItem,
@@ -76,7 +77,7 @@ export const PlaylistPanel = ({
           <h2 id="playlist-title">歌单</h2>
         </div>
         {!creating ? (
-          <button type="button" disabled={busy} onClick={() => setCreating(true)}>新建歌单</button>
+          <button type="button" className="playlist-action playlist-action--icon" aria-label="新建歌单" title="新建歌单" disabled={busy} onClick={() => setCreating(true)}><InterfaceIcon name="add" /></button>
         ) : <form
           className="playlist-create"
           onSubmit={(event) => {
@@ -119,6 +120,9 @@ export const PlaylistPanel = ({
                 </div>
                 <button
                   type="button"
+                  className="playlist-action playlist-action--icon"
+                  aria-label={metadataPlaylistId === selectedPlaylist.id ? "收起歌单信息" : "编辑歌单信息"}
+                  title="编辑歌单信息"
                   disabled={busy}
                   aria-expanded={metadataPlaylistId === selectedPlaylist.id}
                   onClick={() =>
@@ -129,9 +133,7 @@ export const PlaylistPanel = ({
                     )
                   }
                 >
-                  {metadataPlaylistId === selectedPlaylist.id
-                    ? "收起歌单信息"
-                    : "编辑歌单信息"}
+                  <InterfaceIcon name={metadataPlaylistId === selectedPlaylist.id ? "close" : "edit"} />
                 </button>
               </div>
               {metadataPlaylistId === selectedPlaylist.id && (
@@ -144,18 +146,9 @@ export const PlaylistPanel = ({
                   onCancel={() => setMetadataPlaylistId(null)}
                 />
               )}
-              <details key={`manage-${selectedPlaylist.id}`} className="playlist-manage">
-                <summary>添加歌曲</summary>
-                <PlaylistItemsEditor
-                  key={`items-${selectedPlaylist.id}`}
-                  playlist={selectedPlaylist}
-                  playlists={playlists}
-                  items={items}
-                  busy={busy}
-                  onAddItems={onAddItems}
-                />
-              </details>
               <PlaylistListeningView
+                addControls={<PlaylistItemsEditor playlist={selectedPlaylist} playlists={playlists}
+                  items={items} busy={busy} onAddItems={onAddItems} />}
                 key={`listening-${selectedPlaylist.id}`}
                 playlist={selectedPlaylist}
                 items={items}

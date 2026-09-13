@@ -16,6 +16,5 @@ export const VideoStage = ({ visible, title, output = tauriVideoOutput }: {
       <video ref={video} playsInline preload="metadata" aria-label={title || "当前视频"} disablePictureInPicture />
       {error && <div className="video-stage__error" role="alert">{error}</div>}
     </div>
-    <p className="video-stage__caption">{title}</p>
   </section>;
 };

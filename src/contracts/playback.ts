@@ -157,11 +157,20 @@ export const playbackCommandSchema = z.discriminatedUnion("type", [
     volume: z.number().min(0).max(100),
     generation: z.number().int().nonnegative(),
     sequence: z.number().int().nonnegative(),
+    gestureId: z.string().min(1).max(64),
   }),
   z.object({
     type: z.literal("cancel-volume-preview"),
     generation: z.number().int().nonnegative(),
     sequence: z.number().int().nonnegative(),
+    gestureId: z.string().min(1).max(64),
+  }),
+  z.object({
+    type: z.literal("commit-volume-preview"),
+    volume: z.number().min(0).max(100),
+    generation: z.number().int().nonnegative(),
+    sequence: z.number().int().nonnegative(),
+    gestureId: z.string().min(1).max(64),
   }),
   z.object({
     type: z.literal("set-muted"),

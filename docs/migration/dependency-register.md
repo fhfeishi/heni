@@ -2,6 +2,41 @@
 
 更新日期：2026-09-03
 
+## 2026-09-11 Windows 打包预审
+
+使用锁文件与本机 registry 的 `cargo metadata --offline --locked --filter-platform
+x86_64-pc-windows-msvc` 核对实际解析图：存在 MIT/Apache、BSD、Unicode、Zlib、
+MPL-2.0 等声明。图包含构建期依赖，不能将它直接当成二进制链接清单。
+其中 21 个包声明 MPL-2.0（Symphonia 系列，以及 cssparser、cssparser-macros、
+dtoa-short、option-ext、selectors）；React 本机包声明 MIT。此项是元数据盘点，
+不是完整许可证合规结论。尚未整理第三方 notice 原文、实际随包组件及来源材料。
+当前 NSIS 候选仅附项目 MIT License，未捆绑 ffprobe，不得标记为完成许可验收。
+
+`pnpm audit:licenses` 从锁定 Windows Cargo 解析图及实际安装的 npm 生产依赖提取
+许可原文，输出到被忽略的 `output/release-license-audit/`。`inventory.json` 包含输入
+hash、上游仓库/源码提交、原文文件 hash 与缺项；文本是审核候选，不自动进入 bundle。
+2026-09-11 实跑：340 个包，14 个包缺常见名称的本地许可原文，命令返回 1：
+alloc-stdlib、dasp_sample、defmt-parser、realfft、selectors、tauri-plugin、5 个 unic
+包及3 个 webview2-com 包。下一步按 inventory 中的固定源码提交补齐上游原文并审阅
+内嵌组件；不可直接用“MIT”等标识替代许可文本。此图包含构建期依赖，数量不代表
+安装包实际链接数量。pnpm 自带 licenses 命令因本地包索引缺失失败，未因此重装依赖；
+当前脚本使用可正常读取的 pnpm list 与已安装包清单。
+
+补充核对：`pnpm audit:licenses --fetch-upstream` 仅对缺项请求 Cargo 元数据记录的
+GitHub 固定提交根目录，校验返回文本的 Git blob hash 并记录来源 URL/SHA-256。
+本轮输出的缺项已由 14 降为 2：realfft 3.5.0、selectors 0.36.1。其余 12 项原文已
+写入审核候选；离线模式仍只反映本地 crate 文件，不应把 14 项本地缺文件误报为退步。
+selectors 的 lib.rs 头部明确指向 https://mozilla.org/MPL/2.0/，官网已核对存在相同
+MPL 2.0 声明与文本；其固定提交仓库根目录未附独立许可文件。realfft 的 Cargo/README
+声明 MIT，但对应提交根目录没有原文；不自行填写版权年份或持有人来冒充上游许可。
+这两项、嵌入第三方源码的分发范围及 MPL 源码获取材料仍需完成，未改 bundle 资源。
+
+打包入口：`pnpm package:windows` 重新构建并打包；`pnpm bundle:windows` 仅打包已有
+Release，调用前需正常退出 Heni，并确认该 Release 对应当前源码。Tauri 会尝试写入
+bundler 标记，运行中程序会造成文件锁冲突；不能把打包旧 exe 当成构建新源码。
+配置采用 currentUser 和 WebView2 downloadBootstrapper；缺少 WebView2 的机器可能
+需要联网。安装/卸载须在独立测试用户或虚拟机执行，避免触碰现有曲库配置。
+
 本表记录当前生产切片新增且会进入 Windows 二进制的数据与系统依赖。完整传递依赖版本以 `Cargo.lock` 为准。
 
 | 依赖 | 固定版本 | 用途 | 维护/许可证 | 分发与跨平台影响 |

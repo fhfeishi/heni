@@ -21,6 +21,7 @@ export const useWindowMode = (port: WindowPort): WindowModeController => {
   const [snapshot, setSnapshot] = useState<WindowSnapshot | null>(null);
   const [available, setAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [requestedMode, setRequestedMode] = useState<WindowMode | null>(null);
   const [error, setError] = useState<WindowError | null>(null);
 
   useEffect(() => {
@@ -47,8 +48,11 @@ export const useWindowMode = (port: WindowPort): WindowModeController => {
     }
     setBusy(true);
     setError(null);
+    // Render the compact surface before the native window shrinks.
+    setRequestedMode(mode);
     const result = await port.setMode(mode);
     setBusy(false);
+    setRequestedMode(null);
     if (!result.ok) {
       setError(result.error);
       return false;
@@ -58,7 +62,7 @@ export const useWindowMode = (port: WindowPort): WindowModeController => {
   };
 
   return {
-    mode: snapshot?.mode ?? "main",
+    mode: requestedMode === "mini-player" ? requestedMode : snapshot?.mode ?? "main",
     snapshot,
     available,
     busy,

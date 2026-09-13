@@ -1,4 +1,4 @@
-import { defaultGlassSettings, type GlassSettings } from "../../contracts/settings";
+import { defaultGlassSettings, glassFog, type GlassSettings } from "../../contracts/settings";
 import { DraftActions } from "./DraftActions";
 
 interface GlassControlProps {
@@ -29,7 +29,11 @@ export const GlassControl = ({ value, dirty, disabled, onChange, onSave, onCance
       <input type="range" aria-label="玻璃通透度" min={0} max={100} step={1}
         value={value.transparency} onChange={(event) => onChange({ ...value, transparency: event.currentTarget.valueAsNumber })} />
     </label>
-    <p className="scenery-control__hint">只改变界面材质，不淡化文字。拖动预览，保存后保留；图片强度单独调整。</p>
+    <label>雾度 · {glassFog(value)}%
+      <input type="range" aria-label="玻璃雾度" min={0} max={100} step={1}
+        value={glassFog(value)} onChange={(event) => onChange({ ...value, fog: event.currentTarget.valueAsNumber })} />
+    </label>
+    <p className="scenery-control__hint">通透度调整底色，雾度调整模糊，不淡化文字。切换材质恢复该预设；保存后保留。</p>
     <DraftActions dirty={dirty} saveLabel="保存材质" cancelLabel="取消预览" onSave={onSave} onCancel={onCancel}
       reset={{ label: "恢复默认材质", onClick: () => onChange(defaultGlassSettings) }} />
   </fieldset>

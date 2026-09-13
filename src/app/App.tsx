@@ -450,7 +450,7 @@ export const App = ({
         <>
         <GlassControl
           value={glassDraft ?? savedGlass}
-          dirty={glassDraft !== null && (glassDraft.material !== savedGlass.material || glassDraft.transparency !== savedGlass.transparency)}
+          dirty={glassDraft !== null && (glassDraft.material !== savedGlass.material || glassDraft.transparency !== savedGlass.transparency || glassDraft.fog !== savedGlass.fog)}
           disabled={settings.loading || settings.busy}
           onChange={setGlassDraft}
           onCancel={() => setGlassDraft(null)}
@@ -543,6 +543,7 @@ export const App = ({
       }
       miniPlayer={
         <MiniPlayer
+          sceneryImageUrl={scenery.imageUrl}
           snapshot={snapshot}
           clockSample={playback.clockSample}
           currentItem={currentItem}

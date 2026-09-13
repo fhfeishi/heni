@@ -123,6 +123,7 @@ export const AppFrame = ({
   }, [concealContent]);
   return (
     <div className="app-frame" data-theme={themeId} data-window-mode={windowMode}
+      data-stage={!mini && activeView === "now-playing"} data-glass-material={glass.material}
       data-edge-panels={panelsPinned ? "pinned" : "auto"} style={glassStyle(glass)}>
       <WindowChrome mini={mini} onRestoreMain={onToggleWindowMode} busy={windowBusy} />
       <SceneryBackdrop
@@ -134,6 +135,7 @@ export const AppFrame = ({
         onImageLoad={setLoadedScenery}
         onImageError={(url) => { setLoadedScenery(null); onSceneryImageError?.(url); }}
       />
+      <div className="app-glass" aria-hidden="true" style={{ opacity: concealContent ? 1 - immersion : 1 }} />
       {mini && <>
         <header className="mini-player-chrome">
           <span className="brand-wordmark brand-wordmark--mini">heni</span>
@@ -157,6 +159,14 @@ export const AppFrame = ({
         {miniPlayer}
       </>}
       <div className="app-main-shell" hidden={mini} inert={mini}>
+        {!mini && !panelsPinned && <nav className="edge-lights" aria-label="边缘面板">
+          {([['top', '展开顶部工具'], ['left', '展开侧边导航'], ['bottom', '展开播放控制']] as const).map(([edge, label]) =>
+            <button key={edge} type="button" className={`edge-light edge-light--${edge}`} aria-label={label}
+              onClick={() => {
+                const selector = edge === 'top' ? '.app-topbar button' : edge === 'left' ? '.app-sidebar button' : '.playback-bar button';
+                document.querySelector<HTMLButtonElement>(`${selector}:not(:disabled)`)?.focus({ preventScroll: true });
+              }}><span /></button>)}
+        </nav>}
         <header className="app-topbar">
           <button
             type="button"
@@ -242,6 +252,7 @@ export const AppFrame = ({
             onSelect={onSelectView}
           />
           <main ref={mainContent} className="main-view" id="main-content" inert={concealContent}
+            data-presentation={activeView === "now-playing" ? (videoVisible ? "video" : "audio") : "browse"}
             aria-hidden={concealContent || undefined} style={{ opacity: concealContent ? 1 - immersion : 1 }}>
             {children}
           </main>

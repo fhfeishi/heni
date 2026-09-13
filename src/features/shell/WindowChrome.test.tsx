@@ -39,13 +39,13 @@ describe("WindowChrome", () => {
     fireEvent.mouseDown(drag, { button: 2, detail: 1 });
     expect(port.startDragging).toHaveBeenCalledOnce();
   });
-  it("disables maximize in mini and retains a return action", async () => {
+  it("omits maximize in mini and retains a return action", async () => {
     const port = createPort();
     const restore = vi.fn();
     render(<WindowChrome mini port={port} onRestoreMain={restore} />);
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "最大化窗口" })); });
+    await act(async () => {});
     expect(port.toggleMaximize).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "最大化窗口" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "最大化窗口" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "返回主窗口" }));
     expect(restore).toHaveBeenCalledOnce();
   });

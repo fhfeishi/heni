@@ -866,13 +866,19 @@ describe("App", () => {
     expect(update).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "取消预览" }));
     expect(slider).toHaveValue("35");
+    const fog = screen.getByRole("slider", { name: "玻璃雾度" });
+    expect(fog).toHaveValue("40");
+    fireEvent.change(fog, { target: { value: "0" } });
+    expect(container.querySelector(".app-frame")).toHaveStyle({ "--glass-blur": "0px" });
+    expect(slider).toHaveValue("35");
+    expect(screen.getByRole("button", { name: "保存材质" })).toBeEnabled();
     fireEvent.change(slider, { target: { value: "80" } });
     fireEvent.click(screen.getByRole("button", { name: "保存材质" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "保存材质" })).toBeEnabled());
     expect(slider).toHaveValue("80");
     fireEvent.click(screen.getByRole("button", { name: "保存材质" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "保存材质" })).toBeDisabled());
-    expect(update).toHaveBeenLastCalledWith({ glass: { material: "soft", transparency: 80 } });
+    expect(update).toHaveBeenLastCalledWith({ glass: { material: "soft", transparency: 80, fog: 0 } });
     expect(slider).toHaveValue("80");
   });
 

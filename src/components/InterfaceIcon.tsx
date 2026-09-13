@@ -1,4 +1,7 @@
 const paths = {
+  add: "M12 5v14M5 12h14",
+  edit: "m15 4 5 5M4 20l5-1L20 8a2 2 0 0 0-5-5L4 14Z",
+  subtract: "M7 12h10M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
   play: "m9 5 11 7-11 7Z",
   locate: "M12 2v4m0 12v4M2 12h4m12 0h4M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z",
   remove: "M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 10v7m4-7v7",

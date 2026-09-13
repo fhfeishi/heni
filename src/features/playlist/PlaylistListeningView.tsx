@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { InterfaceIcon } from "../../components/InterfaceIcon";
 
 import type { LibraryItem, LibraryPlaylist } from "../../contracts/library";
@@ -9,6 +9,7 @@ interface PlaylistListeningViewProps {
   playlist: LibraryPlaylist;
   items: ReadonlyArray<LibraryItem>;
   busy: boolean;
+  addControls: ReactNode;
   currentMediaId: string | null;
   onRemoveItems(playlistId: string, mediaIds: ReadonlyArray<string>): Promise<boolean>;
   onPlay(playlist: LibraryPlaylist, startMediaId?: string): void;
@@ -28,11 +29,17 @@ export const PlaylistListeningView = ({
   playlist,
   items,
   busy,
+  addControls,
   onPlay,
   currentMediaId,
   onRemoveItems,
 }: PlaylistListeningViewProps) => {
   const [search, setSearch] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const selectButton = useRef<HTMLButtonElement>(null);
+  const addRegionId = useId();
+  const addButton = useRef<HTMLButtonElement>(null);
   const [selection, setSelection] = useState<ReadonlyArray<string>>([]);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState(false);
@@ -69,24 +76,36 @@ export const PlaylistListeningView = ({
   const skipped = playlist.itemIds.length - playableCount;
 
   return (
-    <div className="playlist-listening">
+    <div className="playlist-listening" data-selecting={selecting} onKeyDown={(event) => {
+      if (event.key === "Escape" && selecting && !removing) {
+        setSelecting(false); setSelection([]); selectButton.current?.focus();
+      }
+    }}>
       <div className="playlist-listening__actions">
         <button
           type="button"
-          className="primary-action"
+          className="playlist-action playlist-action--play"
+          aria-label="播放歌单"
           disabled={busy || removing || playableCount === 0}
           onClick={() => onPlay(playlist)}
         >
-          <InterfaceIcon name="play" />播放歌单
+          <InterfaceIcon name="play" /><span>播放</span>
         </button>
-        <button type="button" aria-label="定位当前播放歌曲" title="定位当前播放歌曲"
+        <button ref={addButton} type="button" className="playlist-action" aria-expanded={adding}
+          aria-controls={addRegionId} disabled={removing}
+          onClick={() => { setAdding((value) => !value); setSelecting(false); setSelection([]); }}>
+          <InterfaceIcon name={adding ? "close" : "add"} /><span>添加歌曲</span>
+        </button>
+        <button ref={selectButton} type="button" className="playlist-action" aria-pressed={selecting}
+          disabled={removing || playlist.itemIds.length === 0}
+          onClick={() => { setSelecting(!selecting); setSelection([]); setAdding(false); }}>
+          <InterfaceIcon name={selecting ? "close" : "check"} /><span>{selecting ? "完成多选" : "多选"}</span>
+        </button>
+        <button type="button" className="playlist-action playlist-action--icon" aria-label="定位当前播放歌曲"
+          title={currentMediaId === null || !playlist.itemIds.includes(currentMediaId) ? "当前歌曲不在此歌单" : "定位当前播放歌曲"}
           disabled={currentMediaId === null || !playlist.itemIds.includes(currentMediaId)}
           onClick={() => { setSearch(""); setSelection([]); setLocateRequest((value) => value + 1); }}>
           <InterfaceIcon name="locate" />
-        </button>
-        <button type="button" aria-label={`移除所选（${selectedIds.length}）`} title="从歌单移除所选，不删除文件"
-          disabled={busy || removing || selectedIds.length === 0} onClick={() => void remove(selectedIds)}>
-          <InterfaceIcon name="remove" /><span>{selectedIds.length}</span>
         </button>
         <label className="playlist-list-search">
           <span className="visually-hidden">搜索此歌单</span>
@@ -98,10 +117,28 @@ export const PlaylistListeningView = ({
           />
         </label>
       </div>
+      <div id={addRegionId} className="playlist-add-region" hidden={!adding}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation(); setAdding(false); addButton.current?.focus();
+          }
+        }}>{addControls}</div>
       {error && <p role="status">曲目未移除，所选项目已保留，请重试。</p>}
-      {rows.length > 0 && <label className="playlist-select-all"><input type="checkbox" aria-label="全选当前搜索结果"
+      {selecting && rows.length > 0 && <div className="playlist-selection-bar"><label className="playlist-select-all"><input type="checkbox" aria-label="全选当前搜索结果"
+        ref={(element) => { if (element !== null) element.indeterminate = selectedIds.length > 0 && selectedIds.length < rows.length; }}
         disabled={busy || removing} checked={rows.every(({ mediaId }) => selectedIds.includes(mediaId))}
-        onChange={(event) => setSelection(event.currentTarget.checked ? rows.map(({ mediaId }) => mediaId) : [])} />全选当前列表</label>}
+        onChange={(event) => setSelection(event.currentTarget.checked ? rows.map(({ mediaId }) => mediaId) : [])} />
+        {selectedIds.length > 0 ? `已选 ${selectedIds.length} 首` : "全选"}</label>
+        {selectedIds.length > 0 && <>
+          <button type="button" className="playlist-action playlist-action--remove"
+            aria-label={`移除所选（${selectedIds.length}）`} title="只移出此歌单，不删除文件"
+            disabled={busy || removing} onClick={() => void remove(selectedIds)}>
+            <InterfaceIcon name="subtract" /><span>{removing ? "移除中…" : "移出歌单"}</span>
+          </button>
+          <button type="button" className="playlist-action playlist-action--icon" aria-label="取消选择" title="取消选择"
+            disabled={removing} onClick={() => setSelection([])}><InterfaceIcon name="close" /></button>
+        </>}
+      </div>}
       {skipped > 0 && (
         <p className="playlist-listening__hint">
           播放时将跳过 {skipped} 项不可用文件或暂不支持的容器。
@@ -119,18 +156,20 @@ export const PlaylistListeningView = ({
               aria-current={mediaId === currentMediaId ? "true" : undefined}
               onDoubleClick={(event) => {
                 if ((event.target as HTMLElement).closest("button, input")) return;
-                if (!busy && !removing && item !== null && isPlayableMedia(item)) onPlay(playlist, mediaId);
+                if (!selecting && !busy && !removing && item !== null && isPlayableMedia(item)) onPlay(playlist, mediaId);
               }}>
-              <input type="checkbox" aria-label={`选择 ${item?.title ?? mediaId}`} disabled={busy || removing}
+              {selecting && <input type="checkbox" aria-label={`选择 ${item?.title ?? mediaId}`} disabled={busy || removing}
                 checked={selectedIds.includes(mediaId)} onChange={(event) => setSelection(event.currentTarget.checked
-                  ? [...selectedIds, mediaId] : selectedIds.filter((id) => id !== mediaId))} />
-              <span className="playlist-track-list__index">{playlistIndex + 1}</span>
+                  ? [...selectedIds, mediaId] : selectedIds.filter((id) => id !== mediaId))} />}
+              <span className="playlist-track-list__lead">
+                <span className="playlist-track-list__index">{playlistIndex + 1}</span>
+                <button type="button" className="playlist-row-play" aria-label={`播放 ${item?.title ?? mediaId}`} title="从此曲开始播放"
+                  disabled={busy || removing || item === null || !isPlayableMedia(item)} onClick={() => onPlay(playlist, mediaId)}><InterfaceIcon name="play" /></button>
+              </span>
               <strong>{item?.title ?? "曲库中已缺失"}</strong>
               <span>{presentTrackStatus(item)}</span>
-              <button type="button" aria-label={`播放 ${item?.title ?? mediaId}`} title="从此曲开始播放"
-                disabled={busy || removing || item === null || !isPlayableMedia(item)} onClick={() => onPlay(playlist, mediaId)}><InterfaceIcon name="play" /></button>
-              <button type="button" aria-label={`移除 ${item?.title ?? mediaId}`} title="从歌单移除，不删除文件"
-                disabled={busy || removing} onClick={() => void remove([mediaId])}><InterfaceIcon name="remove" /></button>
+              <button type="button" className="playlist-row-remove" aria-label={`移除 ${item?.title ?? mediaId}`} title="只移出此歌单，不删除文件"
+                disabled={busy || removing} onClick={() => void remove([mediaId])}><InterfaceIcon name="subtract" /></button>
             </li>
           ))}
         </ol>

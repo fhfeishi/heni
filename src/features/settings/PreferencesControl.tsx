@@ -37,13 +37,22 @@ export const PreferencesControl = ({
         panel.current.open = false;
       }
     };
+    const dismissWithEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || !panel.current?.open) return;
+      event.preventDefault();
+      panel.current.open = false;
+      panel.current.querySelector("summary")?.focus();
+    };
     document.addEventListener("pointerdown", dismiss);
-    return () => document.removeEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", dismissWithEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", dismissWithEscape);
+    };
   }, []);
   return (
   <details
     ref={panel}
-    onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); close(); } }}
     className="preferences-control"
     data-error={
       errorMessage === undefined && !appearanceIssue ? undefined : "true"

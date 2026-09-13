@@ -66,6 +66,10 @@ impl PlaybackSession {
         self.snapshot.clone()
     }
 
+    pub(super) fn invalidate_volume_gesture(&mut self) {
+        self.bump_sequence();
+    }
+
     pub fn update(&self, known_version: PlaybackVersion) -> PlaybackUpdate {
         let snapshot = &self.snapshot;
         if known_version.generation != snapshot.generation
@@ -164,7 +168,10 @@ impl PlaybackSession {
                     "Preview belongs to the output controller.",
                 ));
             }
-            PlaybackCommand::SetVolume { volume } => {
+            PlaybackCommand::SetVolume { volume }
+            | PlaybackCommand::CommitVolumePreview { volume, .. } => {
+                let keep_muted = matches!(command, PlaybackCommand::CommitVolumePreview { .. })
+                    && self.snapshot.muted;
                 if !volume.is_finite() || !(0.0..=100.0).contains(&volume) {
                     return Err(PlaybackError::new(
                         "invalid-contract",
@@ -172,7 +179,7 @@ impl PlaybackSession {
                     ));
                 }
                 self.snapshot.volume = volume;
-                self.snapshot.muted = volume == 0.0;
+                self.snapshot.muted = keep_muted || volume == 0.0;
                 if volume > 0.0 {
                     self.last_audible_volume = volume.max(1.0);
                 }

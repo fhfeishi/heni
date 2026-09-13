@@ -13,10 +13,10 @@ const MAIN_MIN_WIDTH: f64 = 900.0;
 const MAIN_MIN_HEIGHT: f64 = 620.0;
 const MAIN_DEFAULT_WIDTH: f64 = 1180.0;
 const MAIN_DEFAULT_HEIGHT: f64 = 760.0;
-const MINI_WIDTH: f64 = 420.0;
-const MINI_HEIGHT: f64 = 236.0;
-const MINI_MIN_WIDTH: f64 = 360.0;
-const MINI_MIN_HEIGHT: f64 = 220.0;
+const MINI_WIDTH: f64 = 360.0;
+const MINI_HEIGHT: f64 = 180.0;
+const MINI_MIN_WIDTH: f64 = 320.0;
+const MINI_MIN_HEIGHT: f64 = 180.0;
 const MINI_MARGIN: f64 = 24.0;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]

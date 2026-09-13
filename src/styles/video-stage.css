@@ -1,8 +1,7 @@
-.video-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 8px 20px 20px; }
+.video-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .video-stage[hidden] { display: none; }
-.video-stage__surface { position: relative; min-height: 0; width: 100%; flex: 1; overflow: hidden; border-radius: 18px; background: #08090b; box-shadow: 0 16px 48px rgb(0 0 0 / 20%); }
+.video-stage__surface { position: relative; min-height: 0; width: 100%; flex: 1; overflow: hidden; }
 .video-stage video { display: block; width: 100%; height: 100%; object-fit: contain; }
-.video-stage__caption { margin: 0; text-align: center; color: var(--text-muted); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .video-stage__error { position: absolute; inset: 0; display: grid; place-content: center; padding: 32px; background: #11151d; color: #eee; text-align: center; }
 
 /* A single moving lens, not two separately boxed buttons. */

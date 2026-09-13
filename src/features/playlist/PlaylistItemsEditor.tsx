@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { InterfaceIcon } from "../../components/InterfaceIcon";
 import type { LibraryItem, LibraryPlaylist } from "../../contracts/library";
 import { projectPlaylistCandidates } from "./playlistProjection";
 
@@ -68,7 +69,9 @@ export const PlaylistItemsEditor = ({ playlist, playlists, items, busy, onAddIte
             <span><strong>{item.title}</strong><small>{item.path}</small></span>
           </label></li>)}</ul>
         </>}
-        <button type="button" disabled={selectedIds.length === 0} onClick={() => void add()}>加入所选（{selectedIds.length}）</button>
+        <button type="button" className="playlist-action playlist-action--play" aria-label={`加入所选（${selectedIds.length}）`}
+          disabled={selectedIds.length === 0} onClick={() => void add()}><InterfaceIcon name="add" />
+          {saving ? "添加中…" : `加入 ${selectedIds.length} 首`}</button>
         {error && <p role="status">未能添加歌曲，所选项目已保留，请重试。</p>}
       </fieldset>
     </div>

@@ -12,6 +12,30 @@ const frameProps: AppFrameProps = {
 };
 
 describe("AppFrame toolbar", () => {
+  it("keeps edge panels out of mini mode and restores the main surface", () => {
+    const { rerender } = render(<AppFrame {...frameProps} playbackBar={<button>底部播放</button>} miniPlayer={<p>紧凑播放</p>} />);
+    expect(screen.getByRole("button", { name: "展开播放控制" })).toBeInTheDocument();
+    rerender(<AppFrame {...frameProps} windowMode="mini-player" playbackBar={<button>底部播放</button>} miniPlayer={<p>紧凑播放</p>} />);
+    expect(screen.queryByRole("button", { name: "展开播放控制" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "底部播放" })).not.toBeInTheDocument();
+    expect(screen.getByText("紧凑播放")).toBeInTheDocument();
+    rerender(<AppFrame {...frameProps} />);
+    expect(screen.getByRole("button", { name: "展开顶部工具" })).toBeInTheDocument();
+  });
+  it("uses one central surface for audio/video and restores the browsing presentation", () => {
+    const { container, rerender } = render(<AppFrame {...frameProps} />);
+    const main = screen.getByRole("main");
+    expect(container.querySelectorAll(".app-glass")).toHaveLength(1);
+    expect(main).not.toContainElement(container.querySelector(".app-glass"));
+    expect(container.querySelector(".app-frame")).toHaveAttribute("data-stage", "true");
+    expect(main).toHaveAttribute("data-presentation", "audio");
+    rerender(<AppFrame {...frameProps} videoVisible />);
+    expect(main).toHaveAttribute("data-presentation", "video");
+    rerender(<AppFrame {...frameProps} activeView="library" />);
+    expect(main).toHaveAttribute("data-presentation", "browse");
+    expect(container.querySelector(".app-frame")).toHaveAttribute("data-stage", "false");
+  });
+
   it("conceals only central content after image load and restores interaction from the toolbar", () => {
     const { container } = render(<AppFrame {...frameProps} sceneryImageUrl="blob:picture" sceneryReveal={300}
       playbackBar={<button>播放控制</button>}><button>中央操作</button></AppFrame>);
@@ -24,10 +48,12 @@ describe("AppFrame toolbar", () => {
     expect(screen.getByRole("button", { name: "显示内容" })).toHaveFocus();
     expect(main).toHaveAttribute("inert");
     expect(main).toHaveStyle({ opacity: "0" });
+    expect(container.querySelector(".app-glass")).toHaveStyle({ opacity: "0" });
     expect(screen.getByRole("button", { name: "播放控制" })).not.toHaveAttribute("inert");
     fireEvent.click(screen.getByRole("button", { name: "显示内容" }));
     expect(main).not.toHaveAttribute("inert");
     expect(main).toHaveStyle({ opacity: "1" });
+    expect(container.querySelector(".app-glass")).toHaveStyle({ opacity: "1" });
     fireEvent.click(screen.getByRole("button", { name: "恢复背景沉浸" }));
     fireEvent.error(picture);
     expect(main).not.toHaveAttribute("inert");
