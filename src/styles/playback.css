@@ -201,13 +201,14 @@
 .playback-mode summary { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; list-style: none; cursor: pointer; }
 .playback-mode summary::-webkit-details-marker { display: none; }
 .playback-mode[open] summary, .playback-mode summary:hover { color: var(--accent-strong); background: rgb(var(--accent-rgb) / 12%); }
-.playback-mode__panel { position: absolute; bottom: calc(100% + 16px); right: 0; width: 220px; margin: 0; padding: 16px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface); box-shadow: 0 12px 38px rgb(0 0 0 / 25%); color: var(--text); }
-.playback-mode__panel legend { padding-inline: 5px; font-size: 12px; }
-.playback-mode__panel p { margin: 8px 0; color: var(--text-muted); font-size: 11px; }
-.playback-mode__panel > div { display: grid; gap: 5px; }
-.playback-mode__panel button { min-height: 32px; padding: 6px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--text); text-align: left; }
+.playback-mode__panel { position: absolute; right: 0; bottom: calc(100% + 16px); width: 236px; margin: 0; padding: 14px 16px 16px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface); box-shadow: 0 12px 38px rgb(0 0 0 / 25%); color: var(--text); }
+.playback-mode__title { margin: 0; font-size: 12px; font-weight: 650; letter-spacing: 0.02em; }
+.playback-mode__hint { margin: 6px 0 12px; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
+.playback-mode__panel > div { display: grid; gap: 6px; }
+.playback-mode__panel button { min-height: 34px; padding: 8px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--text); text-align: left; font-size: 12px; line-height: 1.35; white-space: nowrap; }
+.playback-mode__panel button:disabled { opacity: 0.45; cursor: default; }
 .playback-mode__panel button[aria-pressed="true"] { background: rgb(var(--accent-rgb) / 16%); color: var(--accent-strong); }
-.playback-mode__panel button:hover { background: var(--surface-hover); }
+.playback-mode__panel button:hover:not(:disabled) { background: var(--surface-hover); }
 
 .utility-button:hover {
   border-color: var(--line-strong);

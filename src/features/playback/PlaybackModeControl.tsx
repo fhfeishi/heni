@@ -38,15 +38,16 @@ export const PlaybackModeControl = ({ snapshot, busy, onDispatch }: {
       }
     }}>
       <summary title={label} aria-label={`播放模式：${label}`}><PlayerIcon name={icon} /></summary>
-      <fieldset className="playback-mode__panel" disabled={busy || pending || snapshot === null}>
-        <legend>播放模式</legend>
-        <p>播完自动续播，不会停在曲尾</p>
+      <div className="playback-mode__panel" role="group" aria-label="播放模式">
+        <p className="playback-mode__title">播放模式</p>
+        <p className="playback-mode__hint">播完自动续播，不会停在曲尾</p>
         <div>
           {playbackModeOptions.map((option) => <button type="button" key={option.mode} title={option.hint}
+            disabled={busy || pending || snapshot === null}
             aria-pressed={mode === option.mode}
             onClick={() => void send({ type: "set-playback-mode", mode: option.mode })}>{option.label}</button>)}
         </div>
-      </fieldset>
+      </div>
     </details>
   );
 };
