@@ -20,7 +20,8 @@
       "volume": 100,
       "muted": false,
       "repeatMode": "all",
-      "shuffle": false
+      "shuffle": false,
+      "nextIndex": 0
     }
   },
   {

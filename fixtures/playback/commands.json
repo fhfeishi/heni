@@ -62,5 +62,6 @@
   { "type": "commit-volume-preview", "volume": 35, "generation": 1, "sequence": 2, "gestureId": "gesture-1" },
   { "type": "set-muted", "muted": true },
   { "type": "set-repeat-mode", "repeatMode": "one" },
-  { "type": "set-shuffle", "shuffle": true }
+  { "type": "set-shuffle", "shuffle": true },
+  { "type": "set-playback-mode", "mode": "shuffle" }
 ]

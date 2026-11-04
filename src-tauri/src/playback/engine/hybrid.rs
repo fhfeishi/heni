@@ -32,17 +32,11 @@ impl PlaybackEngine for HybridEngine {
                 })?;
             Ok(item.duration_ms)
         } else {
-            // The frontend pauses and acknowledges the video before dispatching a replacement.
-            // Automatic advance arrives only after ended. Never overlap two sound outputs.
-            if !self.video.is_quiet() {
-                return Err(PlaybackError::new(
-                    "playback-unavailable",
-                    "Wait for the video output to pause before switching audio.",
-                ));
-            }
-            let duration = self.audio.load(item, position_ms, playing, volume, muted)?;
+            // The frontend acknowledges a manual video pause. Automatic advance has no
+            // such handshake, so retire the video output here instead of refusing the
+            // load: a refused load used to mark the whole session failed forever.
             self.video.stop();
-            Ok(duration)
+            self.audio.load(item, position_ms, playing, volume, muted)
         }
     }
     fn set_playing(&mut self, playing: bool) -> Result<(), PlaybackError> {
@@ -56,6 +50,11 @@ impl PlaybackEngine for HybridEngine {
     fn stop(&mut self) {
         self.audio.stop();
         self.video.stop();
+    }
+    fn prepare_for_next(&mut self) {
+        // A stale video observation otherwise masks the audio engine's completion.
+        self.video.stop();
+        self.audio.stop();
     }
     fn set_volume(&mut self, volume: f64) {
         self.audio.set_volume(volume);

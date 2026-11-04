@@ -90,13 +90,17 @@ impl ActivePlayback {
             },
         );
 
+        let completed = self.metrics.completed.load(Ordering::Acquire);
         EngineObservation {
             active: true,
             position_ms,
             duration_ms: self.duration_ms,
-            completed: self.metrics.completed.load(Ordering::Acquire),
-            failed: self.metrics.decoder_failed.load(Ordering::Acquire)
-                || self.metrics.stream_errors.load(Ordering::Acquire) > 0,
+            completed,
+            // A track that reached its audible end must advance, even if the output
+            // device reported a late error. Only a live failure may block playback.
+            failed: !completed
+                && (self.metrics.decoder_failed.load(Ordering::Acquire)
+                    || self.metrics.stream_errors.load(Ordering::Acquire) > 0),
         }
     }
 
@@ -187,15 +191,18 @@ impl NativeAudioEngine {
         let worker = thread::Builder::new()
             .name("heni-audio-decoder".to_owned())
             .spawn(move || {
-                if decode_into_ring(
+                let result = decode_into_ring(
                     decoder_state,
                     producer,
                     Arc::clone(&worker_metrics),
                     output_rate,
                     output_channels,
-                )
-                .is_err()
-                {
+                );
+                // Loose trailing packets (VBR/ID3/torn containers) are an end of
+                // stream, not a playback failure: the audible tail already played.
+                // Marking it failed would leave the queue stuck instead of advancing.
+                let produced = worker_metrics.produced_samples.load(Ordering::Acquire);
+                if result.is_err() && produced == 0 {
                     worker_metrics.decoder_failed.store(true, Ordering::Release);
                 }
                 worker_metrics.producer_done.store(true, Ordering::Release);

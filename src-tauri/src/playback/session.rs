@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use super::{
     contracts::{
-        PlaybackCommand, PlaybackError, PlaybackPosition, PlaybackSnapshot, PlaybackStatus,
-        PlaybackUpdate, PlaybackVersion, RepeatMode,
+        PlaybackCommand, PlaybackError, PlaybackMode, PlaybackPosition, PlaybackSnapshot,
+        PlaybackStatus, PlaybackUpdate, PlaybackVersion, RepeatMode,
     },
     order::{OrderMove, PlaybackOrder},
     preferences::PlaybackPreferences,
@@ -31,6 +31,7 @@ impl Default for PlaybackSession {
                 muted: false,
                 repeat_mode: RepeatMode::All,
                 shuffle: false,
+                next_index: None,
                 preferences_error: None,
             },
             order: PlaybackOrder::build(0, 0, false),
@@ -63,7 +64,9 @@ impl PlaybackSession {
     }
 
     pub fn snapshot(&self) -> PlaybackSnapshot {
-        self.snapshot.clone()
+        let mut snapshot = self.snapshot.clone();
+        snapshot.next_index = self.order.peek_next(self.snapshot.repeat_mode);
+        snapshot
     }
 
     pub(super) fn invalidate_volume_gesture(&mut self) {
@@ -195,16 +198,28 @@ impl PlaybackSession {
                 self.bump_sequence();
             }
             PlaybackCommand::SetRepeatMode { repeat_mode } => {
-                self.snapshot.repeat_mode = repeat_mode;
-                self.snapshot.shuffle = false;
+                // "Stop at the end" is no longer offered: every mode keeps playing.
+                self.snapshot.repeat_mode = if repeat_mode == RepeatMode::None {
+                    RepeatMode::All
+                } else {
+                    repeat_mode
+                };
                 self.rebuild_order();
                 self.bump_sequence();
             }
             PlaybackCommand::SetShuffle { shuffle } => {
                 self.snapshot.shuffle = shuffle;
-                if shuffle {
-                    self.snapshot.repeat_mode = RepeatMode::All;
-                }
+                self.rebuild_order();
+                self.bump_sequence();
+            }
+            PlaybackCommand::SetPlaybackMode { mode } => {
+                let (repeat_mode, shuffle) = match mode {
+                    PlaybackMode::Sequential => (RepeatMode::All, false),
+                    PlaybackMode::Shuffle => (RepeatMode::All, true),
+                    PlaybackMode::One => (RepeatMode::One, false),
+                };
+                self.snapshot.repeat_mode = repeat_mode;
+                self.snapshot.shuffle = shuffle;
                 self.rebuild_order();
                 self.bump_sequence();
             }
@@ -215,7 +230,12 @@ impl PlaybackSession {
 
     pub fn advance_automatically(&mut self) -> Result<bool, PlaybackError> {
         self.require_queue()?;
-        if self.snapshot.status != PlaybackStatus::Completed {
+        // Failed is allowed: the controller may be skipping an unplayable item.
+        // Only an explicit user stop/pause may hold the queue in place.
+        if matches!(
+            self.snapshot.status,
+            PlaybackStatus::Paused | PlaybackStatus::Stopped | PlaybackStatus::Idle
+        ) {
             return Ok(false);
         }
         self.advance_next(true)
@@ -245,10 +265,16 @@ impl PlaybackSession {
             .duration_ms
             .map_or(position_ms, |duration| position_ms.min(duration));
 
-        let next_status = if failed {
-            Some(PlaybackStatus::Failed)
-        } else if completed && self.snapshot.status == PlaybackStatus::Playing {
+        let next_status = if completed
+            && matches!(
+                self.snapshot.status,
+                PlaybackStatus::Playing | PlaybackStatus::Failed
+            ) {
+            // The audible tail finished. A late device/decoder error must not win
+            // over completion or the automatic advance would never run.
             Some(PlaybackStatus::Completed)
+        } else if failed && !completed {
+            Some(PlaybackStatus::Failed)
         } else {
             None
         };
@@ -322,10 +348,12 @@ impl PlaybackSession {
 
     fn advance_next(&mut self, automatic: bool) -> Result<bool, PlaybackError> {
         self.require_queue()?;
-        let repeat_mode = if !automatic && self.snapshot.repeat_mode == RepeatMode::One {
-            RepeatMode::All
-        } else {
-            self.snapshot.repeat_mode
+        let repeat_mode = match (automatic, self.snapshot.repeat_mode) {
+            // A manual Next escapes single-track repeat; an automatic advance must
+            // never stop at the end of the queue, regardless of a legacy mode value.
+            (false, RepeatMode::One) => RepeatMode::All,
+            (true, RepeatMode::None) => RepeatMode::All,
+            (_, mode) => mode,
         };
         match self.order.next(repeat_mode) {
             OrderMove::Stop => Ok(false),
@@ -361,7 +389,7 @@ impl PlaybackSession {
     }
 
     fn rebuild_order(&mut self) {
-        self.order = PlaybackOrder::build(
+        self.order = self.order.rebuild(
             self.snapshot.queue.len(),
             self.snapshot.current_index.unwrap_or(0),
             self.snapshot.shuffle,
@@ -837,7 +865,7 @@ mod tests {
     }
 
     #[test]
-    fn automatic_advance_stops_at_the_end_without_repeat() {
+    fn automatic_advance_loops_even_for_a_legacy_stop_at_end_mode() {
         let mut session = loaded_session();
         session
             .dispatch(PlaybackCommand::PlayIndex { index: 1 })
@@ -847,11 +875,69 @@ mod tests {
                 repeat_mode: RepeatMode::None,
             })
             .expect("mode");
+        assert_eq!(session.snapshot().repeat_mode, RepeatMode::All);
         session.sync_runtime(70_000, Some(70_000), true, false);
 
-        assert!(!session.advance_automatically().expect("automatic advance"));
+        assert!(session.advance_automatically().expect("automatic advance"));
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.status, PlaybackStatus::Playing);
+        assert_eq!(snapshot.current_index, Some(0));
+    }
+
+    #[test]
+    fn a_late_failure_flag_cannot_mask_completion() {
+        let mut session = loaded_session();
+        session.sync_runtime(60_000, Some(60_000), true, true);
+
         assert_eq!(session.snapshot().status, PlaybackStatus::Completed);
-        assert_eq!(session.snapshot().current_index, Some(1));
+        assert!(session.advance_automatically().expect("automatic advance"));
+    }
+
+    #[test]
+    fn playback_modes_are_independent_and_atomic() {
+        let mut session = loaded_session();
+        let shuffled = session
+            .dispatch(PlaybackCommand::SetPlaybackMode {
+                mode: PlaybackMode::Shuffle,
+            })
+            .expect("shuffle");
+        assert!(shuffled.shuffle);
+        assert_eq!(shuffled.repeat_mode, RepeatMode::All);
+        assert!(shuffled.next_index.is_some());
+
+        let single = session
+            .dispatch(PlaybackCommand::SetPlaybackMode {
+                mode: PlaybackMode::One,
+            })
+            .expect("one");
+        assert!(!single.shuffle);
+        assert_eq!(single.repeat_mode, RepeatMode::One);
+        assert_eq!(single.next_index, single.current_index);
+
+        let sequential = session
+            .dispatch(PlaybackCommand::SetPlaybackMode {
+                mode: PlaybackMode::Sequential,
+            })
+            .expect("sequential");
+        assert!(!sequential.shuffle);
+        assert_eq!(sequential.repeat_mode, RepeatMode::All);
+    }
+
+    #[test]
+    fn shuffle_toggle_no_longer_overwrites_repeat_mode() {
+        let mut session = loaded_session();
+        session
+            .dispatch(PlaybackCommand::SetRepeatMode {
+                repeat_mode: RepeatMode::One,
+            })
+            .expect("one");
+
+        let snapshot = session
+            .dispatch(PlaybackCommand::SetShuffle { shuffle: true })
+            .expect("shuffle");
+
+        assert!(snapshot.shuffle);
+        assert_eq!(snapshot.repeat_mode, RepeatMode::One);
     }
 
     #[test]
@@ -925,7 +1011,7 @@ mod tests {
     }
 
     #[test]
-    fn previous_at_the_start_replays_the_current_item_without_repeat() {
+    fn previous_at_the_start_wraps_to_the_last_item() {
         let mut session = loaded_session();
         session
             .dispatch(PlaybackCommand::SetRepeatMode {
@@ -937,7 +1023,7 @@ mod tests {
             .dispatch(PlaybackCommand::Previous)
             .expect("previous");
 
-        assert_eq!(snapshot.current_index, Some(0));
+        assert_eq!(snapshot.current_index, Some(1));
         assert_eq!(snapshot.generation, 2);
     }
 

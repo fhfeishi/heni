@@ -150,10 +150,18 @@ impl VideoRuntime {
             .map(|active| active.observation)
     }
 
+    #[allow(
+        dead_code,
+        reason = "kept for output-state diagnostics and bridge tests"
+    )]
     pub(super) fn is_quiet(&self) -> bool {
-        self.0
-            .lock()
-            .is_ok_and(|state| state.active.as_ref().is_none_or(|active| active.quiet))
+        self.0.lock().is_ok_and(|state| {
+            state.active.as_ref().is_none_or(|active| {
+                // A report can be dropped when its revision is stale; the observed
+                // terminal state must still count as quiet or audio can never resume.
+                active.quiet || active.observation.completed || active.observation.failed
+            })
+        })
     }
 
     pub fn exchange(

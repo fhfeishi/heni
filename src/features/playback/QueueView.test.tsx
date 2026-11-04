@@ -70,6 +70,41 @@ describe("QueueView", () => {
     expect(screen.getByText("下一首")).toBeInTheDocument();
   });
 
+  it("switches the whole playback mode with one atomic command", () => {
+    const dispatch = vi.fn();
+    render(
+      <QueueView
+        snapshot={snapshot({ shuffle: true })}
+        busy={false}
+        onDispatch={dispatch}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "随机播放" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "单曲播放" }));
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith({
+      type: "set-playback-mode",
+      mode: "one",
+    });
+  });
+
+  it("labels the shuffle-aware next item instead of the linear neighbour", () => {
+    render(
+      <QueueView
+        snapshot={snapshot({ shuffle: true, nextIndex: 2 })}
+        busy={false}
+        onDispatch={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("下一首").closest("li")?.textContent).toContain(
+      "Three",
+    );
+  });
+
   it("clears search and focuses the current item when locating", async () => {
     render(<QueueView snapshot={snapshot()} busy={false} onDispatch={vi.fn()} />);
     const search = screen.getByRole("searchbox", { name: "搜索队列" });

@@ -4,6 +4,7 @@ import type {
   PlaybackCommand,
   PlaybackSnapshot,
 } from "../../contracts/playback";
+import { playbackModeOf, playbackModeOptions } from "./playbackMode";
 import { projectQueueRows } from "./queueProjection";
 
 export interface QueueViewProps {
@@ -11,24 +12,6 @@ export interface QueueViewProps {
   busy: boolean;
   onDispatch(command: PlaybackCommand): void;
 }
-
-const repeatLabel: Readonly<Record<PlaybackSnapshot["repeatMode"], string>> = {
-  none: "不循环",
-  all: "列表循环",
-  one: "单曲循环",
-};
-
-const nextRepeatMode = (
-  current: PlaybackSnapshot["repeatMode"],
-): PlaybackSnapshot["repeatMode"] => {
-  if (current === "none") {
-    return "all";
-  }
-  if (current === "all") {
-    return "one";
-  }
-  return "none";
-};
 
 const snapshotKey = (snapshot: PlaybackSnapshot): string =>
   `${snapshot.generation}:${snapshot.sequence}`;
@@ -47,14 +30,27 @@ export const QueueView = ({ snapshot, busy, onDispatch }: QueueViewProps) => {
   const [dragState, setDragState] = useState<QueueDragState | null>(null);
   const [dragTargetIndex, setDragTargetIndex] = useState<number | null>(null);
   const currentButtonRef = useRef<HTMLButtonElement>(null);
+  const mode = playbackModeOf(snapshot);
+  // Old snapshots have no projected next item; never mislabel one while shuffling.
+  const nextIndex = (() => {
+    if (snapshot === null || snapshot.queue.length === 0 || mode === "one") {
+      return null;
+    }
+    if (snapshot.nextIndex !== undefined) return snapshot.nextIndex;
+    if (snapshot.shuffle || snapshot.repeatMode === "one" || snapshot.currentIndex === null) {
+      return null;
+    }
+    return (snapshot.currentIndex + 1) % snapshot.queue.length;
+  })();
   const rows = useMemo(
     () =>
       projectQueueRows(
         snapshot?.queue ?? [],
         snapshot?.currentIndex ?? null,
         search,
+        nextIndex,
       ),
-    [search, snapshot?.currentIndex, snapshot?.queue],
+    [search, snapshot?.currentIndex, snapshot?.queue, nextIndex],
   );
   const confirmationOpen =
     snapshot !== null && clearConfirmationKey === snapshotKey(snapshot);
@@ -98,33 +94,21 @@ export const QueueView = ({ snapshot, busy, onDispatch }: QueueViewProps) => {
           <h2 id="queue-title">播放队列</h2>
         </div>
         <div className="queue-mode-actions" aria-label="播放模式">
-          <button
-            type="button"
-            disabled={snapshot === null || busy}
-            onClick={() =>
-              snapshot === null
-                ? undefined
-                : onDispatch({
-                    type: "set-repeat-mode",
-                    repeatMode: nextRepeatMode(snapshot.repeatMode),
-                  })
-            }
-          >
-            {repeatLabel[snapshot?.repeatMode ?? "all"]}
-          </button>
-          <button
-            type="button"
-            className={snapshot?.shuffle === true ? "mode-active" : undefined}
-            disabled={snapshot === null || busy}
-            onClick={() =>
-              onDispatch({
-                type: "set-shuffle",
-                shuffle: !(snapshot?.shuffle ?? false),
-              })
-            }
-          >
-            随机播放
-          </button>
+          {playbackModeOptions.map((option) => (
+            <button
+              type="button"
+              key={option.mode}
+              title={option.hint}
+              aria-pressed={mode === option.mode}
+              className={mode === option.mode ? "mode-active" : undefined}
+              disabled={snapshot === null || busy}
+              onClick={() =>
+                onDispatch({ type: "set-playback-mode", mode: option.mode })
+              }
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       </div>
 

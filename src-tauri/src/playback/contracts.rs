@@ -41,6 +41,16 @@ pub enum RepeatMode {
     One,
 }
 
+/// The three user-facing modes. `sequential` and `shuffle` both loop the queue;
+/// `one` repeats the current track. There is no "stop at the end" mode anymore.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PlaybackMode {
+    Sequential,
+    Shuffle,
+    One,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackSnapshot {
@@ -55,6 +65,9 @@ pub struct PlaybackSnapshot {
     pub muted: bool,
     pub repeat_mode: RepeatMode,
     pub shuffle: bool,
+    /// The item the playback order will actually play next (shuffle/repeat aware).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_index: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preferences_error: Option<PlaybackError>,
 }
@@ -151,6 +164,9 @@ pub enum PlaybackCommand {
     },
     SetShuffle {
         shuffle: bool,
+    },
+    SetPlaybackMode {
+        mode: PlaybackMode,
     },
 }
 

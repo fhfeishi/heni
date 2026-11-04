@@ -14,6 +14,7 @@ export const projectQueueRows = (
   queue: ReadonlyArray<PlaybackItem>,
   currentIndex: number | null,
   search: string,
+  nextIndex: number | null = currentIndex === null ? null : currentIndex + 1,
 ): ReadonlyArray<Readonly<QueueProjectionRow>> => {
   const query = search.trim().toLocaleLowerCase("zh-CN");
   return queue.flatMap((item, queueIndex) => {
@@ -25,7 +26,7 @@ export const projectQueueRows = (
         item,
         queueIndex,
         isCurrent: queueIndex === currentIndex,
-        isNext: currentIndex !== null && queueIndex === currentIndex + 1,
+        isNext: nextIndex !== null && queueIndex === nextIndex,
       },
     ];
   });

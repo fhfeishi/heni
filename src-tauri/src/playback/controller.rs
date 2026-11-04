@@ -13,10 +13,14 @@ struct VolumePreview {
     last_update: std::time::Instant,
 }
 
+// A corrupt/unsupported file must not spin the monitor thread forever.
+const MAX_AUTO_ADVANCE_ATTEMPTS: usize = 3;
+
 pub(super) struct PlaybackController<E> {
     session: PlaybackSession,
     engine: E,
     volume_preview: Option<VolumePreview>,
+    auto_advance_failures: usize,
 }
 
 impl<E: PlaybackEngine> PlaybackController<E> {
@@ -25,6 +29,7 @@ impl<E: PlaybackEngine> PlaybackController<E> {
             session: PlaybackSession::default(),
             engine,
             volume_preview: None,
+            auto_advance_failures: 0,
         }
     }
 
@@ -62,6 +67,8 @@ impl<E: PlaybackEngine> PlaybackController<E> {
         save: impl FnOnce(PlaybackPreferences) -> Result<(), PlaybackError>,
     ) -> Result<PlaybackSnapshot, PlaybackError> {
         let _ = self.tick();
+        // An explicit user command is a fresh chance to recover from a bad track.
+        self.auto_advance_failures = 0;
 
         let previous_snapshot = self.session.snapshot();
         let is_commit = matches!(command, PlaybackCommand::CommitVolumePreview { .. });
@@ -180,40 +187,62 @@ impl<E: PlaybackEngine> PlaybackController<E> {
             self.cancel_volume_preview();
         }
         let observation = self.synchronize();
-        if !observation.active
-            || !observation.completed
-            || self.session.snapshot().status != PlaybackStatus::Completed
-        {
+        // Completion is owned by the engine, not by a session status flag that a
+        // late decoder/device error can overwrite. Once the output ended, advance.
+        if !observation.active || !observation.completed {
+            return Ok(());
+        }
+        // A user pause/stop must hold the queue in place (and keep its engine).
+        if matches!(
+            self.session.snapshot().status,
+            PlaybackStatus::Paused | PlaybackStatus::Stopped | PlaybackStatus::Idle
+        ) {
+            return Ok(());
+        }
+        if self.auto_advance_failures >= MAX_AUTO_ADVANCE_ATTEMPTS {
             return Ok(());
         }
 
         self.cancel_volume_preview();
-        let mut candidate = self.session.clone();
-        if !candidate.advance_automatically()? {
-            self.engine.stop();
-            self.session = candidate;
-            return Ok(());
-        }
-
-        let candidate_snapshot = candidate.snapshot();
-        let item = required_current_item(&candidate_snapshot)?;
-        match self.engine.load(
-            item,
-            0,
-            true,
-            candidate_snapshot.volume,
-            candidate_snapshot.muted,
-        ) {
-            Ok(duration_ms) => {
-                candidate.set_duration(duration_ms);
+        self.engine.prepare_for_next();
+        let mut last_error: Option<PlaybackError> = None;
+        for _ in self.auto_advance_failures..MAX_AUTO_ADVANCE_ATTEMPTS {
+            let mut candidate = self.session.clone();
+            if !candidate.advance_automatically()? {
+                self.engine.stop();
                 self.session = candidate;
-                Ok(())
+                self.auto_advance_failures = 0;
+                return Ok(());
             }
-            Err(error) => {
-                self.session.mark_failed();
-                Err(error)
+
+            let candidate_snapshot = candidate.snapshot();
+            let item = required_current_item(&candidate_snapshot)?;
+            match self.engine.load(
+                item,
+                0,
+                true,
+                candidate_snapshot.volume,
+                candidate_snapshot.muted,
+            ) {
+                Ok(duration_ms) => {
+                    candidate.set_duration(duration_ms);
+                    self.session = candidate;
+                    self.auto_advance_failures = 0;
+                    return Ok(());
+                }
+                Err(error) => {
+                    // Skip an unplayable item instead of parking the queue on it.
+                    self.auto_advance_failures += 1;
+                    self.session = candidate;
+                    self.session.mark_failed();
+                    self.engine.prepare_for_next();
+                    last_error = Some(error);
+                }
             }
         }
+        Err(last_error.unwrap_or_else(|| {
+            PlaybackError::new("decoder-failed", "The next track could not be loaded.")
+        }))
     }
 
     fn validate_gesture(
@@ -343,7 +372,9 @@ impl<E: PlaybackEngine> PlaybackController<E> {
                 self.engine.set_muted(next.muted);
                 Ok(None)
             }
-            PlaybackCommand::SetRepeatMode { .. } | PlaybackCommand::SetShuffle { .. } => Ok(None),
+            PlaybackCommand::SetRepeatMode { .. }
+            | PlaybackCommand::SetShuffle { .. }
+            | PlaybackCommand::SetPlaybackMode { .. } => Ok(None),
             PlaybackCommand::ReorderQueue { .. } => Ok(None),
         }
     }
@@ -833,7 +864,7 @@ mod tests {
     }
 
     #[test]
-    fn conditional_reads_do_not_hide_failure_to_load_the_next_track() {
+    fn conditional_reads_skip_an_unplayable_next_track_instead_of_parking() {
         let mut controller = PlaybackController::new(FakeEngine::default());
         let previous = controller
             .dispatch(PlaybackCommand::ReplaceQueue {
@@ -848,15 +879,18 @@ mod tests {
             generation: previous.generation,
             sequence: previous.sequence,
         }) else {
-            panic!("failure must supply its complete state");
+            panic!("skipping must supply its complete state");
         };
-        assert_eq!(snapshot.status, PlaybackStatus::Failed);
+        // Index 1 could not load, so the monitor moved on to the following item
+        // (index 0 in this two-track loop) instead of parking on the bad track.
+        assert_eq!(snapshot.status, PlaybackStatus::Playing);
         assert_eq!(snapshot.current_index, Some(0));
-        assert!(snapshot.sequence > previous.sequence);
+        assert!(snapshot.generation > previous.generation + 1);
+        assert_eq!(controller.engine.loaded_ids, ["one", "one"]);
     }
 
     #[test]
-    fn conditional_reads_report_terminal_completion_without_fabricating_next() {
+    fn a_legacy_stop_at_end_mode_still_restarts_the_single_track() {
         let mut controller = PlaybackController::new(FakeEngine::default());
         controller
             .dispatch(PlaybackCommand::ReplaceQueue {
@@ -876,35 +910,33 @@ mod tests {
             generation: previous.generation,
             sequence: previous.sequence,
         }) else {
-            panic!("completion must supply its complete state");
+            panic!("the loop must supply its complete state");
         };
-        assert_eq!(snapshot.status, PlaybackStatus::Completed);
-        assert_eq!(snapshot.position_ms, 60_000);
-        assert_eq!(controller.engine.loaded_ids, ["one"]);
+        assert_eq!(snapshot.status, PlaybackStatus::Playing);
+        assert_eq!(snapshot.position_ms, 0);
+        assert_eq!(controller.engine.loaded_ids, ["one", "one"]);
     }
 
     #[test]
-    fn runtime_completion_is_projected_into_the_snapshot() {
+    fn a_late_engine_error_after_the_audible_tail_still_advances() {
         let mut controller = PlaybackController::new(FakeEngine::default());
         controller
             .dispatch(PlaybackCommand::ReplaceQueue {
-                queue: vec![track("one")],
+                queue: vec![track("one"), track("two")],
                 current_index: Some(0),
                 autoplay: true,
             })
             .expect("load should work");
-        controller
-            .dispatch(PlaybackCommand::SetRepeatMode {
-                repeat_mode: crate::playback::contracts::RepeatMode::None,
-            })
-            .expect("mode should work");
         controller.engine.observation.position_ms = 60_000;
         controller.engine.observation.completed = true;
+        controller.engine.observation.failed = true;
 
-        let snapshot = controller.snapshot();
+        controller.tick().expect("automatic advance should work");
 
-        assert_eq!(snapshot.status, PlaybackStatus::Completed);
-        assert_eq!(snapshot.position_ms, 60_000);
+        let snapshot = controller.session.snapshot();
+        assert_eq!(snapshot.status, PlaybackStatus::Playing);
+        assert_eq!(snapshot.current_index, Some(1));
+        assert_eq!(controller.engine.loaded_ids, ["one", "two"]);
     }
 
     #[test]

@@ -65,6 +65,26 @@ describe("playbackSnapshotSchema", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("rejects a projected next index outside the queue", () => {
+    const result = playbackSnapshotSchema.safeParse({
+      ...emptySnapshot,
+      queue: [
+        {
+          id: "track-1",
+          path: "C:\\Music\\one.flac",
+          title: "one",
+          kind: "audio",
+          durationMs: 1_000,
+        },
+      ],
+      currentIndex: 0,
+      nextIndex: 1,
+      status: "playing",
+    });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("playbackCommandSchema", () => {

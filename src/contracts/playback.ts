@@ -13,6 +13,7 @@ export const playbackItemSchema = z.object({
 });
 
 export const repeatModeSchema = z.enum(["none", "all", "one"]);
+export const playbackModeSchema = z.enum(["sequential", "shuffle", "one"]);
 export const playbackStatusSchema = z.enum([
   "idle",
   "loading",
@@ -57,6 +58,8 @@ export const playbackSnapshotSchema = z
     muted: z.boolean(),
     repeatMode: repeatModeSchema,
     shuffle: z.boolean(),
+    // Shuffle/repeat aware "up next", optional for older sessions.
+    nextIndex: z.number().int().nonnegative().nullable().optional(),
     preferencesError: playbackErrorSchema.optional(),
   })
   .superRefine((snapshot, context) => {
@@ -66,6 +69,17 @@ export const playbackSnapshotSchema = z
         code: "custom",
         path: ["currentIndex"],
         message: "currentIndex must point to an item in queue.",
+      });
+    }
+
+    if (
+      snapshot.nextIndex != null &&
+      snapshot.nextIndex >= snapshot.queue.length
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["nextIndex"],
+        message: "nextIndex must point to an item in queue.",
       });
     }
 
@@ -184,6 +198,10 @@ export const playbackCommandSchema = z.discriminatedUnion("type", [
     type: z.literal("set-shuffle"),
     shuffle: z.boolean(),
   }),
+  z.object({
+    type: z.literal("set-playback-mode"),
+    mode: playbackModeSchema,
+  }),
 ]);
 
 export const playbackVersionSchema = z.object({
@@ -211,6 +229,7 @@ export const playbackUpdateSchema = z.discriminatedUnion("type", [
 ]);
 
 export type PlaybackItem = Readonly<z.infer<typeof playbackItemSchema>>;
+export type PlaybackMode = z.infer<typeof playbackModeSchema>;
 export type PlaybackStatus = z.infer<typeof playbackStatusSchema>;
 export type PlaybackSnapshot = Readonly<z.infer<typeof playbackSnapshotSchema>>;
 export type PlaybackCommand = Readonly<z.infer<typeof playbackCommandSchema>>;

@@ -51,4 +51,15 @@ describe("projectQueueRows", () => {
     ]);
     expect(queue).toEqual(before);
   });
+
+  it("uses the shuffle-aware projected next index instead of a linear guess", () => {
+    expect(projectQueueRows(queue, 0, "", 2).map((row) => row.isNext)).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    expect(
+      projectQueueRows(queue, 0, "", null).some((row) => row.isNext),
+    ).toBe(false);
+  });
 });
